@@ -40,6 +40,10 @@ You are a senior Python engineer on `bn-en-translate`. Read `CLAUDE.md` before a
 
 **.gitignore:** Use `/models/` not `models/`. Bare form matches `src/bn_en_translate/models/` too.
 
+**DataLoader workers + fast tokenizer:** NLLB uses a Rust-backed fast tokenizer. With `num_workers > 0` on Linux, workers are forked and the Rust thread pool deadlocks. Always set `os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")` before `Trainer.__init__()` when using CPU training with workers.
+
+**`prefetch_factor` requires `num_workers > 0`:** PyTorch raises ValueError if `prefetch_factor` is anything other than `None` when `num_workers=0`. GPU path → `num_workers=0, prefetch_factor=None`. CPU path → `num_workers=4, prefetch_factor=2`.
+
 ---
 
 ## Project Structure
