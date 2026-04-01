@@ -168,8 +168,18 @@ class NLLBFineTuner:
         """
         self._require_loaded()
 
+        import os
         import torch
         import transformers
+
+        # NLLB uses a Rust-backed fast tokenizer. On Linux, DataLoader workers
+        # are forked from the main process, which already has the Rust thread
+        # pool running. After fork those threads vanish but their mutex state
+        # persists, causing deadlocks when workers try to tokenise items.
+        # Setting TOKENIZERS_PARALLELISM=false disables the thread pool in
+        # worker processes and must be done *before* any worker is spawned.
+        if not self._use_cuda:  # only relevant when we use num_workers > 0
+            os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
         from bn_en_translate.training.dataset import BengaliEnglishDataset
 

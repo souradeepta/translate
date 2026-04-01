@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -137,6 +138,91 @@ def test_finetuner_compute_bleu_low_for_bad_translation() -> None:
     score = compute_corpus_bleu(hyps, refs)
 
     assert score < 10.0
+
+
+# ---------------------------------------------------------------------------
+# DataLoader safety (parallel workers + fast tokenizer)
+# ---------------------------------------------------------------------------
+
+def test_train_sets_tokenizers_parallelism_false_on_cpu(tmp_path: Path) -> None:
+    """CPU training (num_workers=4) must disable fast-tokenizer thread pool
+    before workers fork to prevent deadlocks (Rust thread state after fork).
+    """
+    from bn_en_translate.training.trainer import NLLBFineTuner
+
+    model_cfg, ft_cfg = _make_config(tmp_path)
+    tuner = NLLBFineTuner(model_cfg, ft_cfg)
+    tuner._use_cuda = False  # simulate CPU path
+
+    mock_model = MagicMock()
+    mock_model.parameters.return_value = iter([MagicMock(device=MagicMock(
+        __str__=lambda _: "cpu"
+    ))])
+
+    captured_env: dict[str, str] = {}
+
+    def fake_trainer_init(*args, **kwargs):
+        captured_env["TOKENIZERS_PARALLELISM"] = os.environ.get(
+            "TOKENIZERS_PARALLELISM", "not_set"
+        )
+        mock_trainer = MagicMock()
+        mock_trainer.train.return_value = MagicMock(training_loss=0.5)
+        return mock_trainer
+
+    with (
+        patch("transformers.Trainer", side_effect=fake_trainer_init),
+        patch("transformers.Seq2SeqTrainingArguments"),
+        patch("bn_en_translate.training.dataset.BengaliEnglishDataset"),
+    ):
+        tuner._peft_model = mock_model
+        tuner._tokenizer = MagicMock()
+        tuner._eval_bleu = MagicMock(return_value=30.0)  # type: ignore[method-assign]
+        tuner.train(["src1"], ["tgt1"], ["vsrc1"], ["vtgt1"])
+
+    assert captured_env.get("TOKENIZERS_PARALLELISM") == "false", (
+        "TOKENIZERS_PARALLELISM must be 'false' before Trainer init "
+        "to prevent fast-tokenizer deadlock in forked DataLoader workers"
+    )
+
+
+def test_train_num_workers_zero_on_gpu(tmp_path: Path) -> None:
+    """GPU path must use num_workers=0 to avoid CUDA context in forked processes."""
+    from bn_en_translate.training.trainer import NLLBFineTuner
+
+    model_cfg, ft_cfg = _make_config(tmp_path)
+    tuner = NLLBFineTuner(model_cfg, ft_cfg)
+    tuner._use_cuda = True  # simulate GPU path
+
+    mock_model = MagicMock()
+    mock_model.parameters.return_value = iter([MagicMock(device=MagicMock(
+        __str__=lambda _: "cuda:0"
+    ))])
+
+    captured_kwargs: dict = {}
+
+    def fake_training_args(*args, **kwargs):
+        captured_kwargs.update(kwargs)
+        return MagicMock()
+
+    mock_trainer = MagicMock()
+    mock_trainer.train.return_value = MagicMock(training_loss=0.4)
+
+    with (
+        patch("transformers.Trainer", return_value=mock_trainer),
+        patch("transformers.Seq2SeqTrainingArguments", side_effect=fake_training_args),
+        patch("bn_en_translate.training.dataset.BengaliEnglishDataset"),
+    ):
+        tuner._peft_model = mock_model
+        tuner._tokenizer = MagicMock()
+        tuner._eval_bleu = MagicMock(return_value=30.0)  # type: ignore[method-assign]
+        tuner.train(["src1"], ["tgt1"], ["vsrc1"], ["vtgt1"])
+
+    assert captured_kwargs.get("dataloader_num_workers") == 0, (
+        "GPU path must use num_workers=0 to prevent CUDA context forking"
+    )
+    assert captured_kwargs.get("dataloader_prefetch_factor") is None, (
+        "prefetch_factor must be None when num_workers=0 (PyTorch requires this)"
+    )
 
 
 # ---------------------------------------------------------------------------
