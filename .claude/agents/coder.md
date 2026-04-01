@@ -6,47 +6,70 @@ model: sonnet
 
 You are a senior Python engineer on `bn-en-translate`. Read `CLAUDE.md` before any task.
 
-## STOP — Read These First (Learned the Hard Way)
+## HARDWARE — Load This First
 
-**GPU compute type:** CTranslate2 INT8 (`int8`, `int8_float16`, `int8_float32`) **fails** on sm_120 + CUDA 12.4 with `CUBLAS_STATUS_NOT_SUPPORTED`. Use `float16`. The `_best_compute_type()` probe handles this automatically — do not remove or bypass it.
+**Device:** Acer Nitro V16, WSL2 Ubuntu on Windows 11  
+**GPU:** NVIDIA RTX 5050 Laptop — Blackwell sm_120, **8 GB GDDR7 VRAM** ← primary compute  
+**CPU:** AMD Ryzen 5 240 (Zen 4), no AMX — ~20× slower than GPU, use only as last resort  
+**PyTorch:** 2.6.0+cu124 installed  
+**CTranslate2:** 4.7.1
 
-**CT2 probe must use ≥15 tokens:** Short probes (< 10 tokens) don't trigger INT8 ops and pass falsely. The probe sentence in `_best_compute_type()` is intentionally ~20 tokens. Don't shorten it.
+### GPU-First Rules (enforce always)
+- **Inference:** Always `device="cuda"` or `device="auto"`. Never hardcode `device="cpu"` for inference.
+- **CTranslate2 compute type:** Always `float16`. INT8 variants fail on sm_120+cu124.
+- **PyTorch training on sm_120+cu124:** Element-wise CUDA ops fail (`.ne()`, `.eq()`). `trainer.py` auto-detects and falls back to CPU via probe. Do not remove this probe.
+- **PyTorch cu128:** Would fix training but SIGBUS on AMD Ryzen (AMX). Do not suggest installing cu128 on this machine.
+- **LD_LIBRARY_PATH:** Every CUDA subprocess needs `export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH`.
+- **Verify GPU is in use:** `ctranslate2.get_cuda_device_count()` must return 1. If 0, check LD_LIBRARY_PATH.
 
-**NLLB tokenization format:** Source = `tokens + ["</s>", src_lang]`. Target prefix = `[tgt_lang]`. NOT `[src_lang] + tokens`. Wrong format produces "Ra Ra Ra..." garbage with no error.
+---
 
-**LD_LIBRARY_PATH:** Every CUDA subprocess needs `LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH`. Subprocesses don't inherit it from parent shell.
+## STOP — Additional Gotchas (Learned the Hard Way)
 
-**PyTorch:** Use 2.6.0+cu124 (stable). Nightly crashes SIGBUS on AMD Ryzen + WSL2. Never suggest nightly.
+**CT2 probe must use ≥15 tokens:** Short probes don't trigger INT8 ops and pass falsely. Never shorten the 20-token probe in `_best_compute_type()`.
 
-**pip installs:** Kill any existing pip before starting a new one: `kill $(pgrep -f "pip install") 2>/dev/null`. Never run concurrent pip installs.
+**NLLB tokenization format:** Source = `tokens + ["</s>", src_lang]`. Target prefix = `[tgt_lang]`. NOT `[src_lang] + tokens`. Wrong format → "Ra Ra Ra..." garbage.
 
-**.gitignore:** Use `/models/` (root-anchored), not `models/`. The bare form matches `src/bn_en_translate/models/` too.
+**PyTorch:** Use 2.6.0+cu124 stable only. Nightly AND cu128 stable both SIGBUS on AMD Ryzen (AMX). Never suggest either.
+
+**pip installs:** Kill existing pip first: `kill $(pgrep -f "pip install") 2>/dev/null`. Never concurrent.
+
+**CUDA probe for training:** Must use element-wise op, not matmul. `torch.tensor([1,-100,3]).cuda().ne(-100)` — matmul works via PTX JIT even when other ops don't.
+
+**Transformers 5.x API:** `eval_strategy` (not `evaluation_strategy`), `use_cpu` (not `no_cuda`), `dtype=` (not `torch_dtype=`).
+
+**.gitignore:** Use `/models/` not `models/`. Bare form matches `src/bn_en_translate/models/` too.
+
+---
 
 ## Project Structure
 ```
 src/bn_en_translate/
   cli.py                      # Click entry point: bn-translate
-  config.py                   # ChunkConfig, ModelConfig, PipelineConfig
+  config.py                   # ChunkConfig, ModelConfig, PipelineConfig, FineTuneConfig
   models/
     base.py                   # TranslatorBase ABC
-    factory.py                # get_translator() — routes to CT2 when model dir exists
-    nllb.py                   # NLLB HF pipeline fallback
-    nllb_ct2.py               # NLLB CTranslate2 (preferred — float16 GPU)
-    indicTrans2.py            # IndicTrans2 HF fallback
-    indicTrans2_ct2.py        # IndicTrans2 CTranslate2 (preferred — float16 GPU)
+    factory.py                # get_translator() — CT2 when model dir exists, HF fallback
+    nllb_ct2.py               # NLLB CTranslate2 float16 GPU ← PRIMARY
+    indicTrans2_ct2.py        # IndicTrans2 CTranslate2 float16 GPU ← PRIMARY
+    nllb.py / indicTrans2.py  # HF fallbacks (no CT2 model on disk)
     ollama_translator.py      # Ollama polish pass
   pipeline/
     pipeline.py               # 4-stage orchestration
     preprocessor.py / chunker.py / postprocessor.py
+  training/
+    corpus.py                 # load/filter/split/save parallel corpus
+    dataset.py                # BengaliEnglishDataset (PyTorch), collate_fn
+    trainer.py                # NLLBFineTuner (LoRA via PEFT), compute_corpus_bleu
   utils/
     text_utils.py / file_io.py / cuda_check.py
 ```
 
 ## Adding a New Model Backend
 1. Extend `TranslatorBase` — implement `load()`, `unload()`, `_translate_batch()`
-2. Never override `translate()` (it checks `_loaded`)
-3. Register in `factory.py` with CT2-first logic (check if model dir exists)
-4. Use `_best_compute_type(device, sp)` pattern with a 20-token probe
+2. Always load with `device="cuda"` (or auto-detect). Never default to CPU.
+3. Use `_best_compute_type(device, sp)` with 20-token probe — always float16 on this GPU
+4. Register in `factory.py` with CT2-first logic
 5. NLLB/M2M source format: `tokens + ["</s>", src_lang]`
 
 ## Code Style
