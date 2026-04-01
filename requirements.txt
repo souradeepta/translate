@@ -1,0 +1,12 @@
+# Install PyTorch separately with CUDA 12.8 support:
+#   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+# If RTX 5050 (Blackwell sm_100) causes issues, use nightly:
+#   pip install torch --index-url https://download.pytorch.org/whl/nightly/cu128
+
+transformers>=4.45.0
+sentencepiece>=0.2.0
+ctranslate2>=4.4.0
+sacrebleu>=2.4.0
+click>=8.1.0
+python-dotenv>=1.0.0
+httpx>=0.27.0
