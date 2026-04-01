@@ -1,5 +1,28 @@
 # Bengali → English Translator — Claude Code Guide
 
+## Quick Resume (read this first in any new session)
+
+```bash
+source .venv/bin/activate && export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH
+make test          # 99 tests, ~0.5s — confirms env is working
+python scripts/benchmark.py --models nllb-600M --sentences 5   # quick GPU smoke test
+```
+
+**State as of 2026-04-01:**
+- `models/nllb-600M-ct2/` ✅ downloaded, working via CT2 float16
+- `corpus/` ✅ 90-sentence built-in (10 domains)
+- All 99 unit/integration tests passing
+- Next unlock: `python scripts/download_models.py --model indicTrans2-1B` (~3 GB)
+
+**Never do these (painful lessons):**
+- ❌ PyTorch nightly → SIGBUS on AMD Ryzen; use stable cu124
+- ❌ CTranslate2 int8/int8_float16 on CUDA → CUBLAS fail on sm_120; use float16
+- ❌ `[src_lang, tokens...]` for NLLB → garbage output; use `tokens + [</s>, src_lang]`
+- ❌ Multiple concurrent pip installs → corrupt install
+- ❌ `models/` in .gitignore (bare) → also matches src/bn_en_translate/models/; use `/models/`
+
+---
+
 ## Project Overview
 
 `bn-en-translate` is a local, GPU-powered Bengali-to-English story translation system.  
