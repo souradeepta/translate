@@ -62,6 +62,62 @@ class ModelConfig:
 
 
 @dataclass
+class FineTuneConfig:
+    """Configuration for LoRA fine-tuning of NLLB models."""
+
+    # Optimisation
+    learning_rate: float = 2e-4
+    num_epochs: int = 3
+    train_batch_size: int = 8
+    eval_batch_size: int = 16
+    gradient_accumulation_steps: int = 4
+    warmup_steps: int = 100
+    weight_decay: float = 0.01
+    max_grad_norm: float = 1.0
+
+    # LoRA
+    lora_r: int = 16
+    lora_alpha: int = 32
+    lora_dropout: float = 0.1
+    lora_target_modules: list[str] = field(
+        default_factory=lambda: ["q_proj", "v_proj", "k_proj", "out_proj"]
+    )
+
+    # Data
+    max_source_length: int = 256
+    max_target_length: int = 256
+
+    # Checkpointing / output
+    output_dir: str = "models/nllb-600M-finetuned"
+    save_steps: int = 500
+    eval_steps: int = 500
+    logging_steps: int = 100
+    fp16: bool = True
+
+    def __post_init__(self) -> None:
+        if self.learning_rate <= 0:
+            raise ValueError("learning_rate must be positive")
+        if self.num_epochs <= 0:
+            raise ValueError("num_epochs must be positive")
+        if self.train_batch_size <= 0:
+            raise ValueError("train_batch_size must be positive")
+        if self.eval_batch_size <= 0:
+            raise ValueError("eval_batch_size must be positive")
+        if self.gradient_accumulation_steps <= 0:
+            raise ValueError("gradient_accumulation_steps must be positive")
+        if self.warmup_steps < 0:
+            raise ValueError("warmup_steps must be non-negative")
+        if self.lora_r <= 0:
+            raise ValueError("lora_r must be positive")
+        if self.lora_alpha <= 0:
+            raise ValueError("lora_alpha must be positive")
+        if self.max_source_length <= 0:
+            raise ValueError("max_source_length must be positive")
+        if self.max_target_length <= 0:
+            raise ValueError("max_target_length must be positive")
+
+
+@dataclass
 class PipelineConfig:
     """Top-level pipeline configuration."""
 

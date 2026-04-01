@@ -4,14 +4,15 @@
 
 ```bash
 source .venv/bin/activate && export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH
-make test          # 99 tests, ~0.5s — confirms env is working
+make test          # 140 tests, ~8s — confirms env is working
 python scripts/benchmark.py --models nllb-600M --sentences 5   # quick GPU smoke test
 ```
 
 **State as of 2026-04-01:**
-- `models/nllb-600M-ct2/` ✅ downloaded, working via CT2 float16
-- `corpus/` ✅ 90-sentence built-in (10 domains)
-- All 99 unit/integration tests passing
+- `models/nllb-600M-ct2/` ✅ downloaded, working via CT2 float16 (BLEU 65.2 on built-in corpus)
+- `corpus/` ✅ 100-sentence built-in + 9,829 Samanantar pairs (train/val/test splits)
+- All 140 unit/integration tests passing
+- Fine-tuning pipeline implemented (LoRA via PEFT); **PyTorch 2.7.1+cu128 installed** — GPU training works
 - Next unlock: `python scripts/download_models.py --model indicTrans2-1B` (~3 GB)
 
 **Never do these (painful lessons):**
@@ -20,6 +21,11 @@ python scripts/benchmark.py --models nllb-600M --sentences 5   # quick GPU smoke
 - ❌ `[src_lang, tokens...]` for NLLB → garbage output; use `tokens + [</s>, src_lang]`
 - ❌ Multiple concurrent pip installs → corrupt install
 - ❌ `models/` in .gitignore (bare) → also matches src/bn_en_translate/models/; use `/models/`
+- ❌ PyTorch training on sm_120 with cu124 → `no kernel image` on `.ne()` and other ops; install cu128
+- ✅ PyTorch 2.7.1+cu128 works for both training and inference on sm_120 (installed 2026-04-01)
+- ❌ `evaluation_strategy` in transformers ≥5.x → renamed to `eval_strategy`
+- ❌ `no_cuda` in transformers ≥5.x → renamed to `use_cpu`
+- ❌ `torch_dtype` in transformers ≥5.x → renamed to `dtype`
 
 ---
 
@@ -54,12 +60,21 @@ src/bn_en_translate/
     file_io.py               # read_story(), write_translation() UTF-8
     cuda_check.py            # is_cuda_available(), get_best_device(), get_free_vram_mib()
 
+  training/
+    corpus.py                # load/save/filter/split parallel corpus files
+    dataset.py               # BengaliEnglishDataset (PyTorch Dataset), collate_fn
+    trainer.py               # NLLBFineTuner (LoRA via PEFT + Seq2SeqTrainer), compute_corpus_bleu
+
 tests/
   conftest.py                # MockTranslator fixture
-  unit/                      # Pure logic tests — no GPU, no downloads (~3s)
+  unit/                      # Pure logic tests — no GPU, no downloads (~8s)
   integration/               # Full pipeline with mock + real models (marked slow)
   e2e/                       # Quality assertions BLEU≥25, Ollama (marked e2e)
   fixtures/                  # Sample Bengali texts + reference translations
+
+scripts/
+  download_corpus.py         # Download Samanantar from HF, split train/val/test
+  finetune.py                # LoRA fine-tune NLLB-600M + export to CT2
 ```
 
 ---

@@ -64,7 +64,7 @@ make typecheck      # mypy strict
 
 | Tier | Command | Time | Requires |
 |------|---------|------|----------|
-| Unit + mock integration | `make test` | ~0.5s | nothing |
+| Unit + mock integration | `make test` | ~8s | nothing |
 | Real NLLB-600M | `make test-slow` | ~30s | `models/nllb-600M-ct2/` |
 | E2E quality (BLEU) | `make test-e2e` | ~60s+ | GPU + IndicTrans2 model |
 | All | `make test-all` | ~90s+ | GPU + all models |
@@ -92,8 +92,12 @@ tests/
 │   ├── test_text_utils.py
 │   ├── test_file_io.py
 │   ├── test_config.py
+│   ├── test_finetune_config.py    # FineTuneConfig validation
 │   ├── test_cuda_check.py
-│   └── test_model_interface.py
+│   ├── test_model_interface.py
+│   ├── test_corpus_utils.py       # Corpus split / filter / load/save
+│   ├── test_trainer.py            # NLLBFineTuner (all mocked)
+│   └── test_training_dataset.py   # BengaliEnglishDataset
 ├── integration/
 │   ├── test_pipeline_mock.py      # Full pipeline, MockTranslator
 │   └── test_pipeline_nllb.py      # Real NLLB-600M (marked slow)
@@ -223,13 +227,94 @@ Output columns: Model, Backend class, BLEU, Time, chars/sec, VRAM used.
 ## Corpus
 
 ```bash
-python scripts/get_corpus.py          # generates/downloads to corpus/
+python scripts/get_corpus.py          # generates/downloads built-in 100-sentence corpus
 python scripts/get_corpus.py --force  # re-generate
+
+# Download Samanantar (8.5M Bengali-English pairs, sample 10K)
+python scripts/download_corpus.py              # 10 000 pairs → corpus/samanantar/
+python scripts/download_corpus.py --size 50000 # larger sample
+python scripts/download_corpus.py --verify     # check alignment without re-downloading
 ```
 
-The built-in corpus has 90 sentence pairs across 10 domains (literature, history, geography, science, education, health, everyday life, agriculture, economy, proverbs).
+### Corpus Structure
 
-For FLORES-200 (1012 sentences): `pip install datasets` — the script picks it up automatically.
+```
+corpus/
+├── flores200_devtest.bn.txt     # 100 Bengali sentences (built-in, 10 domains)
+├── flores200_devtest.en.txt     # 100 English references
+└── samanantar/                  # Downloaded from ai4bharat/samanantar
+    ├── train.bn.txt / train.en.txt  # ~7 800 pairs (80%)
+    ├── val.bn.txt   / val.en.txt    # ~980 pairs  (10%)
+    └── test.bn.txt  / test.en.txt   # ~980 pairs  (10%)
+```
+
+---
+
+## Fine-tuning
+
+Fine-tune NLLB-600M with LoRA (parameter-efficient, < 1% trainable params).
+
+### Install training dependencies
+
+```bash
+pip install -e ".[train]"
+# or individually:
+pip install "peft>=0.12.0" "datasets>=3.0.0" "accelerate>=0.34.0"
+```
+
+### Download training corpus
+
+```bash
+python scripts/download_corpus.py   # ~10 000 pairs, takes ~30s
+```
+
+### Run fine-tuning
+
+```bash
+# Full run (3 epochs on all 7 800 training pairs)
+python scripts/finetune.py
+
+# Quick smoke test (CPU, 500 pairs, 1 epoch)
+python scripts/finetune.py --epochs 1 --max-train-pairs 500 --skip-baseline
+
+# With all options
+python scripts/finetune.py \
+    --epochs 3 \
+    --lr 2e-4 \
+    --train-batch-size 4 \
+    --grad-accum 8 \
+    --lora-r 16 \
+    --output-dir models/nllb-600M-finetuned \
+    --ct2-output models/nllb-600M-finetuned-ct2
+```
+
+**Output:** Adapter weights at `models/nllb-600M-finetuned/adapter/`, CT2 model at `models/nllb-600M-finetuned-ct2/`.
+
+### Use the fine-tuned model
+
+```bash
+bn-translate --input story.bn.txt --output story.en.txt \
+    --model nllb-600M --model-path models/nllb-600M-finetuned-ct2
+```
+
+### GPU note (sm_120 + PyTorch cu124)
+
+PyTorch 2.6.0+cu124 has no compiled sm_120 (Blackwell) training kernels. Fine-tuning automatically falls back to CPU. For GPU training, install PyTorch cu128:
+
+```bash
+pip install torch --index-url https://download.pytorch.org/whl/cu128
+```
+
+CTranslate2 inference (not training) continues to work via its own CUDA kernels at float16.
+
+### Architecture: src/bn_en_translate/training/
+
+```
+training/
+├── corpus.py    # load_corpus_files, filter_corpus, split_corpus, save_corpus_files
+├── dataset.py   # BengaliEnglishDataset (PyTorch Dataset), collate_fn
+└── trainer.py   # NLLBFineTuner (LoRA via PEFT + HF Seq2SeqTrainer), compute_corpus_bleu
+```
 
 ---
 
@@ -245,3 +330,6 @@ See [`docs/HARDWARE.md`](HARDWARE.md) for GPU-specific issues.
 | Corrupt torch install | Concurrent pip processes | Kill all pip, `rm -rf .venv/lib/.../torch`, reinstall |
 | `ModuleNotFoundError: torch` after install | Venv not activated | `source .venv/bin/activate` |
 | Slow model downloads | HF_HOME on NTFS `/mnt/c/...` | Set `HF_HOME` to Linux filesystem path |
+| Fine-tuning falls back to CPU | PyTorch cu124 has no sm_120 kernels | Install PyTorch cu128 for GPU training |
+| `evaluation_strategy` TypeError | transformers 5.x renamed it | Use `eval_strategy` in TrainingArguments |
+| `no_cuda` TypeError | transformers 5.x renamed it | Use `use_cpu=True` in TrainingArguments |

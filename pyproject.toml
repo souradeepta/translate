@@ -19,7 +19,15 @@ dependencies = [
 
 [project.optional-dependencies]
 gpu = [
-    # Install separately: pip install torch --index-url https://download.pytorch.org/whl/cu128
+    # Install separately (sm_120 Blackwell requires cu128):
+    # pip install torch==2.7.1+cu128 --index-url https://download.pytorch.org/whl/cu128
+    # cu124 works for CTranslate2 inference but NOT for PyTorch training on sm_120
+]
+train = [
+    "peft>=0.12.0",
+    "datasets>=3.0.0",
+    "accelerate>=0.34.0",
+    "evaluate>=0.4.0",
 ]
 dev = [
     "pytest>=8.3.0",
@@ -45,6 +53,7 @@ markers = [
     "slow: marks tests that download/load models (deselect with -m 'not slow')",
     "e2e: marks full end-to-end quality tests (deselect with -m 'not e2e')",
     "gpu: marks tests that require a CUDA device",
+    "training: marks tests that require training dependencies (peft, datasets)",
 ]
 addopts = "-ra -q --tb=short"
 
