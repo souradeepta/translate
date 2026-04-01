@@ -214,7 +214,8 @@ class NLLBFineTuner:
             metric_for_best_model="eval_loss",
             greater_is_better=False,
             report_to="none",
-            dataloader_num_workers=0,  # avoid multiprocessing with CUDA
+            dataloader_num_workers=0 if self._use_cuda else 4,  # parallel loading safe on CPU; 0 avoids CUDA fork issues
+            dataloader_prefetch_factor=2 if not self._use_cuda else None,  # prefetch 2 batches per worker on CPU
             use_cpu=not self._use_cuda,  # force CPU when sm_120 not supported by this PyTorch build
         )
 
