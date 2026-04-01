@@ -43,9 +43,16 @@ download-indicTrans2:
 download-nllb:
 	python scripts/download_models.py --model nllb-600M
 
-# Run benchmarks against all models
+# Download Bengali-English FLORES-200 corpus
+get-corpus:
+	python scripts/get_corpus.py
+
+# Run benchmarks against available models (downloads corpus first if missing)
 benchmark:
-	python scripts/benchmark.py
+	python scripts/benchmark.py --models nllb-600M --sentences 50
+
+benchmark-all:
+	python scripts/benchmark.py --models nllb-600M nllb-1.3B indicTrans2-1B --sentences 100
 
 clean:
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null; true

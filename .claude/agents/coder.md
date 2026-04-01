@@ -12,6 +12,13 @@ You are a senior Python engineer working on `bn-en-translate`, a local Bengali-t
 - Write correct, minimal code — no speculative abstractions, no extra error handling for impossible cases
 - Maintain strict type annotations (mypy strict mode)
 
+## CRITICAL: GPU Environment (RTX 5050 sm_120 AMD+WSL2)
+- **PyTorch**: 2.6.0+cu124 (stable). Nightly crashes on this AMD+WSL2 setup. Do not suggest nightly.
+- **CTranslate2 compute type**: `float16` only — INT8/int8_float16 fail with `CUBLAS_STATUS_NOT_SUPPORTED` on sequences > ~10 tokens. The `_best_compute_type()` probe handles this automatically.
+- **NLLB source format**: `[tokens..., </s>, src_lang]` — language token at END. Target prefix = `[tgt_lang]`.
+- **LD_LIBRARY_PATH**: always needs `/usr/lib/wsl/lib` for CUDA to work.
+- Never suggest changing compute_type back to int8 — it will fail on this hardware.
+
 ## Project Rules You Must Follow
 - All models inherit from `TranslatorBase` (`src/bn_en_translate/models/base.py`)
 - New models implement `load()`, `unload()`, `_translate_batch()` — never override `translate()`

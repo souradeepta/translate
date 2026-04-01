@@ -5,7 +5,32 @@
       "Bash(mkdir -p /home/sbisw/github/translate/.claude/commands)",
       "Bash(git init:*)",
       "Bash(git add:*)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(git commit:*)",
+      "Bash(git config:*)",
+      "Bash(nvidia-smi)",
+      "Bash(python3 -m venv .venv)",
+      "Bash(sudo apt:*)",
+      "Bash(python3 -m pip --version)",
+      "Bash(python3 -c \"import venv\")",
+      "Bash(python3 -m virtualenv .venv)",
+      "Bash(python3 -m pip install virtualenv --user -q)",
+      "Bash(dpkg -l python3.12-venv)",
+      "Bash(python3 -m venv .venv --without-pip)",
+      "Bash(.venv/bin/python3 --version)",
+      "Bash(curl -sS https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py)",
+      "Bash(.venv/bin/python3 /tmp/get-pip.py -q)",
+      "Bash(.venv/bin/pip --version)",
+      "Bash(nvcc --version)",
+      "Read(//usr/local/**)",
+      "Read(//proc/driver/nvidia/**)",
+      "Bash(python3:*)",
+      "Bash(ls /tmp/claude-1000/-home-sbisw-github-translate/1fe1e814-343c-4ebe-89d0-13bb1335b564/tasks/*.output)",
+      "Bash(xargs -I{} sh -c 'echo \"=== {} ===\" && tail -3 {}')",
+      "Bash(wait 4054)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(ls /usr/local/cuda-12.8/lib64/libcudart*)",
+      "Bash(ps:*)"
     ]
   }
 }

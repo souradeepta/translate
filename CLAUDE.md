@@ -80,22 +80,64 @@ Bengali .txt  →  [Preprocessor]  →  [Chunker]  →  [Translator]  →  [Post
 
 ## Model Reference
 
-| Key | HF ID | VRAM INT8 | BLEU bn→en |
-|-----|-------|-----------|------------|
-| `nllb-600M` | `facebook/nllb-200-distilled-600M` | 0.6 GB | ~22 |
-| `nllb-1.3B` | `facebook/nllb-200-distilled-1.3B` | 1.3 GB | ~26 |
-| `indicTrans2-1B` | `ai4bharat/indictrans2-indic-en-1B` | 1.5 GB | ~30+ |
-| `ollama` | `qwen2.5:7b-instruct-q4_K_M` via Ollama | 4.7 GB | subjective |
+| Key | HF ID | VRAM (float16) | BLEU bn→en | Status |
+|-----|-------|----------------|------------|--------|
+| `nllb-600M` | `facebook/nllb-200-distilled-600M` | ~2 GB | ~22–64* | **Working** — CT2 at `models/nllb-600M-ct2/` |
+| `nllb-1.3B` | `facebook/nllb-200-distilled-1.3B` | ~2.6 GB | ~26 | Needs download |
+| `indicTrans2-1B` | `ai4bharat/indictrans2-indic-en-1B` | ~3 GB | ~30+ | Needs download |
+| `ollama` | `qwen2.5:7b-instruct-q4_K_M` via Ollama | ~4.7 GB | subjective | Optional polish |
+
+*BLEU varies highly with corpus; 64 on built-in test pairs, ~22 on open-domain.
+
+## Corpus
+
+Built-in 90-sentence corpus at `corpus/` (10 domains: literature, history, geography, science,
+education, health, everyday life, agriculture, proverbs). Used by benchmark.
+
+FLORES-200 (1012 sentences): download attempted automatically, falls back to built-in.
+
+## CT2 Model Setup
+
+```bash
+# Download + convert NLLB-600M (done — already at models/nllb-600M-ct2/)
+python scripts/download_models.py --model nllb-600M
+
+# Download IndicTrans2-1B (best quality, ~3 GB)
+python scripts/download_models.py --model indicTrans2-1B
+
+# Benchmark
+python scripts/benchmark.py --models nllb-600M --sentences 20
+```
 
 ---
 
+## Environment Setup
+
+```bash
+# Activate venv (always required)
+source .venv/bin/activate
+export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH
+
+# Install (if .venv missing)
+python3 -m venv .venv --without-pip
+curl -sS https://bootstrap.pypa.io/get-pip.py | .venv/bin/python3
+pip install torch --index-url https://download.pytorch.org/whl/cu124
+pip install -e ".[dev]"
+```
+
 ## WSL2 / RTX 5050 Critical Notes
 
-1. **LD_LIBRARY_PATH** must include `/usr/lib/wsl/lib` — CUDA driver lives there in WSL2
-2. **Blackwell (sm_100)** — use PyTorch nightly if stable fails: `pip install torch --index-url https://download.pytorch.org/whl/nightly/cu128`
-3. **HF_HOME** must be on Linux fs, not `/mnt/c/...` (10-20× speed difference)
-4. **Multiprocessing** — never use `fork` with CUDA; use `spawn`
-5. **VRAM headroom** — IndicTrans2 INT8 uses ~1.5 GB; Ollama qwen2.5:7b uses ~4.7 GB (can't run both at once)
+**GPU is RTX 5050 sm_120 (Blackwell). Key discoveries from setup:**
+
+1. **LD_LIBRARY_PATH** must include `/usr/lib/wsl/lib` for every Python process
+2. **PyTorch**: use `2.6.0+cu124` (stable). Nightly cu128 crashes with SIGBUS on AMD Ryzen+WSL2 (AMX incompatibility). GPU ops work via PTX JIT despite sm_120 warning.
+3. **CTranslate2 INT8 fails on sm_120 + cu124**: `CUBLAS_STATUS_NOT_SUPPORTED` for INT8/INT8_FLOAT16. **Use `float16`** instead — same speed, works correctly.
+4. **Compute type probe**: `NLLBCt2Translator._best_compute_type()` runs a real ~20-token translation probe to detect this at load time. Short probes (< ~10 tokens) don't trigger INT8 ops and give false positives.
+5. **NLLB source format**: `[text_tokens..., </s>, src_lang]` — NOT `[src_lang, text_tokens...]`. Target: forced BOS = `tgt_lang`.
+6. **HF_HOME** must be on Linux fs, not `/mnt/c/...`
+7. **Multiprocessing**: never use `fork` with CUDA; use `spawn`
+8. **VRAM**: NLLB-600M float16 = ~2 GB. IndicTrans2-1B = ~2-3 GB. Ollama qwen2.5:7b = ~4.7 GB.
+9. **Python venv**: `python3-venv` package may not be installed. Use `--without-pip` + bootstrap pip via `get-pip.py`.
 
 ---
 
