@@ -43,6 +43,4 @@ def _normalize_punctuation(text: str) -> str:
     # Some texts use U+0964 variants or ASCII period for Bengali danda
     # Normalize fullwidth period to ASCII
     text = text.replace("\uff0e", ".")
-    # Normalize double danda variants
-    text = text.replace("\u0965", "\u0965")  # identity (already canonical)
     return text
