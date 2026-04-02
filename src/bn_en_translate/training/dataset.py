@@ -58,8 +58,9 @@ class BengaliEnglishDataset(Dataset):  # type: ignore[type-arg]
             truncation=True,
         )
 
-        # Tokenise target — use as_target_tokenizer if available (older transformers)
-        try:
+        # Tokenise target — newer transformers (≥4.x) use text_target kwarg;
+        # older versions used a context manager API.
+        if hasattr(self.tokenizer, "as_target_tokenizer"):
             with self.tokenizer.as_target_tokenizer():
                 target_enc = self.tokenizer(
                     tgt,
@@ -67,8 +68,7 @@ class BengaliEnglishDataset(Dataset):  # type: ignore[type-arg]
                     padding="max_length",
                     truncation=True,
                 )
-        except AttributeError:
-            # Newer transformers: set text_target kwarg directly
+        else:
             target_enc = self.tokenizer(
                 text_target=tgt,
                 max_length=self.max_target_length,
