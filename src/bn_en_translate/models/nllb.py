@@ -55,7 +55,7 @@ class NLLBTranslator(TranslatorBase):
             texts,
             src_lang=src_lang,
             tgt_lang=tgt_lang,
-            batch_size=self.config.beam_size,
+            batch_size=self.config.inference_batch_size,
         )
         return [r["translation_text"] for r in results]  # type: ignore[index]
 

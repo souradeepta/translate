@@ -38,6 +38,7 @@ class ModelConfig:
     tgt_lang: str = "eng_Latn"
     beam_size: int = 4
     max_decoding_length: int = 512
+    inference_batch_size: int = 8  # number of sequences translated in one forward pass
 
     VALID_DEVICES = {"cuda", "cpu", "auto"}
     VALID_COMPUTE_TYPES = {"int8", "float16", "float32", "int8_float16"}
@@ -53,6 +54,8 @@ class ModelConfig:
             raise ValueError("beam_size must be positive")
         if self.max_decoding_length <= 0:
             raise ValueError("max_decoding_length must be positive")
+        if self.inference_batch_size <= 0:
+            raise ValueError("inference_batch_size must be positive")
 
     def validate_model_path(self) -> None:
         """Check that model_path exists on disk. Call explicitly before loading."""
