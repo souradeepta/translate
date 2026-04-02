@@ -166,6 +166,19 @@ class NLLBFineTuner:
         """
         self._require_loaded()
 
+        if not train_src:
+            raise ValueError("train_src is empty — nothing to train on")
+        if len(train_src) != len(train_tgt):
+            raise ValueError(
+                f"Corpus misaligned: {len(train_src)} src lines ≠ {len(train_tgt)} tgt lines"
+            )
+        if not val_src:
+            raise ValueError("val_src is empty — validation set required")
+        if len(val_src) != len(val_tgt):
+            raise ValueError(
+                f"Val corpus misaligned: {len(val_src)} src lines ≠ {len(val_tgt)} tgt lines"
+            )
+
         import os
         import torch
         import transformers
@@ -239,7 +252,17 @@ class NLLBFineTuner:
             "Starting training: %d train pairs, %d val pairs, %d epochs",
             len(train_src), len(val_src), ft.num_epochs,
         )
-        train_result = trainer.train()
+        output_path = Path(ft.output_dir)
+        try:
+            train_result = trainer.train()
+        except Exception:
+            # Save whatever adapter weights exist so a partial run is recoverable
+            try:
+                self._peft_model.save_pretrained(str(output_path / "adapter_partial"))
+                logger.warning("Training failed — partial adapter saved to %s/adapter_partial/", ft.output_dir)
+            except Exception:
+                pass
+            raise
         metrics: dict[str, float] = {"train_loss": train_result.training_loss}
 
         # BLEU on validation set after training
@@ -249,7 +272,6 @@ class NLLBFineTuner:
         logger.info("Validation BLEU: %.2f", val_bleu)
 
         # Save adapter weights
-        output_path = Path(ft.output_dir)
         self._peft_model.save_pretrained(str(output_path / "adapter"))
         tokenizer.save_pretrained(str(output_path / "tokenizer"))
         logger.info("Adapter weights saved to %s/adapter/", ft.output_dir)
