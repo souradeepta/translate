@@ -10,6 +10,8 @@ build/
 .ruff_cache/
 /models/
 /output/
+/monitor/runs.db
+/monitor/plots/
 *.env
 .env
 .hypothesis/

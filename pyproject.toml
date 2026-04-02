@@ -29,6 +29,10 @@ train = [
     "accelerate>=0.34.0",
     "evaluate>=0.4.0",
 ]
+monitor = [
+    "psutil>=6.0.0",
+    "pynvml>=11.5.0",
+]
 dev = [
     "pytest>=8.3.0",
     "pytest-cov>=5.0.0",
@@ -54,6 +58,7 @@ markers = [
     "e2e: marks full end-to-end quality tests (deselect with -m 'not e2e')",
     "gpu: marks tests that require a CUDA device",
     "training: marks tests that require training dependencies (peft, datasets)",
+    "monitor: marks tests for the resource monitoring subsystem",
 ]
 addopts = "-ra -q --tb=short"
 

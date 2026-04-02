@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -198,48 +199,78 @@ def main() -> None:
                         help="Cap training corpus (e.g. 500 for a quick CPU demo)")
     args = parser.parse_args()
 
-    # Load corpus splits
-    train_src, train_tgt = _load_corpus_split("train")
-    val_src, val_tgt = _load_corpus_split("val")
-    test_src, test_tgt = _load_corpus_split("test")
+    from bn_en_translate.config import MonitorConfig
+    from bn_en_translate.utils.monitor import ResourceMonitor, format_summary
+    from bn_en_translate.utils.run_db import RunDatabase
 
-    # Baseline BLEU
-    baseline_bleu = 0.0
-    if not args.skip_baseline and not args.export_only:
-        baseline_bleu = _baseline_bleu(test_src, test_tgt)
+    monitor_cfg = MonitorConfig()
+    started_at = datetime.now(tz=timezone.utc)
 
-    if args.export_only:
-        # Just re-export existing adapter
-        from bn_en_translate.config import FineTuneConfig, ModelConfig
-        from bn_en_translate.training.trainer import NLLBFineTuner
+    with ResourceMonitor(config=monitor_cfg) as monitor:
+        # Load corpus splits
+        train_src, train_tgt = _load_corpus_split("train")
+        val_src, val_tgt = _load_corpus_split("val")
+        test_src, test_tgt = _load_corpus_split("test")
 
-        model_cfg = ModelConfig(model_path=HF_MODEL_ID, device="auto")
-        ft_cfg = FineTuneConfig(output_dir=args.output_dir)
-        tuner = NLLBFineTuner(model_cfg, ft_cfg)
-        tuner.load()
-        _export_ct2(tuner, args.ct2_output)
+        # Baseline BLEU
+        baseline_bleu = 0.0
+        if not args.skip_baseline and not args.export_only:
+            baseline_bleu = _baseline_bleu(test_src, test_tgt)
+
+        if args.export_only:
+            from bn_en_translate.config import FineTuneConfig, ModelConfig
+            from bn_en_translate.training.trainer import NLLBFineTuner
+
+            model_cfg = ModelConfig(model_path=HF_MODEL_ID, device="auto")
+            ft_cfg = FineTuneConfig(output_dir=args.output_dir)
+            tuner = NLLBFineTuner(model_cfg, ft_cfg)
+            tuner.load()
+            _export_ct2(tuner, args.ct2_output)
+            tuner.unload()
+            return
+
+        # Optionally cap training size (useful for CPU runs / quick demos)
+        if args.max_train_pairs and len(train_src) > args.max_train_pairs:
+            logger.info(
+                "Capping training corpus to %d pairs (from %d)",
+                args.max_train_pairs, len(train_src),
+            )
+            train_src = train_src[: args.max_train_pairs]
+            train_tgt = train_tgt[: args.max_train_pairs]
+
+        # Fine-tune
+        metrics, tuner = _run_finetune(train_src, train_tgt, val_src, val_tgt, args)
+
+        # Export to CT2
+        if not args.no_export:
+            _export_ct2(tuner, args.ct2_output)
+
         tuner.unload()
-        return
 
-    # Optionally cap training size (useful for CPU runs / quick demos)
-    if args.max_train_pairs and len(train_src) > args.max_train_pairs:
-        logger.info("Capping training corpus to %d pairs (from %d)", args.max_train_pairs, len(train_src))
-        train_src = train_src[: args.max_train_pairs]
-        train_tgt = train_tgt[: args.max_train_pairs]
+        # Post fine-tune BLEU
+        post_bleu = 0.0
+        if not args.no_export:
+            post_bleu = _post_finetune_bleu(test_src, test_tgt, args.ct2_output)
 
-    # Fine-tune
-    metrics, tuner = _run_finetune(train_src, train_tgt, val_src, val_tgt, args)
-
-    # Export to CT2
-    if not args.no_export:
-        _export_ct2(tuner, args.ct2_output)
-
-    tuner.unload()
-
-    # Post fine-tune BLEU
-    post_bleu = 0.0
-    if not args.no_export:
-        post_bleu = _post_finetune_bleu(test_src, test_tgt, args.ct2_output)
+    # Record run to DB (outside the `with` block so summary is available)
+    finished_at = datetime.now(tz=timezone.utc)
+    if monitor.summary is not None:
+        try:
+            with RunDatabase() as db:
+                db.save_run(
+                    run_id=monitor.run_id,
+                    run_type="finetune",
+                    model_name="nllb-600M",
+                    started_at=started_at,
+                    finished_at=finished_at,
+                    status="ok",
+                    summary=monitor.summary,
+                    bleu_score=post_bleu if post_bleu > 0 else metrics.get("eval_bleu"),
+                    sample_interval_s=monitor_cfg.sample_interval_s,
+                )
+            logger.info("Resource usage: %s", format_summary(monitor.summary))
+        except Exception as db_err:
+            logger.warning("DB write skipped: %s", db_err)
 
     # Summary
     print("\n" + "=" * 60)
@@ -254,6 +285,7 @@ def main() -> None:
             delta = post_bleu - baseline_bleu
             print(f"  Delta:             {delta:+.2f}")
     print("=" * 60)
+    print("Run history: python scripts/show_stats.py list")
 
 
 if __name__ == "__main__":

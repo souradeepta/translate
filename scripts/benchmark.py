@@ -5,34 +5,11 @@ from __future__ import annotations
 import argparse
 import subprocess
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 FIXTURES_DIR = Path(__file__).parent.parent / "tests" / "fixtures"
 CORPUS_DIR = Path(__file__).parent.parent / "corpus"
-
-
-def _gpu_vram_mib() -> int:
-    """Return current GPU memory usage in MiB via nvidia-smi."""
-    try:
-        out = subprocess.check_output(
-            ["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"],
-            text=True, stderr=subprocess.DEVNULL
-        )
-        return int(out.strip().splitlines()[0])
-    except Exception:
-        return 0
-
-
-def _gpu_util_pct() -> int:
-    """Return GPU compute utilization % via nvidia-smi."""
-    try:
-        out = subprocess.check_output(
-            ["nvidia-smi", "--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"],
-            text=True, stderr=subprocess.DEVNULL
-        )
-        return int(out.strip().splitlines()[0])
-    except Exception:
-        return -1
 
 
 def benchmark_model(
@@ -43,51 +20,73 @@ def benchmark_model(
 ) -> dict:  # type: ignore[type-arg]
     import sacrebleu  # type: ignore[import-untyped]
 
-    from bn_en_translate.config import ModelConfig, PipelineConfig
+    from bn_en_translate.config import ModelConfig, MonitorConfig, PipelineConfig
     from bn_en_translate.models.factory import get_translator
     from bn_en_translate.pipeline.pipeline import TranslationPipeline
+    from bn_en_translate.utils.monitor import ResourceMonitor, format_summary
+    from bn_en_translate.utils.run_db import RunDatabase
 
     config = PipelineConfig(model=ModelConfig(model_name=model_name, device=device))
+    monitor_cfg = MonitorConfig()
+    started_at = datetime.now(tz=timezone.utc)
 
     try:
         translator = get_translator(config)
         pipeline = TranslationPipeline(translator, config)
 
-        vram_before = _gpu_vram_mib()
-
-        t0 = time.perf_counter()
-        with translator:
-            vram_loaded = _gpu_vram_mib()
-            hypotheses = [pipeline.translate(t) for t in bengali_texts]
-            vram_during = _gpu_vram_mib()
-        elapsed = time.perf_counter() - t0
+        with ResourceMonitor(config=monitor_cfg) as monitor:
+            t0 = time.perf_counter()
+            with translator:
+                hypotheses = [pipeline.translate(t) for t in bengali_texts]
+            elapsed = time.perf_counter() - t0
 
         bleu = sacrebleu.corpus_bleu(hypotheses, [references])
-        vram_used = vram_loaded - vram_before
+        input_chars = sum(len(t) for t in bengali_texts)
+        chars_per_sec = round(input_chars / elapsed) if elapsed > 0 else 0
 
-        return {
+        result = {
             "model": model_name,
             "backend": type(translator).__name__,
             "bleu": round(bleu.score, 2),
             "seconds": round(elapsed, 2),
-            "chars_per_sec": round(sum(len(t) for t in bengali_texts) / elapsed),
-            "vram_loaded_mib": vram_used,
-            "vram_peak_mib": vram_during - vram_before,
+            "chars_per_sec": chars_per_sec,
             "output_preview": hypotheses[0][:80] if hypotheses else "",
             "error": None,
         }
+
+        # Record to DB
+        if monitor.summary is not None:
+            try:
+                with RunDatabase() as db:
+                    db.save_run(
+                        run_id=monitor.run_id,
+                        run_type="benchmark",
+                        model_name=model_name,
+                        started_at=started_at,
+                        finished_at=datetime.now(tz=timezone.utc),
+                        status="ok",
+                        summary=monitor.summary,
+                        input_chars=input_chars,
+                        bleu_score=bleu.score,
+                        chars_per_sec=float(chars_per_sec),
+                        sample_interval_s=monitor_cfg.sample_interval_s,
+                    )
+                print(f"  Monitor: {format_summary(monitor.summary)}")
+            except Exception as db_err:
+                print(f"  [monitor] DB write skipped: {db_err}")
+
     except Exception as e:
-        return {
+        result = {
             "model": model_name,
             "backend": "N/A",
             "bleu": None,
             "seconds": None,
             "chars_per_sec": None,
-            "vram_loaded_mib": None,
-            "vram_peak_mib": None,
             "output_preview": None,
             "error": str(e),
         }
+
+    return result
 
 
 def load_corpus(n: int = 50) -> tuple[list[str], list[str]]:
@@ -137,7 +136,7 @@ def main() -> None:
 
     bn_texts, en_refs = load_corpus(n=args.sentences)
 
-    print(f"\n{'Model':<22} {'Backend':<24} {'BLEU':>6} {'Time':>7} {'ch/s':>6} {'VRAM':>6}")
+    print(f"\n{'Model':<22} {'Backend':<24} {'BLEU':>6} {'Time':>7} {'ch/s':>6}")
     print("-" * 72)
 
     for model_name in args.models:
@@ -145,15 +144,15 @@ def main() -> None:
         if r["error"]:
             print(f"{model_name:<22} {'ERROR':<24} {r['error'][:20]}")
         else:
-            vram_str = f"{r['vram_loaded_mib']}M" if r["vram_loaded_mib"] else "N/A"
             print(
                 f"{model_name:<22} {r['backend']:<24} "
                 f"{r['bleu']:>6.1f} {r['seconds']:>6.1f}s "
-                f"{r['chars_per_sec']:>6} {vram_str:>6}"
+                f"{r['chars_per_sec']:>6}"
             )
             print(f"  Preview: {r['output_preview']}")
 
     print("=" * 72)
+    print("Run history: python scripts/show_stats.py list")
 
 
 if __name__ == "__main__":

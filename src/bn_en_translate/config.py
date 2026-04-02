@@ -126,3 +126,29 @@ class PipelineConfig:
     ollama_polish: bool = False
     ollama_model: str = "qwen2.5:7b-instruct-q4_K_M"
     ollama_base_url: str = "http://localhost:11434"
+
+
+@dataclass
+class MonitorConfig:
+    """Configuration for ResourceMonitor and RunDatabase."""
+
+    # Sampling
+    sample_interval_s: float = 2.0       # background thread wakes every N seconds
+    enabled: bool = True                  # set False to make ResourceMonitor a no-op
+
+    # Storage
+    db_path: Path = field(default_factory=lambda: Path("monitor/runs.db"))
+
+    # GPU backend preference
+    gpu_backend: str = "pynvml"           # 'pynvml' | 'nvidia-smi' | 'none'
+
+    VALID_GPU_BACKENDS = {"pynvml", "nvidia-smi", "none"}
+
+    def __post_init__(self) -> None:
+        if self.sample_interval_s <= 0:
+            raise ValueError("sample_interval_s must be positive")
+        if self.gpu_backend not in self.VALID_GPU_BACKENDS:
+            raise ValueError(
+                f"gpu_backend must be one of {self.VALID_GPU_BACKENDS}, "
+                f"got '{self.gpu_backend}'"
+            )

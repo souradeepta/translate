@@ -4,14 +4,16 @@
 
 ```bash
 source .venv/bin/activate && export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH
-make test          # 140 tests, ~8s — confirms env is working
+make test          # 186 tests, ~12s — confirms env is working
 python scripts/benchmark.py --models nllb-600M --sentences 5   # quick GPU smoke test
 ```
 
 **State as of 2026-04-01:**
 - `models/nllb-600M-ct2/` ✅ downloaded, working via CT2 float16 (BLEU 65.2 on built-in corpus)
 - `corpus/` ✅ 100-sentence built-in + 9,829 Samanantar pairs (train/val/test splits)
-- All 140 unit/integration tests passing
+- All 186 unit/integration tests passing
+- Fine-tuning pipeline implemented (LoRA via PEFT); smoke test complete (train_loss=7.19, CPU)
+- Resource monitoring: `ResourceMonitor` + `RunDatabase` (SQLite) record every benchmark/finetune run
 - Fine-tuning pipeline implemented (LoRA via PEFT); **PyTorch 2.7.1+cu128 installed** — GPU training works
 - Next unlock: `python scripts/download_models.py --model indicTrans2-1B` (~3 GB)
 
@@ -209,6 +211,7 @@ Use these specialized agents via the Agent tool:
 | `.claude/agents/coder.md` | Implementing new features, fixing bugs, refactoring |
 | `.claude/agents/tester.md` | Writing or running tests, debugging test failures |
 | `.claude/agents/architect.md` | Design decisions, new model integration, pipeline changes |
+| `.claude/agents/monitor.md` | After any run: detect regressions, suggest optimizations, update `monitor/observations.md` |
 
 ---
 
