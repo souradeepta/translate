@@ -26,6 +26,7 @@ class IndicTrans2Translator(TranslatorBase):
     HF_MODEL_ID = "ai4bharat/indictrans2-indic-en-1B"
 
     def __init__(self, config: ModelConfig | None = None) -> None:
+        super().__init__()
         self.config = config or ModelConfig(
             model_name="indicTrans2-1B",
             model_path="models/indicTrans2-1B-ct2",

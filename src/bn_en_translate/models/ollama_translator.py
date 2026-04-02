@@ -41,6 +41,7 @@ class OllamaTranslator(TranslatorBase):
     """
 
     def __init__(self, config: PipelineConfig | None = None) -> None:
+        super().__init__()
         self.config = config or PipelineConfig()
         self._client: httpx.Client | None = None
 

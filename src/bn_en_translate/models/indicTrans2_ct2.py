@@ -29,6 +29,7 @@ class IndicTrans2Ct2Translator(TranslatorBase):
     SPM_FILENAME = "sentencepiece.bpe.model"
 
     def __init__(self, config: ModelConfig | None = None) -> None:
+        super().__init__()
         self.config = config or ModelConfig(
             model_name="indicTrans2-1B",
             model_path="models/indicTrans2-1B-ct2",

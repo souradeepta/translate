@@ -21,6 +21,7 @@ class NLLBCt2Translator(TranslatorBase):
     """
 
     def __init__(self, config: ModelConfig | None = None) -> None:
+        super().__init__()
         self.config = config or ModelConfig(model_name="nllb-600M")
         self._translator: object | None = None
         self._sp: object | None = None

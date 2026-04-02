@@ -16,7 +16,8 @@ class TranslatorBase(ABC):
         4. Call unload() to free GPU/CPU memory.
     """
 
-    _loaded: bool = False
+    def __init__(self) -> None:
+        self._loaded: bool = False
 
     @abstractmethod
     def load(self) -> None:
