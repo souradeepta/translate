@@ -81,3 +81,35 @@ src/bn_en_translate/
 - Line length 100, Python 3.12, mypy strict
 - No `print()` in library code
 - Dataclasses for config, ABCs for bases
+
+## Commit Discipline (senior dev standard)
+Make **one small, focused commit per logical change**. Never batch
+unrelated fixes into a single commit.
+
+Commit message format:
+```
+<type>: <short imperative summary (≤72 chars)>
+
+<optional body: what changed and why, not what the diff shows>
+```
+
+Types: `fix` (bug), `feat` (new behaviour), `refactor` (no behaviour change),
+`test`, `docs`, `chore`.
+
+Good commit granularity:
+- One file changed → one commit (unless tightly coupled to another file)
+- A bug fix + its test → one commit
+- A refactor of class A and a new feature in class B → **two** commits
+
+Never do:
+- `git add -A` and commit everything at once
+- Combine a refactor with a feature in one commit
+- Put "and also fixed X" in the body of a feature commit — that's two commits
+
+## Adding a New Model Backend
+1. Extend `TranslatorBase` — implement `load()`, `unload()`, `_translate_batch()`
+2. Call `super().__init__()` first in `__init__`
+3. Always load with `device="cuda"` (or auto-detect). Never default to CPU.
+4. Use `_best_compute_type(device, sp)` with 20-token probe — always float16 on this GPU
+5. Register with `@register_model("your-name")` decorator in `factory.py` — no if/elif edits needed
+6. NLLB/M2M source format: `tokens + ["</s>", src_lang]`
