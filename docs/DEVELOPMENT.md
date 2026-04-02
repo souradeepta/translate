@@ -5,7 +5,7 @@
 ### Prerequisites
 
 - Python 3.12+
-- NVIDIA GPU with CUDA 12.x (optional — CPU fallback works, ~20× slower)
+- NVIDIA GPU with CUDA 12.x (optional — CPU fallback works, ~20x slower)
 - WSL2 on Windows, or native Linux
 
 ### First-time Setup
@@ -23,15 +23,17 @@ source .venv/bin/activate
 export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH
 # Add to ~/.bashrc to make permanent
 
-# 4. Install PyTorch (cu124 = CUDA 12.4, works on CUDA 12.x drivers)
-pip install torch --index-url https://download.pytorch.org/whl/cu124
+# 4. Install PyTorch (cu128 = CUDA 12.8, required for sm_120 GPU training kernels)
+pip install torch --index-url https://download.pytorch.org/whl/cu128
 
 # 5. Install project + dev deps
 pip install -e ".[dev]"
 
 # 6. Verify
-make test     # 99 tests should pass in ~0.5s
+make test     # 186 tests should pass in ~12s
 ```
+
+> **Note:** Use `cu128` (not `cu124`). PyTorch `2.7.0+cu128` ships compiled sm_120 (Blackwell) kernels required for GPU fine-tuning. `cu124` falls back to CPU for training operations on sm_120.
 
 ### Verify GPU
 
@@ -43,6 +45,14 @@ print('CTranslate2:', ctranslate2.__version__, '| CUDA devices:', ctranslate2.ge
 if torch.cuda.is_available():
     print('GPU:', torch.cuda.get_device_name(0), '| Compute:', torch.cuda.get_device_capability(0))
 "
+```
+
+Expected output on the RTX 5050 target machine:
+
+```
+PyTorch: 2.7.0+cu128 | CUDA: True
+CTranslate2: 4.7.1 | devices: 1
+GPU: NVIDIA GeForce RTX 5050 Laptop GPU | Compute: (12, 0)
 ```
 
 ---
@@ -64,18 +74,20 @@ make typecheck      # mypy strict
 
 | Tier | Command | Time | Requires |
 |------|---------|------|----------|
-| Unit + mock integration | `make test` | ~8s | nothing |
+| Unit + mock integration | `make test` | ~12s | nothing |
 | Real NLLB-600M | `make test-slow` | ~30s | `models/nllb-600M-ct2/` |
 | E2E quality (BLEU) | `make test-e2e` | ~60s+ | GPU + IndicTrans2 model |
 | All | `make test-all` | ~90s+ | GPU + all models |
 
 Run a single test file:
+
 ```bash
 pytest tests/unit/test_chunker.py -v
 pytest -k "test_normalize" -v
 ```
 
 Run with coverage:
+
 ```bash
 pytest --cov=bn_en_translate --cov-report=term-missing tests/unit/
 ```
@@ -102,7 +114,7 @@ tests/
 │   ├── test_pipeline_mock.py      # Full pipeline, MockTranslator
 │   └── test_pipeline_nllb.py      # Real NLLB-600M (marked slow)
 └── e2e/
-    ├── test_indicTrans2_quality.py # BLEU ≥ 25 assertion (marked e2e)
+    ├── test_indicTrans2_quality.py # BLEU >= 25 assertion (marked e2e)
     └── test_ollama_integration.py  # Ollama API (marked e2e)
 ```
 
@@ -180,10 +192,6 @@ class MyModelCt2Translator(TranslatorBase):
         )
         return [self._sp.decode(r.hypotheses[0][1:] if r.hypotheses[0][0] == tgt_lang else r.hypotheses[0])
                 for r in results]
-
-    def _best_compute_type(self, device: str, sp: object) -> str:
-        # See src/bn_en_translate/models/nllb_ct2.py for full implementation
-        ...
 ```
 
 Then register in `factory.py` and `scripts/download_models.py`.
@@ -210,10 +218,13 @@ The script uses `ct2-transformers-converter` and copies the SentencePiece tokeni
 ## Benchmark
 
 ```bash
-# Quick smoke test (20 sentences, NLLB-600M)
+# Quick smoke test (5 sentences, NLLB-600M) — also validates GPU
+python scripts/benchmark.py --models nllb-600M --sentences 5
+
+# Standard comparison (20 sentences)
 python scripts/benchmark.py --models nllb-600M --sentences 20
 
-# Full comparison
+# Full comparison across models
 python scripts/benchmark.py --models nllb-600M nllb-1.3B indicTrans2-1B --sentences 100
 
 # CPU only
@@ -222,12 +233,14 @@ python scripts/benchmark.py --models nllb-600M --device cpu --sentences 10
 
 Output columns: Model, Backend class, BLEU, Time, chars/sec, VRAM used.
 
+Current baseline BLEU on 90-sentence built-in corpus: **56.2** (NLLB-600M CT2 float16).
+
 ---
 
 ## Corpus
 
 ```bash
-python scripts/get_corpus.py          # generates/downloads built-in 100-sentence corpus
+python scripts/get_corpus.py          # generates/downloads built-in 90-sentence corpus
 python scripts/get_corpus.py --force  # re-generate
 
 # Download Samanantar (8.5M Bengali-English pairs, sample 10K)
@@ -240,19 +253,19 @@ python scripts/download_corpus.py --verify     # check alignment without re-down
 
 ```
 corpus/
-├── flores200_devtest.bn.txt     # 100 Bengali sentences (built-in, 10 domains)
-├── flores200_devtest.en.txt     # 100 English references
+├── flores200_devtest.bn.txt     # 90 Bengali sentences (built-in, 10 domains)
+├── flores200_devtest.en.txt     # 90 English references
 └── samanantar/                  # Downloaded from ai4bharat/samanantar
-    ├── train.bn.txt / train.en.txt  # ~7 800 pairs (80%)
-    ├── val.bn.txt   / val.en.txt    # ~980 pairs  (10%)
-    └── test.bn.txt  / test.en.txt   # ~980 pairs  (10%)
+    ├── train.bn.txt / train.en.txt  # ~7 863 pairs (80%)
+    ├── val.bn.txt   / val.en.txt    # ~982 pairs  (10%)
+    └── test.bn.txt  / test.en.txt   # ~984 pairs  (10%)
 ```
 
 ---
 
-## Fine-tuning
+## Running Fine-tuning
 
-Fine-tune NLLB-600M with LoRA (parameter-efficient, < 1% trainable params).
+Fine-tune NLLB-600M with LoRA (parameter-efficient, ~0.76% trainable params). See [`docs/TRAINING.md`](TRAINING.md) for full details.
 
 ### Install training dependencies
 
@@ -271,13 +284,13 @@ python scripts/download_corpus.py   # ~10 000 pairs, takes ~30s
 ### Run fine-tuning
 
 ```bash
-# Full run (3 epochs on all 7 800 training pairs)
+# Full GPU run (3 epochs on all ~7 863 training pairs, ~20-30 min on RTX 5050)
 python scripts/finetune.py
 
 # Quick smoke test (CPU, 500 pairs, 1 epoch)
 python scripts/finetune.py --epochs 1 --max-train-pairs 500 --skip-baseline
 
-# With all options
+# With explicit options
 python scripts/finetune.py \
     --epochs 3 \
     --lr 2e-4 \
@@ -297,24 +310,74 @@ bn-translate --input story.bn.txt --output story.en.txt \
     --model nllb-600M --model-path models/nllb-600M-finetuned-ct2
 ```
 
-### GPU note (sm_120 + PyTorch cu124)
+---
 
-PyTorch 2.6.0+cu124 has no compiled sm_120 (Blackwell) training kernels. Fine-tuning automatically falls back to CPU. For GPU training, install PyTorch cu128:
+## Resource Monitoring
+
+Every benchmark and fine-tune run is recorded to `monitor/runs.db`. Use the analysis scripts to review run history.
+
+### View run statistics with `show_stats.py`
 
 ```bash
-pip install torch --index-url https://download.pytorch.org/whl/cu128
+# List recent runs
+python scripts/show_stats.py list
+
+# Filter by run type and model
+python scripts/show_stats.py list --run-type benchmark --model nllb-600M --limit 10
+
+# Show full detail for one run (use run_id prefix)
+python scripts/show_stats.py show abc123
+
+# Show a metric trend over time (oldest → newest)
+python scripts/show_stats.py trend bleu_score --run-type benchmark
+
+# Compare two runs side by side
+python scripts/show_stats.py compare <run_id_a> <run_id_b>
+
+# Detect regressions vs rolling average of last 5 runs
+python scripts/show_stats.py regressions --run-type benchmark --lookback 5
 ```
 
-CTranslate2 inference (not training) continues to work via its own CUDA kernels at float16.
+Available metrics for `trend`: `bleu_score`, `chars_per_sec`, `duration_s`, `cpu_peak_pct`, `cpu_avg_pct`, `ram_peak_mib`, `ram_avg_mib`, `swap_peak_mib`, `swap_avg_mib`, `disk_read_mb`, `disk_write_mb`, `gpu_vram_peak_mib`, `gpu_vram_avg_mib`, `gpu_util_peak_pct`, `gpu_util_avg_pct`.
 
-### Architecture: src/bn_en_translate/training/
+### Generate plots with `plot_stats.py`
 
+```bash
+# All plots (saved to monitor/plots/)
+python scripts/plot_stats.py
+
+# Filter by run type
+python scripts/plot_stats.py --run-type benchmark
+
+# Last N runs only
+python scripts/plot_stats.py --limit 20
 ```
-training/
-├── corpus.py    # load_corpus_files, filter_corpus, split_corpus, save_corpus_files
-├── dataset.py   # BengaliEnglishDataset (PyTorch Dataset), collate_fn
-└── trainer.py   # NLLBFineTuner (LoRA via PEFT + HF Seq2SeqTrainer), compute_corpus_bleu
-```
+
+Plots produced:
+- `bleu_over_runs.png` — BLEU score per benchmark run (bar chart, colour-coded by quality tier)
+- `resource_usage.png` — CPU, RAM, VRAM, GPU utilisation per run
+- `duration_vs_input.png` — translation speed scatter (duration vs input character count)
+- `finetune_loss.png` — training loss over fine-tune runs
+- `radar_latest.png` — radar chart of the latest run's full resource profile
+
+See [`docs/MONITORING.md`](MONITORING.md) for full monitoring documentation.
+
+---
+
+## Running the Monitor Agent
+
+The monitor Claude Code agent (`/.claude/agents/monitor.md`) reviews run history, detects regressions, and updates `monitor/observations.md`.
+
+To invoke it:
+
+1. Open Claude Code in the project root with the venv active.
+2. Use the Agent tool referencing `.claude/agents/monitor.md`, or use the slash command if configured.
+3. The agent reads `monitor/runs.db`, runs `python scripts/show_stats.py regressions`, and appends findings to `monitor/observations.md`.
+
+Typical triggers:
+- After any benchmark run where BLEU changed
+- After fine-tuning completes (to compare pre/post BLEU)
+- After hardware or dependency changes (to detect resource regressions)
 
 ---
 
@@ -324,12 +387,13 @@ See [`docs/HARDWARE.md`](HARDWARE.md) for GPU-specific issues.
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `CUBLAS_STATUS_NOT_SUPPORTED` | INT8 ops on sm_120 + CUDA 12.4 | Use float16; `_best_compute_type()` handles this |
+| `CUBLAS_STATUS_NOT_SUPPORTED` | INT8 ops on sm_120 + CUDA 12.4 | Use float16; `_best_compute_type()` handles this automatically |
 | "Ra Ra Ra Ra..." output | Wrong NLLB tokenisation order | Source must be `tokens + [</s>, src_lang]` |
-| `Bus error` on `import torch` | PyTorch nightly on AMD CPU (AMX) | Use `2.6.0+cu124` stable |
+| `Bus error` on `import torch` | PyTorch nightly on AMD CPU (AMX) | Use stable cu128: `pip install torch --index-url https://download.pytorch.org/whl/cu128` |
+| GPU training falls back to CPU | PyTorch cu124 has no sm_120 training kernels | Install PyTorch cu128 |
 | Corrupt torch install | Concurrent pip processes | Kill all pip, `rm -rf .venv/lib/.../torch`, reinstall |
-| `ModuleNotFoundError: torch` after install | Venv not activated | `source .venv/bin/activate` |
-| Slow model downloads | HF_HOME on NTFS `/mnt/c/...` | Set `HF_HOME` to Linux filesystem path |
-| Fine-tuning falls back to CPU | PyTorch cu124 has no sm_120 kernels | Install PyTorch cu128 for GPU training |
-| `evaluation_strategy` TypeError | transformers 5.x renamed it | Use `eval_strategy` in TrainingArguments |
-| `no_cuda` TypeError | transformers 5.x renamed it | Use `use_cpu=True` in TrainingArguments |
+| `ModuleNotFoundError: torch` | Venv not activated | `source .venv/bin/activate` |
+| Slow model downloads | HF_HOME on NTFS `/mnt/c/...` | Set `HF_HOME` to a Linux filesystem path |
+| `evaluation_strategy` TypeError | transformers 5.x renamed it | Use `eval_strategy` in `TrainingArguments` |
+| `no_cuda` TypeError | transformers 5.x renamed it | Use `use_cpu=True` in `TrainingArguments` |
+| `torch_dtype` TypeError | transformers 5.x renamed it | Use `dtype=` in `from_pretrained()` |

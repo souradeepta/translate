@@ -122,10 +122,8 @@ class NLLBFineTuner:
 
         self._use_cuda = use_cuda
         if use_cuda:
-            if self.finetune_config.fp16:
-                self._peft_model = self._peft_model.half()
             self._peft_model = self._peft_model.to("cuda")
-            logger.info("Model moved to CUDA (fp16=%s)", self.finetune_config.fp16)
+            logger.info("Model moved to CUDA (bf16=%s)", self.finetune_config.fp16)
         else:
             logger.info("Training on CPU (PyTorch sm_120 not supported in cu124)")
         try:
@@ -214,7 +212,8 @@ class NLLBFineTuner:
             weight_decay=ft.weight_decay,
             max_grad_norm=ft.max_grad_norm,
             learning_rate=ft.learning_rate,
-            fp16=use_fp16,
+            bf16=use_fp16,
+            fp16=False,
             eval_strategy="steps",
             eval_steps=ft.eval_steps,
             save_strategy="steps",

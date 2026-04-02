@@ -14,3 +14,13 @@ build/
 *.env
 .env
 .hypothesis/
+
+# Paper PDFs (compiled output — generate locally with: cd paper && tectonic ieee_paper.tex)
+/paper/*.pdf
+/paper/*.aux
+/paper/*.log
+/paper/*.out
+/paper/*.toc
+/paper/*.bbl
+/paper/*.blg
+/paper/*.synctex.gz

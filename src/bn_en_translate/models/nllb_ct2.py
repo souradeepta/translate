@@ -115,6 +115,7 @@ class NLLBCt2Translator(TranslatorBase):
             target_prefix=target_prefix,
             beam_size=self.config.beam_size,
             max_decoding_length=self.config.max_decoding_length,
+            max_batch_size=32,
         )
 
         output_texts: list[str] = []

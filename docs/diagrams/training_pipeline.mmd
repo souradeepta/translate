@@ -1,0 +1,45 @@
+flowchart LR
+    subgraph Data["Data"]
+        A["Samanantar corpus\n7,863 train pairs\n982 val pairs\n984 test pairs"]
+    end
+
+    subgraph Baseline["Baseline Evaluation"]
+        B["Load CT2 model\nnllb-600M-ct2"]
+        C["Translate 984\ntest sentences\nmax_batch_size=32"]
+        D["Compute BLEU\nbaseline ~56.2"]
+        B --> C --> D
+    end
+
+    subgraph LoRA["LoRA Fine-tuning"]
+        E["Load NLLB-600M\nfloat32 → CUDA"]
+        F["Wrap with LoRA\nr=16, α=32\ntarget: q/k/v/out_proj\n0.76% trainable params"]
+        G["Seq2SeqTrainer\nbf16=True · batch=8\ngrad_accum=4 · lr=2e-4\n3 epochs"]
+        H["Checkpoint every\n~123 steps"]
+        E --> F --> G --> H
+    end
+
+    subgraph Export["CT2 Export"]
+        I["Merge LoRA\nadapter weights\ninto base model"]
+        J["ct2-opus-mt-converter\nor optimum export\nfloat16 quantization"]
+        K["models/\nnllb-600M-finetuned-ct2/"]
+        I --> J --> K
+    end
+
+    subgraph PostEval["Post-FT Evaluation"]
+        L["Load fine-tuned\nCT2 model"]
+        M["Translate 984\ntest sentences"]
+        N["Compute BLEU\nΔ vs baseline"]
+        L --> M --> N
+    end
+
+    Data --> Baseline
+    Data --> LoRA
+    Baseline --> LoRA
+    LoRA --> Export
+    Export --> PostEval
+
+    style Data fill:#e8f5e9,stroke:#2e7d32
+    style Baseline fill:#e3f2fd,stroke:#1565c0
+    style LoRA fill:#fff3e0,stroke:#e65100
+    style Export fill:#f3e5f5,stroke:#6a1b9a
+    style PostEval fill:#fce4ec,stroke:#880e4f

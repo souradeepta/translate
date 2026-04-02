@@ -1,0 +1,60 @@
+classDiagram
+    class TranslatorBase {
+        <<abstract>>
+        +config : PipelineConfig
+        +is_loaded : bool
+        +load() None
+        +unload() None
+        +translate(texts, src_lang, tgt_lang) list~str~
+        #_translate_batch(texts, src_lang, tgt_lang) list~str~
+    }
+
+    class NLLBCt2Translator {
+        -_translator : ctranslate2.Translator
+        -_sp : SentencePieceProcessor
+        +load() None
+        #_translate_batch() list~str~
+        -_best_compute_type() str
+        note "Probes float16 vs float32 at load time\nmax_batch_size=32 prevents OOM"
+    }
+
+    class NLLBTranslator {
+        -_pipe : transformers.Pipeline
+        +load() None
+        #_translate_batch() list~str~
+        note "HuggingFace pipeline fallback\nUsed when CT2 model not on disk"
+    }
+
+    class IndicTrans2Translator {
+        -_model : IndicTransTokenizer
+        +load() None
+        #_translate_batch() list~str~
+        note "ai4bharat/indictrans2-indic-en-1B\n~3 GB VRAM"
+    }
+
+    class OllamaTranslator {
+        -_base_url : str
+        +load() None
+        #_translate_batch() list~str~
+        note "HTTP to local Ollama daemon\nqwen2.5:7b-instruct literary polish"
+    }
+
+    class TranslationPipeline {
+        -_translator : TranslatorBase
+        -_preprocessor : Preprocessor
+        -_chunker : Chunker
+        -_postprocessor : Postprocessor
+        +translate_file(input, output) None
+        +translate_text(text) str
+    }
+
+    class ModelFactory {
+        +get_translator(config) TranslatorBase$
+    }
+
+    TranslatorBase <|-- NLLBCt2Translator
+    TranslatorBase <|-- NLLBTranslator
+    TranslatorBase <|-- IndicTrans2Translator
+    TranslatorBase <|-- OllamaTranslator
+    TranslationPipeline --> TranslatorBase : uses
+    ModelFactory ..> TranslatorBase : creates

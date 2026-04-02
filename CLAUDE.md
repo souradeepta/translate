@@ -9,25 +9,26 @@ python scripts/benchmark.py --models nllb-600M --sentences 5   # quick GPU smoke
 ```
 
 **State as of 2026-04-01:**
-- `models/nllb-600M-ct2/` ✅ downloaded, working via CT2 float16 (BLEU 65.2 on built-in corpus)
-- `corpus/` ✅ 100-sentence built-in + 9,829 Samanantar pairs (train/val/test splits)
+- `models/nllb-600M-ct2/` ✅ downloaded, working via CT2 float16 (BLEU 56.2 on 90-sentence corpus)
+- `corpus/` ✅ 90-sentence built-in + 9,829 Samanantar pairs (train/val/test splits)
 - All 186 unit/integration tests passing
-- Fine-tuning pipeline implemented (LoRA via PEFT); smoke test complete (train_loss=7.19, CPU)
+- **PyTorch 2.7.0+cu128** installed — GPU training FULLY UNLOCKED (6/6 sm_120 probes pass)
 - Resource monitoring: `ResourceMonitor` + `RunDatabase` (SQLite) record every benchmark/finetune run
-- Fine-tuning pipeline implemented (LoRA via PEFT); **PyTorch 2.7.1+cu128 installed** — GPU training works
-- Next unlock: `python scripts/download_models.py --model indicTrans2-1B` (~3 GB)
+- Next: run GPU fine-tuning `python scripts/finetune.py` (expected ~20–30 min on RTX 5050)
 
 **Never do these (painful lessons):**
-- ❌ PyTorch nightly → SIGBUS on AMD Ryzen; use stable cu124
+- ❌ PyTorch cu124 for training → `no kernel image` on `.ne()` and all element-wise ops on sm_120
+- ✅ PyTorch 2.7.0+cu128 — all sm_120 training ops pass; AMD Ryzen SIGBUS was a corrupt-pip artifact
+- ❌ PyTorch nightly → historically caused SIGBUS; use cu128 stable instead
 - ❌ CTranslate2 int8/int8_float16 on CUDA → CUBLAS fail on sm_120; use float16
 - ❌ `[src_lang, tokens...]` for NLLB → garbage output; use `tokens + [</s>, src_lang]`
 - ❌ Multiple concurrent pip installs → corrupt install
 - ❌ `models/` in .gitignore (bare) → also matches src/bn_en_translate/models/; use `/models/`
-- ❌ PyTorch training on sm_120 with cu124 → `no kernel image` on `.ne()` and other ops; install cu128
-- ✅ PyTorch 2.7.1+cu128 works for both training and inference on sm_120 (installed 2026-04-01)
 - ❌ `evaluation_strategy` in transformers ≥5.x → renamed to `eval_strategy`
 - ❌ `no_cuda` in transformers ≥5.x → renamed to `use_cpu`
 - ❌ `torch_dtype` in transformers ≥5.x → renamed to `dtype`
+- ❌ `.half()` model weights + `fp16=True` training → GradScaler raises `ValueError: Attempting to unscale FP16 gradients`; use `bf16=True` instead (no GradScaler needed, Blackwell sm_120 supports bf16)
+- ❌ CT2 `translate_batch()` with 900+ sentences at once → CUDA OOM; always pass `max_batch_size=32`
 
 ---
 
@@ -212,6 +213,9 @@ Use these specialized agents via the Agent tool:
 | `.claude/agents/tester.md` | Writing or running tests, debugging test failures |
 | `.claude/agents/architect.md` | Design decisions, new model integration, pipeline changes |
 | `.claude/agents/monitor.md` | After any run: detect regressions, suggest optimizations, update `monitor/observations.md` |
+| `.claude/agents/paper_writer.md` | After a training run: fill in results, regenerate figures, update `paper/ieee_paper.tex` |
+| `.claude/agents/survey_writer.md` | When new Bengali NMT papers publish: search, extract BLEU, update `paper/survey_paper.tex` |
+| `.claude/agents/docs_writer.md` | After API/config/hardware changes: keep `docs/` in sync with codebase |
 
 ---
 

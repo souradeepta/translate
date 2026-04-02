@@ -1,0 +1,38 @@
+sequenceDiagram
+    actor User
+    participant CLI as CLI<br/>(bn-translate)
+    participant PP as Preprocessor
+    participant CK as Chunker
+    participant TR as NLLBCt2Translator<br/>(float16 GPU)
+    participant PO as Postprocessor
+    participant FS as File System
+
+    User->>CLI: bn-translate --input story.bn.txt --output out.en.txt
+    CLI->>FS: read_story(input_path)
+    FS-->>CLI: raw_text (UTF-8)
+
+    CLI->>PP: normalize(raw_text)
+    Note over PP: NFC unicode<br/>collapse whitespace<br/>strip zero-width chars
+    PP-->>CLI: clean_text
+
+    CLI->>CK: chunk(clean_text)
+    Note over CK: Split paragraphs<br/>Split at danda ।/॥<br/>Pack ≤400 tokens<br/>Tag para_id + chunk_id
+    CK-->>CLI: [ChunkResult × N]
+
+    CLI->>TR: load()
+    Note over TR: ctranslate2.Translator<br/>device=cuda, compute_type=float16<br/>_best_compute_type() probe
+    TR-->>CLI: ready
+
+    CLI->>TR: translate(chunk_texts, ben_Beng, eng_Latn)
+    Note over TR: Tokenise with SentencePiece<br/>Format: tokens + [</s>, src_lang]<br/>Target prefix: [tgt_lang]<br/>translate_batch(max_batch_size=32)
+    TR-->>CLI: [translated_texts × N]
+
+    CLI->>PO: reassemble(chunks, translated_texts)
+    Note over PO: Group by para_id<br/>Join sentence chunks<br/>Clean MT artifacts
+    PO-->>CLI: english_text
+
+    CLI->>TR: unload()
+    Note over TR: torch.cuda.empty_cache()
+
+    CLI->>FS: write_translation(output_path, english_text)
+    CLI-->>User: Done ✓

@@ -1,0 +1,55 @@
+flowchart TB
+    subgraph CLI["CLI Layer"]
+        A["bn-translate\n(Click CLI)"]
+    end
+
+    subgraph Pipeline["Pipeline Layer"]
+        B["TranslationPipeline\nOrchestrates 4 stages"]
+    end
+
+    subgraph Stages["Processing Stages"]
+        C["Preprocessor\nNFC · whitespace"]
+        D["Chunker\n≤400 tokens\ndanda split"]
+        E["Postprocessor\npara reassembly\nMT artifact cleanup"]
+    end
+
+    subgraph Models["Model Layer"]
+        F["ModelFactory\nget_translator()"]
+        G["NLLBCt2Translator\nCT2 float16 GPU\n✅ primary"]
+        H["NLLBTranslator\nHF pipeline\nfallback"]
+        I["IndicTrans2\n~3GB VRAM\noptional"]
+        J["OllamaTranslator\nqwen2.5:7b\npolish pass"]
+        F --> G & H & I & J
+    end
+
+    subgraph Training["Training Layer"]
+        K["NLLBFineTuner\nLoRA via PEFT\nbf16 GPU"]
+        L["BengaliEnglishDataset\nPyTorch Dataset"]
+        M["Seq2SeqTrainer\nHuggingFace Trainer"]
+        K --> L & M
+    end
+
+    subgraph Monitoring["Monitoring Layer"]
+        N["ResourceMonitor\npsutil + pynvml\ndaemon thread"]
+        O["RunDatabase\nSQLite upsert\ntrend queries"]
+        N --> O
+    end
+
+    subgraph Config["Config Layer"]
+        P["ChunkConfig\nModelConfig\nPipelineConfig\nFineTuneConfig\nMonitorConfig"]
+    end
+
+    A --> B
+    B --> C & D & E
+    B --> F
+    K --> N
+    M --> N
+    P -.-> B & K & N
+
+    style CLI fill:#e3f2fd,stroke:#1565c0,color:#000
+    style Pipeline fill:#e8f5e9,stroke:#2e7d32,color:#000
+    style Stages fill:#e8f5e9,stroke:#2e7d32,color:#000
+    style Models fill:#fff3e0,stroke:#e65100,color:#000
+    style Training fill:#f3e5f5,stroke:#6a1b9a,color:#000
+    style Monitoring fill:#fce4ec,stroke:#880e4f,color:#000
+    style Config fill:#f5f5f5,stroke:#616161,color:#000

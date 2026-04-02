@@ -1,0 +1,48 @@
+flowchart TD
+    subgraph Scripts["Entry Points"]
+        A["benchmark.py"]
+        B["finetune.py"]
+    end
+
+    subgraph Monitor["ResourceMonitor (context manager)"]
+        C["__enter__\nPrime cpu_percent\nInit pynvml\nSnapshot disk I/O\nStart daemon thread"]
+        D["daemon thread\nSamples every 2s"]
+        E["__exit__\nStop thread\nCompute disk delta\nShutdown pynvml\nBuild ResourceSummary"]
+
+        subgraph Samplers["Samplers"]
+            F["psutil\ncpu_percent()\nvirtual_memory()\nswap_memory()"]
+            G["pynvml\nnvmlDeviceGetMemoryInfo()\nnvmlDeviceGetUtilizationRates()"]
+            H["nvidia-smi\nsubprocess fallback\nif pynvml unavailable"]
+        end
+        D --> F
+        D --> G
+        G -- "unavailable" --> H
+    end
+
+    subgraph Storage["RunDatabase (SQLite)"]
+        I["save_run()\nINSERT OR REPLACE\nupsert on run_id"]
+        J["list_runs()\nfilter by type/model\nORDER BY started_at DESC"]
+        K["get_trend()\nwhitelist-validated metric\nchrono ordered"]
+        L["monitor/runs.db\ngitignored"]
+        I --> L
+        J --> L
+        K --> L
+    end
+
+    subgraph Analysis["Analysis Tools"]
+        M["show_stats.py\nlist / show / trend\ncompare / regressions"]
+        N["plot_stats.py\nBLEU · resources\nradar · scatter"]
+        O[".claude/agents/monitor.md\nregression detection\nobservations.md"]
+    end
+
+    Scripts --> C
+    C --> D
+    C --> E
+    E --> I
+    Storage --> M
+    Storage --> N
+    Storage --> O
+
+    style Monitor fill:#fff3e0,stroke:#e65100
+    style Storage fill:#e3f2fd,stroke:#1565c0
+    style Analysis fill:#e8f5e9,stroke:#2e7d32
