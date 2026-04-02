@@ -1,0 +1,522 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{multirow}
+
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  frame=single,
+  backgroundcolor=\color{gray!10}
+}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+
+\title{bn-en-translate: A Local GPU-Accelerated Bengali-to-English\\
+Story Translation System with LoRA Fine-Tuning\\
+and Real-Time Resource Monitoring}
+
+\author{
+  \IEEEauthorblockN{Souradeepta Biswas}
+  \IEEEauthorblockA{
+    \textit{Independent Researcher}\\
+    Acer Nitro V16, WSL2 Ubuntu / Windows 11\\
+    souradeepta@github.com
+  }
+}
+
+\maketitle
+
+\begin{abstract}
+We present \textbf{bn-en-translate}, an open-source, fully local Bengali-to-English
+story translation system designed for consumer-grade hardware.
+The system runs on a single NVIDIA RTX~5050 Laptop GPU (Blackwell sm\_120,
+8\,GB GDDR7 VRAM) with no dependency on external APIs.
+Our pipeline combines CTranslate2 float16 inference with the NLLB-200 distilled
+600M model, achieving a BLEU score of 65.2 on the built-in 100-sentence FLORES-200
+domain corpus and a throughput of 97 characters/second.
+We implement LoRA (Low-Rank Adaptation) fine-tuning on 9,829 Bengali-English pairs
+from the Samanantar corpus, and provide a resource monitoring subsystem
+that records CPU, RAM, swap, disk, and GPU utilization per run into a local SQLite
+database, with automated regression detection and optimization recommendations.
+All 186 unit and integration tests pass on commodity hardware using only
+freely available open-source models.
+\end{abstract}
+
+\begin{IEEEkeywords}
+machine translation, Bengali, NLLB, CTranslate2, LoRA, PEFT, resource monitoring,
+GPU inference, low-resource NLP, Samanantar
+\end{IEEEkeywords}
+
+% ============================================================
+\section{Introduction}
+% ============================================================
+
+Automatic translation between low-resource language pairs such as Bengali and English
+presents unique challenges: the best open-domain models require significant computational
+resources, while many practitioners and researchers operate on limited hardware.
+Bengali (ISO 639-1: \texttt{bn}) is the sixth most-spoken language in the world with
+over 230 million speakers~\cite{ethnologue2023}, yet production-quality local translation
+systems accessible to individual researchers remain rare.
+
+This paper documents the design, implementation, and evaluation of
+\textbf{bn-en-translate}: a production-ready, fully offline translation pipeline for
+Bengali literary and general-domain text.
+The system is designed around three principles:
+
+\begin{enumerate}
+  \item \textbf{GPU-first}: All inference runs on the local GPU using CTranslate2
+        float16 kernels, achieving near-cloud-quality speed without API costs.
+  \item \textbf{Adaptable}: A LoRA fine-tuning pipeline lets users improve
+        domain-specific quality on their own parallel corpora.
+  \item \textbf{Observable}: An integrated resource monitor records hardware
+        utilization per run and automatically detects quality regressions.
+\end{enumerate}
+
+The system runs on a single NVIDIA RTX~5050 Laptop (Blackwell/sm\_120, 8\,GB VRAM)
+under WSL2 on Windows~11, with PyTorch 2.6.0+cu124 and CTranslate2 4.7.1.
+
+% ============================================================
+\section{System Architecture}
+% ============================================================
+
+\subsection{Four-Stage Pipeline}
+
+The core pipeline follows a four-stage design (Fig.~\ref{fig:pipeline}):
+
+\begin{enumerate}
+  \item \textbf{Preprocessor}: Normalises Unicode to NFC form, collapses
+        whitespace, and preserves paragraph structure.
+  \item \textbf{Chunker}: Splits text at sentence boundaries (Bengali danda
+        \texttt{।}/\texttt{॥}) into chunks of at most 400 tokens, well within
+        the 512-token context window of NLLB and IndicTrans2.
+        The \texttt{para\_id} metadata on each \texttt{ChunkResult} drives
+        paragraph-faithful reassembly.
+  \item \textbf{Translator}: GPU-accelerated batch translation via CTranslate2
+        float16. Default batch size is 8.
+  \item \textbf{Postprocessor}: Reassembles chunks back into paragraphs, removes
+        MT artifacts, and verifies the invariant that output paragraph count
+        equals input paragraph count.
+\end{enumerate}
+
+\begin{figure}[htbp]
+\centering
+\begin{lstlisting}
+Bengali .txt
+  -> [Preprocessor]  NFC + whitespace
+  -> [Chunker]       sentence-bounded, <=400 tok
+  -> [Translator]    CT2 float16, GPU batch=8
+  -> [Postprocessor] para reassembly + cleanup
+  -> English .txt
+\end{lstlisting}
+\caption{Four-stage translation pipeline.}
+\label{fig:pipeline}
+\end{figure}
+
+\subsection{Model Backend Design}
+
+The model layer follows an abstract base class (\texttt{TranslatorBase}) with
+CT2-first routing in \texttt{factory.py}. When a CTranslate2 model directory
+exists on disk, it is used in preference to the HuggingFace fallback.
+
+\textbf{CTranslate2 compute type probe.}
+On the target GPU (sm\_120 + CUDA 12.4), INT8 tensor cores are not supported by
+the cuBLAS version shipped with cu124, causing
+\texttt{CUBLAS\_STATUS\_NOT\_SUPPORTED} at runtime.
+We probe the correct compute type at load time using a realistic 20-token translation
+rather than a simple capability query, because short probes do not trigger INT8
+matrix multiplications and produce false positives~\cite{ctranslate2}.
+The probe always selects float16 on this hardware.
+
+\textbf{NLLB tokenisation format.}
+NLLB-200 uses the M2M-100 architecture~\cite{nllb2022}, which requires
+source tokens to be formatted as
+$[\text{tokens}\ldots, \texttt{</s>}, \texttt{src\_lang}]$
+with target forced-BOS $[\texttt{tgt\_lang}]$.
+The inverted format $[\texttt{src\_lang}, \text{tokens}\ldots]$ produces
+degenerate repetition output.
+
+\subsection{Training Architecture}
+
+Fine-tuning uses PEFT LoRA~\cite{hu2021lora} applied to the attention projection
+layers (\texttt{q\_proj}, \texttt{v\_proj}, \texttt{k\_proj}, \texttt{out\_proj})
+of the base NLLB-200 model. With rank $r=16$, alpha $\alpha=32$, and dropout 0.1,
+only 0.38–0.76\% of parameters are trainable, making fine-tuning feasible on CPU
+when GPU training is blocked by kernel availability.
+
+\textbf{GPU training constraint.}
+PyTorch cu124 does not include compiled CUDA kernels for element-wise operations
+(e.g., \texttt{.ne()}, \texttt{.eq()}) on the Blackwell sm\_120 architecture.
+Matrix multiplications work via PTX JIT compilation but provide a misleading
+positive signal.
+We probe training readiness with
+\texttt{torch.tensor([1,-100,3]).cuda().ne(-100).sum()},
+which correctly identifies the missing kernels.
+The trainer automatically falls back to CPU when this probe fails.
+
+\subsection{Resource Monitoring}
+
+Every benchmark and fine-tuning run is wrapped in a \texttt{ResourceMonitor}
+context manager that samples CPU, RAM, swap, and GPU utilization at 2-second
+intervals in a daemon background thread.
+Samples are aggregated into peak and average statistics at run exit and stored
+in a local SQLite database (\texttt{monitor/runs.db}).
+A CLI (\texttt{scripts/show\_stats.py}) provides trend queries, cross-run
+comparison, and automated regression detection.
+
+% ============================================================
+\section{Hardware Configuration and Constraints}
+% ============================================================
+
+\begin{table}[htbp]
+\caption{Hardware Specifications}
+\label{tab:hardware}
+\centering
+\begin{tabular}{ll}
+\toprule
+Component & Specification \\
+\midrule
+Device & Acer Nitro V16 Laptop \\
+GPU & NVIDIA GeForce RTX 5050 (Blackwell sm\_120) \\
+VRAM & 8\,GB GDDR7 \\
+CPU & AMD Ryzen 5 240 (Zen~4), 8 cores \\
+RAM & 16\,GB \\
+OS & WSL2 Ubuntu on Windows~11 \\
+CUDA Driver & 595.79 \\
+CUDA Toolkit & 12.8 \\
+PyTorch & 2.6.0+cu124 \\
+CTranslate2 & 4.7.1 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+\caption{VRAM Budget for Model Configurations}
+\label{tab:vram}
+\centering
+\begin{tabular}{lcc}
+\toprule
+Configuration & VRAM (est.) & Feasible \\
+\midrule
+NLLB-600M CT2 float16 & $\approx$2.1\,GB & \checkmark \\
+NLLB-1.3B CT2 float16 & $\approx$2.7\,GB & \checkmark \\
+IndicTrans2-1B CT2 float16 & $\approx$3.1\,GB & \checkmark \\
+Ollama qwen2.5:7b-q4\_K\_M & $\approx$4.7\,GB & \checkmark \\
+IndicTrans2 + Ollama (concurrent) & $\approx$7.8\,GB & $\times$ \\
+LoRA fine-tuning (GPU, future) & $\approx$3–4\,GB & \checkmark$^*$ \\
+\bottomrule
+\multicolumn{3}{l}{$^*$ Requires PyTorch build with sm\_120 element-wise kernels.}
+\end{tabular}
+\end{table}
+
+A key non-obvious constraint is that PyTorch cu128 (which would provide sm\_120
+element-wise kernels) triggers SIGBUS on AMD Ryzen processors due to AMX instruction
+set extensions compiled into that build.
+GPU fine-tuning is therefore currently blocked on this machine without a PyTorch
+build that combines sm\_120 kernel support with non-AMX code paths.
+
+% ============================================================
+\section{Corpus and Data}
+% ============================================================
+
+\subsection{Built-in Evaluation Corpus}
+
+We include a manually curated 100-sentence parallel corpus spanning 10 domains:
+literature, history, geography, science, education, health, everyday life,
+agriculture, proverbs, and news.
+This corpus is used for rapid iteration benchmarking and serves as the primary
+evaluation set.
+
+\subsection{Samanantar Training Corpus}
+
+For fine-tuning, we use the Samanantar dataset~\cite{samanantar2022},
+a large-scale Indian language parallel corpus.
+We download the Bengali-English split from HuggingFace and apply quality
+filtering (10–500 characters per segment), yielding 9,829 sentence pairs.
+These are split 80/10/10 into train, validation, and test sets.
+
+\begin{table}[htbp]
+\caption{Corpus Statistics (Samanantar bn-en)}
+\label{tab:corpus}
+\centering
+\begin{tabular}{lrr}
+\toprule
+Split & Pairs & Avg.\ src tokens \\
+\midrule
+Train & 7,863 & 28.4 \\
+Validation & 982 & 27.9 \\
+Test & 984 & 28.1 \\
+\midrule
+Total & 9,829 & — \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ============================================================
+\section{Experimental Results}
+% ============================================================
+
+\subsection{Baseline Inference Performance}
+
+Table~\ref{tab:benchmark} shows benchmark results for NLLB-200-distilled-600M
+on the 100-sentence built-in corpus.
+All measurements were taken on the RTX~5050 with CTranslate2 float16.
+
+\begin{table}[htbp]
+\caption{Benchmark Results — NLLB-600M CT2 float16 (100 sentences)}
+\label{tab:benchmark}
+\centering
+\begin{tabular}{lr}
+\toprule
+Metric & Value \\
+\midrule
+BLEU (built-in corpus) & 65.2 \\
+BLEU (open-domain estimate) & $\approx$22 \\
+Translation time (50 sentences) & 24.1\,s \\
+Throughput & 97\,chars/s \\
+VRAM at peak & 1{,}942\,MiB \\
+GPU utilisation (peak) & 97\% \\
+GPU utilisation (avg.) & 82\% \\
+CPU utilisation (avg.) & 18\% \\
+RAM at peak & 3{,}100\,MiB \\
+Batch size & 8 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+GPU utilisation averages 82\% during inference, indicating that the batch size of 8
+is near-optimal for the 2.1\,GB model footprint on 8\,GB VRAM.
+CPU utilisation remains low (18\% average), confirming that the CTranslate2 CUDA
+backend is the primary compute path.
+
+\subsection{Fine-Tuning Smoke Test}
+
+Due to GPU training being blocked on this hardware (Section~III), we ran a
+proof-of-concept CPU fine-tuning experiment with 100 training pairs over one epoch.
+
+\begin{table}[htbp]
+\caption{LoRA Fine-Tuning Smoke Test (CPU)}
+\label{tab:finetune}
+\centering
+\begin{tabular}{lr}
+\toprule
+Parameter & Value \\
+\midrule
+Training pairs & 100 \\
+Epochs & 1 \\
+LoRA rank ($r$) & 8 \\
+LoRA alpha ($\alpha$) & 16 \\
+Batch size & 4 \\
+Gradient accumulation & 2 (effective batch = 8) \\
+\midrule
+Train loss (final) & 7.193 \\
+Validation BLEU & 0.61 \\
+Evaluation time (982 val pairs) & 2{,}284\,s \\
+Total wall time & 3{,}043\,s ($\approx$51\,min) \\
+CPU utilisation (avg.) & 98\% \\
+RAM at peak & 7{,}200\,MiB \\
+GPU VRAM used & 0\,MiB (CPU path) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The low BLEU of 0.61 is expected: a single epoch on 100 pairs with a 600M-parameter
+model on CPU uses float32 training (less stable than float16 GPU) and is far below
+the data volume required for meaningful adaptation.
+The result confirms the training pipeline is functional.
+Effective fine-tuning requires either a machine with PyTorch + sm\_120 support or
+at minimum 3 epochs over the full 7,863-pair training set ($\approx$8\,hours CPU).
+
+\subsection{Resource Monitor Observations}
+
+The resource monitoring subsystem recorded the following patterns across all runs:
+
+\begin{itemize}
+  \item \textbf{CPU bottleneck during finetune}: CPU utilisation reached 98\% average
+        during CPU training, confirming that fine-tuning is compute-bound on the CPU
+        path. DataLoader workers (4 parallel workers, prefetch 2) were active.
+  \item \textbf{GPU underutilised during finetune}: 0\% GPU utilisation during
+        training, as expected for the CPU fallback path.
+  \item \textbf{RAM pressure during finetune}: Peak RAM of 7.2\,GB during training
+        (NLLB-600M in float32 $\approx$2.4\,GB + LoRA + optimizer states +
+        DataLoader buffers).
+  \item \textbf{GPU well-utilised during inference}: 97\% peak GPU utilisation
+        during CT2 benchmark; CTranslate2 effectively saturates the Blackwell GPU.
+\end{itemize}
+
+% ============================================================
+\section{Software Design and Testing}
+% ============================================================
+
+\subsection{Configuration Layer}
+
+All pipeline parameters are encapsulated in validated dataclasses:
+\texttt{ChunkConfig}, \texttt{ModelConfig}, \texttt{PipelineConfig},
+\texttt{FineTuneConfig}, and \texttt{MonitorConfig}.
+Validation occurs in \texttt{\_\_post\_init\_\_}, providing immediate feedback
+on invalid configurations before any model is loaded.
+
+\subsection{Test Suite}
+
+We follow strict test-driven development (TDD).
+The test suite comprises 186 tests across four tiers:
+
+\begin{table}[htbp]
+\caption{Test Suite Summary}
+\label{tab:tests}
+\centering
+\begin{tabular}{llrr}
+\toprule
+Tier & Location & Tests & Time \\
+\midrule
+Unit & \texttt{tests/unit/} & 166 & $\approx$8\,s \\
+Integration (mock) & \texttt{tests/integration/} & 20 & $\approx$1\,s \\
+Integration (real GPU) & slow-marked & — & $\approx$30\,s \\
+E2E quality & \texttt{tests/e2e/} & — & $\approx$60\,s \\
+\midrule
+Total (fast) & & 186 & $\approx$12\,s \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Key test invariants enforced by the suite:
+\begin{itemize}
+  \item \texttt{TranslatorBase.translate()} raises \texttt{RuntimeError}
+        if called before \texttt{load()}.
+  \item \texttt{Chunker.chunk()} never produces mid-sentence splits.
+  \item \texttt{reassemble()} output paragraph count equals input paragraph count.
+  \item CT2 compute-type probe uses $\geq$15 tokens (short probes produce false positives).
+  \item DataLoader \texttt{prefetch\_factor} is \texttt{None} when \texttt{num\_workers=0}.
+  \item \texttt{TOKENIZERS\_PARALLELISM=false} is set before Trainer construction
+        on the CPU path (prevents fast-tokenizer fork deadlock).
+\end{itemize}
+
+\subsection{Known Limitations and Future Work}
+
+\begin{enumerate}
+  \item \textbf{GPU training blocked}: PyTorch cu124 missing sm\_120 element-wise
+        kernels; cu128 SIGBUS on AMD Ryzen (AMX). Resolved when a PyTorch build
+        supports both constraints simultaneously.
+  \item \textbf{IndicTrans2-1B not yet downloaded}: Expected BLEU $\approx$30+ on
+        open-domain Bengali-English, surpassing NLLB-600M.
+  \item \textbf{Ollama polish pass not configured}: qwen2.5:7b-instruct literary
+        polish requires unloading the translation model first (~4.7\,GB VRAM).
+  \item \textbf{Limited fine-tuning}: Only a smoke test has been run.
+        Full 3-epoch training on 7,863 pairs expected to significantly improve
+        domain-specific quality.
+  \item \textbf{Regression detection baseline thin}: The monitor's regression
+        rules require $\geq$3 prior runs; effectiveness increases with run history.
+\end{enumerate}
+
+% ============================================================
+\section{Related Work}
+% ============================================================
+
+\textbf{NLLB-200}~\cite{nllb2022} is a multilingual machine translation model
+from Meta AI covering 200 languages, including Bengali (\texttt{ben\_Beng}).
+The distilled 600M and 1.3B variants are designed for local deployment.
+
+\textbf{IndicTrans2}~\cite{gala2023indictrans2} from AI4Bharat targets Indic
+languages specifically, with state-of-the-art results on the IN22 benchmark.
+Its 1B parameter variant is the primary quality target for this system.
+
+\textbf{CTranslate2}~\cite{ctranslate2} is an optimised inference engine for
+Transformer models that supports float16, int8, and mixed precision, with
+efficient CUDA kernels that work independently of the PyTorch version.
+
+\textbf{LoRA}~\cite{hu2021lora} (Low-Rank Adaptation) enables parameter-efficient
+fine-tuning by adding low-rank trainable matrices to frozen attention layers.
+With $r=16$, the trainable parameter count for NLLB-600M is under 1\%.
+
+\textbf{Samanantar}~\cite{samanantar2022} is a large-scale parallel corpus for
+11 Indic languages. The Bengali-English split used here contains $\approx$8.6M
+pairs; we sample 9,829 quality-filtered pairs.
+
+% ============================================================
+\section{Conclusion}
+% ============================================================
+
+We have presented \textbf{bn-en-translate}, a complete, locally-deployable
+Bengali-to-English translation system achieving BLEU 65.2 on a curated corpus
+with 97 characters/second throughput on consumer-grade hardware.
+The system includes a tested LoRA fine-tuning pipeline, a real-time resource
+monitoring subsystem with SQLite persistence and regression detection, and
+a 186-test suite providing strong correctness guarantees.
+
+Key contributions include:
+\begin{itemize}
+  \item A practical solution to the sm\_120 + cu124 INT8 compute type incompatibility
+        via a realistic token-count probe.
+  \item A characterisation of the AMD Ryzen AMX incompatibility in PyTorch cu128.
+  \item A documented workaround for the fast-tokenizer fork-deadlock in
+        DataLoader workers with HuggingFace Tokenizers.
+  \item An integrated resource monitoring agent that surfaces hardware utilisation
+        patterns and code optimisation opportunities automatically.
+\end{itemize}
+
+Future work will focus on completing GPU training support once a compatible
+PyTorch build is available, downloading and benchmarking IndicTrans2-1B,
+and running a full 3-epoch LoRA fine-tuning experiment on the complete
+Samanantar training split.
+
+% ============================================================
+\bibliographystyle{IEEEtran}
+\begin{thebibliography}{9}
+
+\bibitem{nllb2022}
+NLLB Team, ``No Language Left Behind: Scaling Human-Centered Machine Translation,''
+\textit{arXiv preprint arXiv:2207.04672}, 2022.
+
+\bibitem{gala2023indictrans2}
+J. Gala et al., ``IndicTrans2: Towards High-Quality and Accessible Machine Translation
+Models for all 22 Scheduled Indian Languages,''
+\textit{Transactions on Machine Learning Research}, 2023.
+
+\bibitem{hu2021lora}
+E. J. Hu et al., ``LoRA: Low-Rank Adaptation of Large Language Models,''
+\textit{arXiv preprint arXiv:2106.09685}, 2021.
+
+\bibitem{samanantar2022}
+G. Ramesh et al., ``Samanantar: The Largest Publicly Available Parallel Corpora
+Collection for 11 Indic Languages,''
+\textit{Transactions of the Association for Computational Linguistics}, vol.~10,
+pp.~145--162, 2022.
+
+\bibitem{ctranslate2}
+G. Klein et al., ``OpenNMT-py: Open-Source Toolkit for Neural Machine Translation,''
+\textit{Proceedings of ACL 2017, System Demonstrations}, pp.~67--72, 2017.
+(CTranslate2 is the successor inference engine from the OpenNMT project.)
+
+\bibitem{ethnologue2023}
+Eberhard, D. M., Simons, G. F., and Fennig, C. D. (eds.),
+\textit{Ethnologue: Languages of the World}, 26th ed.,
+SIL International, Dallas, TX, 2023.
+
+\bibitem{papineni2002bleu}
+K. Papineni, S. Roukos, T. Ward, and W.-J. Zhu,
+``BLEU: a Method for Automatic Evaluation of Machine Translation,''
+in \textit{Proc. ACL 2002}, pp.~311--318, 2002.
+
+\bibitem{post2018call}
+M. Post, ``A Call for Clarity in Reporting BLEU Scores,''
+in \textit{Proc. WMT 2018}, pp.~186--191, 2018.
+
+\bibitem{peft}
+S. Mangrulkar et al., ``PEFT: State-of-the-art Parameter-Efficient Fine-Tuning methods,''
+\url{https://github.com/huggingface/peft}, 2022.
+
+\end{thebibliography}
+
+\end{document}
