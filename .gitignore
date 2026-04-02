@@ -11,7 +11,6 @@ build/
 /models/
 /output/
 /monitor/runs.db
-/monitor/plots/
 *.env
 .env
 .hypothesis/
