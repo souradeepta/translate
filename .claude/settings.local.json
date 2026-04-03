@@ -30,7 +30,37 @@
       "Bash(wait 4054)",
       "Bash(echo \"exit: $?\")",
       "Bash(ls /usr/local/cuda-12.8/lib64/libcudart*)",
-      "Bash(ps:*)"
+      "Bash(ps:*)",
+      "Bash(git push:*)",
+      "Bash(sudo apt-get:*)",
+      "Bash(npm list:*)",
+      "Read(//usr/bin/**)",
+      "Bash(command -v node)",
+      "Bash(snap list:*)",
+      "Bash(git -C /home/sbisw/github/translate remote -v)",
+      "Bash(git -C /home/sbisw/github/translate status --short)",
+      "Bash(dpkg -l texlive*)",
+      "Bash(apt list:*)",
+      "Bash(mkdir -p ~/.local/bin)",
+      "Bash(curl -fsSL https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%400.15.0/tectonic-0.15.0-x86_64-unknown-linux-musl.tar.gz -o /tmp/tectonic.tar.gz)",
+      "Bash(tar -xzf /tmp/tectonic.tar.gz -C ~/.local/bin)",
+      "Bash(~/.local/bin/tectonic --version)",
+      "Bash(~/.local/bin/tectonic ieee_paper.tex)",
+      "Bash(ls -lh /home/sbisw/github/translate/paper/*.pdf)",
+      "Bash(~/.local/bin/tectonic survey_paper.tex)",
+      "Bash(ls -lh *.pdf)",
+      "WebSearch",
+      "WebFetch(domain:chromewebstore.google.com)",
+      "Bash(pdflatex -interaction=nonstopmode ieee_paper.tex)",
+      "Bash(dpkg -l)",
+      "Bash(ls /usr/bin/pdf* /usr/bin/xel* /usr/bin/latex*)",
+      "Bash(ls /usr/local/bin/pdf*)",
+      "Bash(git fetch:*)",
+      "Bash(git stash:*)",
+      "Bash(git reset:*)"
     ]
+  },
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true
   }
 }
