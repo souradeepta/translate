@@ -38,6 +38,7 @@ python scripts/download_models.py --model nllb-600M
 | [HARDWARE.md](HARDWARE.md) | Hardware-specific notes for the RTX 5050 sm_120 (Blackwell): WSL2 CUDA setup, INT8 limitations, AMD Ryzen AMX notes, `.wslconfig` tuning, VRAM budget table |
 | [MODELS.md](MODELS.md) | Model reference: download instructions, BLEU benchmarks, VRAM requirements, language codes, and per-model notes |
 | [GLOSSARY.md](GLOSSARY.md) | AI/ML terminology reference: transformer architecture, M2M-100, attention, LoRA/PEFT, bf16/fp16, CTranslate2, beam search, quantization, BLEU, CUDA, WSL2, and more — all defined in the context of this project |
+| [AI_PRIMER.md](AI_PRIMER.md) | **Start here if new to AI/NLP.** A ~4-hour self-contained tutorial covering every math, AI, and programming concept in the research papers — aimed at CS students. Covers linear algebra, transformers, BLEU, LoRA, quantization, GPU architecture, Bengali linguistics, and the Pareto efficiency analysis. |
 
 ---
 
