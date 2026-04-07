@@ -15,6 +15,9 @@ build/
 .env
 .hypothesis/
 
+# Git worktrees
+.worktrees/
+
 # Paper PDFs (compiled output — generate locally with: cd paper && tectonic ieee_paper.tex)
 /paper/*.pdf
 /paper/*.aux
