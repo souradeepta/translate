@@ -25,6 +25,43 @@ data-driven, and publishable under IEEE conference standards (IEEEtran format).
 
 ---
 
+## Revision Tracking (REQUIRED before any paper edit)
+
+Before editing `ieee_paper.tex`, `survey_paper.tex`, or any file in `paper/slides/`:
+
+### Step 0 — Snapshot current version
+```bash
+# Determine next version number (count existing archives for this file)
+ls paper/archive/ieee_paper_*.tex | wc -l   # e.g. output: 1 → next is v2
+cp paper/ieee_paper.tex paper/archive/ieee_paper_YYYY-MM-DD_vN.tex
+cp paper/survey_paper.tex paper/archive/survey_paper_YYYY-MM-DD_vN.tex
+# For slides:
+cp paper/slides/ieee_slides.tex paper/archive/slides/ieee_slides_YYYY-MM-DD_vN.tex 2>/dev/null || true
+```
+
+### After editing — generate diff and update PAPER_REVISIONS.md
+```bash
+diff -u paper/archive/ieee_paper_YYYY-MM-DD_vN.tex paper/ieee_paper.tex \
+  > paper/archive/ieee_paper_vN_to_vM.diff
+diff -u paper/archive/survey_paper_YYYY-MM-DD_vN.tex paper/survey_paper.tex \
+  > paper/archive/survey_paper_vN_to_vM.diff
+```
+
+Then append to `paper/PAPER_REVISIONS.md`:
+```
+## vM — YYYY-MM-DD (description)
+### ieee_paper.tex
+- <bullet: what changed>
+### survey_paper.tex
+- <bullet: what changed>
+### Slides
+- <bullet: what changed>
+Archived: paper/archive/ieee_paper_YYYY-MM-DD_vN.tex
+Diff: paper/archive/ieee_paper_vN_to_vM.diff
+```
+
+---
+
 ## Step-by-Step When Invoked After a Training Run
 
 ### Step 1 — Collect run data
