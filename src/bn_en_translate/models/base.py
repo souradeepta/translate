@@ -16,6 +16,9 @@ class TranslatorBase(ABC):
         4. Call unload() to free GPU/CPU memory.
     """
 
+    DEFAULT_BEAM_SIZE: int = 4
+    """Per-model default beam size. Subclasses override this."""
+
     def __init__(self) -> None:
         self._loaded: bool = False
 
@@ -30,6 +33,13 @@ class TranslatorBase(ABC):
     @abstractmethod
     def _translate_batch(self, texts: list[str], src_lang: str, tgt_lang: str) -> list[str]:
         """Translate a list of texts. Called only when loaded."""
+
+    def _effective_beam_size(self) -> int:
+        """Return beam_size from config if explicitly set, else this model's DEFAULT_BEAM_SIZE."""
+        config = getattr(self, "config", None)
+        if config is not None and getattr(config, "beam_size", None) is not None:
+            return config.beam_size  # type: ignore[union-attr]
+        return self.DEFAULT_BEAM_SIZE
 
     def translate(self, texts: list[str], src_lang: str, tgt_lang: str) -> list[str]:
         """
