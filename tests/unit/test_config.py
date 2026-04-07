@@ -44,7 +44,7 @@ def test_model_config_defaults_are_valid() -> None:
     assert config.model_name == "nllb-600M"
     assert config.device == "cuda"
     assert config.compute_type == "int8"
-    assert config.beam_size == 4
+    assert config.beam_size is None
 
 
 def test_model_config_invalid_device_raises() -> None:

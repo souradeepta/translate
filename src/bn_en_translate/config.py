@@ -36,9 +36,11 @@ class ModelConfig:
     compute_type: str = "int8"
     src_lang: str = "ben_Beng"
     tgt_lang: str = "eng_Latn"
-    beam_size: int = 4
+    beam_size: int | None = None          # None = use each translator's DEFAULT_BEAM_SIZE
     max_decoding_length: int = 512
-    inference_batch_size: int = 8  # number of sequences translated in one forward pass
+    inference_batch_size: int = 8
+    use_flash_attention: bool = True      # Flash Attention 2 if flash-attn is installed
+    max_ct2_batch_size: int = 32          # CT2 translate_batch max_batch_size guard
 
     VALID_DEVICES = {"cuda", "cpu", "auto"}
     VALID_COMPUTE_TYPES = {"int8", "float16", "float32", "int8_float16"}
@@ -50,12 +52,14 @@ class ModelConfig:
             raise ValueError(
                 f"compute_type must be one of {self.VALID_COMPUTE_TYPES}, got '{self.compute_type}'"
             )
-        if self.beam_size <= 0:
+        if self.beam_size is not None and self.beam_size <= 0:
             raise ValueError("beam_size must be positive")
         if self.max_decoding_length <= 0:
             raise ValueError("max_decoding_length must be positive")
         if self.inference_batch_size <= 0:
             raise ValueError("inference_batch_size must be positive")
+        if self.max_ct2_batch_size <= 0:
+            raise ValueError("max_ct2_batch_size must be positive")
 
     def validate_model_path(self) -> None:
         """Check that model_path exists on disk. Call explicitly before loading."""
