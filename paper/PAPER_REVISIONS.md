@@ -24,3 +24,18 @@ and the slide decks in `paper/slides/`. Before any edit to these files:
 Archived:
 - `paper/archive/ieee_paper_2026-04-02_v1.tex`
 - `paper/archive/survey_paper_2026-04-02_v1.tex`
+
+---
+
+## v2 — 2026-04-07 (model expansion: MADLAD-400, SeamlessM4T-v2, Gemma 3, Flash Attention 2)
+
+### ieee_paper.tex
+- Added MADLAD-400-3B and SeamlessM4T-v2 to Background/Related Work
+- Added MADLAD/SeamlessM4T rows to model comparison table (FLORES BLEU from published results)
+- Added Gemma 3 12B as default Ollama polish model note
+- Added Flash Attention 2 note in inference section
+- Added 4 bibliography entries: kudugunta2023madlad, seamlessm4t2023, gemma2025, dao2022flashattention
+- New placeholder commands: \MADLADBLEU{36}, \SEAMLESSBLEU{39}, \MADLADPROJBLEU{TBD}, \SEAMLESSPROJBLEU{TBD}
+
+Archived: paper/archive/ieee_paper_2026-04-07_v2_pre.tex
+Diff: paper/archive/ieee_paper_v1_to_v2.diff

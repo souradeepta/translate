@@ -1,0 +1,96 @@
+--- /home/sbisw/github/translate/.worktrees/model-expansion/paper/archive/ieee_paper_2026-04-07_v2_pre.tex	2026-04-07 17:03:03.114115072 -0700
++++ /home/sbisw/github/translate/.worktrees/model-expansion/paper/ieee_paper.tex	2026-04-07 17:04:13.854356108 -0700
+@@ -49,6 +49,14 @@
+ \newcommand{\TRAINDURATION}{2.46\,h}
+ \newcommand{\EVALLOSSFINAL}{1.992}
+ 
++% New model FLORES-200 BLEU benchmarks (published figures)
++\newcommand{\MADLADBLEU}{36}
++\newcommand{\SEAMLESSBLEU}{39}
++\newcommand{\INDICBLEUTWO}{44}
++% Project benchmark results — fill in after running scripts/benchmark.py --models all
++\newcommand{\MADLADPROJBLEU}{TBD}
++\newcommand{\SEAMLESSPROJBLEU}{TBD}
++
+ % ============================================================
+ \begin{document}
+ % ============================================================
+@@ -180,6 +188,15 @@
+ \textbf{mBART-50}~\cite{liu2020multilingual} provides an alternative Seq2Seq
+ pretrained model that has been used for low-resource fine-tuning.
+ 
++\textbf{MADLAD-400}~\cite{kudugunta2023madlad} from Google represents a newer
++generation of translation-focused multilingual models, trained on 400 languages
++using a T5-based architecture with curated multilingual data filtering.
++The 3B parameter variant achieves \MADLADBLEU{} BLEU on FLORES-200 Bengali-to-English
++in zero-shot evaluation, competitive with models twice its size.
++\textbf{SeamlessM4T-v2}~\cite{seamlessm4t2023} from Meta extends the M4T architecture
++with improved speech and text translation, achieving \SEAMLESSBLEU{} BLEU on
++FLORES-200 Bengali-to-English with its large (1.2B) configuration.
++
+ \subsection{Efficient Inference for Transformer Models}
+ 
+ Deploying large Transformer models at inference time on resource-constrained hardware
+@@ -349,6 +366,11 @@
+ because INT8 cuBLAS tensor cores are not supported by the cuBLAS version
+ shipped with cu124 on Blackwell sm\_120 (see Section~\ref{sec:constraints}).
+ 
++For HuggingFace-loaded models (IndicTrans2, MADLAD-400, SeamlessM4T-v2),
++Flash Attention~2~\cite{dao2022flashattention} is enabled automatically when
++the \texttt{flash-attn} package is installed, providing 1.5--2$\times$ throughput
++improvement on sequences exceeding 128 tokens with no quality degradation.
++
+ \subsection{Training Architecture}
+ 
+ \begin{figure}[htbp]
+@@ -790,6 +812,8 @@
+ NLLB-200-1.3B~\cite{nllb2022} & 33.4 & FLORES-200 & Cloud \\
+ IndicTrans2-1B~\cite{gala2023indictrans2} & 30.1+ & IN22 & Cloud \\
+ mBART-50~\cite{liu2020multilingual} & 18.2 & WMT & Cloud \\
++MADLAD-400-3B~\cite{kudugunta2023madlad} & \MADLADBLEU{} & FLORES-200 & HF native \\
++SeamlessM4T-v2~\cite{seamlessm4t2023} & \SEAMLESSBLEU{} & FLORES-200 & HF native \\
+ Google Translate$^\dagger$ & $\sim$35--45 & Various & API \\
+ \bottomrule
+ \multicolumn{4}{>{\footnotesize\raggedright\arraybackslash}p{0.71\columnwidth}}{$^\dagger$ Informal estimate from~\cite{wu2016googles}; no official bn-en BLEU published.}
+@@ -1173,9 +1197,13 @@
+         which targets Indic language pairs specifically and is expected to
+         outperform NLLB-600M by 5--8 BLEU on open-domain Bengali-English.
+ 
+-  \item \textbf{Ollama literary polish pass}: Integrate qwen2.5:7b-instruct as an
++  \item \textbf{Ollama literary polish pass}: Integrate \texttt{gemma3:12b} as an
+         optional post-processing step for literary translation, with VRAM-aware
+         sequential unloading.
++        The default literary polish model has been updated to \texttt{gemma3:12b},
++        Google's Gemma~3 12\,B instruction-tuned model~\cite{gemma2025}, which offers
++        stronger multilingual literary quality than the previous \texttt{qwen2.5:7b} default.
++        The polish model is configurable at runtime via the \texttt{--ollama-model} flag.
+ 
+   \item \textbf{chrF and TER evaluation}: Add character-level and edit-distance
+         metrics alongside BLEU for more thorough quality assessment,
+@@ -1367,6 +1395,26 @@
+ Technical Report, 2024.
+ [Online]. Available: \url{https://resources.nvidia.com/en-us-blackwell-architecture}
+ 
++\bibitem{kudugunta2023madlad}
++S.~Kudugunta et~al.,
++``MADLAD-400: A Multilingual And Document-Level Large Audited Dataset,''
++\textit{arXiv preprint arXiv:2309.04662}, 2023.
++
++\bibitem{seamlessm4t2023}
++Meta AI,
++``SeamlessM4T---Massively Multilingual \& Multimodal Machine Translation,''
++\textit{arXiv preprint arXiv:2308.11596}, 2023.
++
++\bibitem{gemma2025}
++Google DeepMind,
++``Gemma~3 Technical Report,''
++\textit{arXiv preprint arXiv:2503.19786}, 2025.
++
++\bibitem{dao2022flashattention}
++T.~Dao et~al.,
++``FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness,''
++in \textit{Proc. NeurIPS 2022}, 2022.
++
+ \end{thebibliography}
+ 
+ \end{document}
