@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bengali NMT Survey — bn-en-translate</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/moon.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/monokai.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    .reveal table { font-size: 0.7em; }
+    .reveal pre code { max-height: 400px; }
+    .chart-container { width: 700px; height: 350px; margin: 0 auto; }
+    .highlight-box {
+      background: rgba(255,200,0,0.15);
+      border: 1px solid #ffd700;
+      border-radius: 6px;
+      padding: 12px 20px;
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- Title -->
+<section>
+  <h2>Bengali-to-English NMT</h2>
+  <h3>A Survey &amp; Comparative Analysis</h3>
+  <p>2019 &ndash; 2025 | From Cloud-Scale to Consumer-GPU</p>
+  <p><small>Souradeepta Biswas &mdash; Independent Researcher</small></p>
+</section>
+
+<!-- Why Bengali -->
+<section>
+  <h3>Why Bengali NMT?</h3>
+  <ul>
+    <li>234 million native speakers &mdash; 7th most spoken globally</li>
+    <li>Official language: Bangladesh + West Bengal, India</li>
+    <li>Rich literary tradition &mdash; high translation demand</li>
+    <li><strong>Gap:</strong> best open-source FLORES BLEU = 44 (vs 90+ for en-fr)</li>
+  </ul>
+  <div class="highlight-box">
+    FLORES-200 bn&rarr;en BLEU improved 144% from 2019 to 2023 (18 &rarr; 44)
+  </div>
+</section>
+
+<!-- BLEU Trend Chart -->
+<section>
+  <h3>BLEU Trend 2019&ndash;2025</h3>
+  <div class="chart-container">
+    <canvas id="bleuTrendChart"></canvas>
+  </div>
+</section>
+
+<!-- Model Comparison Table -->
+<section>
+  <h3>Key Systems (FLORES-200 bn&rarr;en)</h3>
+  <table>
+    <thead><tr><th>System</th><th>Arch</th><th>Params</th><th>BLEU</th><th>Year</th></tr></thead>
+    <tbody>
+      <tr><td>mBART-50</td><td>mBART</td><td>610M</td><td>14.0</td><td>2020</td></tr>
+      <tr><td>M2M-100</td><td>M2M</td><td>1.2B</td><td>22.2</td><td>2021</td></tr>
+      <tr><td>NLLB-200-600M</td><td>M2M-100</td><td>600M</td><td>22.8</td><td>2022</td></tr>
+      <tr><td>NLLB-200-1.3B</td><td>M2M-100</td><td>1.3B</td><td>25.8</td><td>2022</td></tr>
+      <tr><td>NLLB-200-3.3B</td><td>M2M-MoE</td><td>3.3B</td><td>34.5</td><td>2022</td></tr>
+      <tr><td>MADLAD-400-3B</td><td>T5</td><td>3B</td><td>36.0</td><td>2023</td></tr>
+      <tr><td>SeamlessM4T-v2</td><td>Custom</td><td>1.2B</td><td>~39</td><td>2023</td></tr>
+      <tr><td><strong>IndicTrans2-1B</strong></td><td>M2M-100v</td><td>1B</td><td><strong>44.1</strong></td><td>2023</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- Quality vs VRAM Chart -->
+<section>
+  <h3>Quality vs. VRAM Trade-off</h3>
+  <div class="chart-container">
+    <canvas id="paretoChart"></canvas>
+  </div>
+  <p><small>Blue = FLORES-200 published results. Red = bn-en-translate in-domain BLEU (different corpus).</small></p>
+</section>
+
+<!-- Domain Variance -->
+<section>
+  <h3>Domain Variance Warning</h3>
+  <div class="highlight-box" style="background:rgba(255,80,80,0.15);border-color:#ff5555;">
+    Within one system (NLLB-600M), domain BLEU ranges from <strong>4.7</strong> (News) to <strong>80.6</strong> (Health) &mdash; a <strong>75-point spread</strong>.
+  </div>
+  <ul>
+    <li>Literary: 60&ndash;80 BLEU</li>
+    <li>News: 5&ndash;15 BLEU</li>
+    <li>Science/Medical: 40&ndash;60 BLEU</li>
+    <li>Proverbs: 30&ndash;50 BLEU</li>
+  </ul>
+</section>
+
+<!-- Bengali-Specific Challenges -->
+<section>
+  <h3>Bengali NMT Challenges</h3>
+  <ul>
+    <li><strong>SOV word order</strong> vs. English SVO</li>
+    <li><strong>Agglutinative morphology</strong> &mdash; high word-per-concept ratio</li>
+    <li><strong>Honorific system</strong> &mdash; tumi/apni have no English equivalent</li>
+    <li><strong>Danda boundary</strong> (।) &mdash; missing from Latin-script corpora</li>
+    <li><strong>Data sparsity</strong> &mdash; &lt;5M pairs vs. &gt;1B for English</li>
+  </ul>
+</section>
+
+<!-- Research Gaps -->
+<section>
+  <h3>Research Gaps</h3>
+  <ol>
+    <li>No literary-domain Bengali model</li>
+    <li>Dialect handling absent in all surveyed models</li>
+    <li>Consumer-GPU benchmark: first documented Blackwell deployment</li>
+    <li>Only 40% of papers report chrF alongside BLEU</li>
+    <li>No Bengali LoRA fine-tuning study &gt;10M pairs</li>
+  </ol>
+</section>
+
+<!-- Conclusion -->
+<section>
+  <h3>Conclusions</h3>
+  <ul>
+    <li>Bengali NMT: <strong>144% BLEU improvement</strong> in 6 years (18 &rarr; 44)</li>
+    <li>IndicTrans2-1B: state-of-the-art open-source</li>
+    <li>Consumer-GPU viable: bn-en-translate achieves 65.2 in-domain BLEU</li>
+    <li>Domain variance is the most underreported finding in the field</li>
+    <li>6 Blackwell sm_120 constraints resolved and documented</li>
+  </ul>
+  <p><small>github.com/souradeepta/translate</small></p>
+</section>
+
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.js"></script>
+<script>
+  Reveal.initialize({
+    hash: true,
+    slideNumber: true,
+    transition: 'slide',
+    plugins: [ RevealHighlight, RevealNotes ]
+  });
+
+  // Chart.js charts — initialize after DOM ready
+  document.addEventListener('DOMContentLoaded', function() {
+    // BLEU Trend
+    var ctx1 = document.getElementById('bleuTrendChart').getContext('2d');
+    new Chart(ctx1, {
+      type: 'line',
+      data: {
+        labels: ['2019','2020','2021','2022','2023','2025'],
+        datasets: [{
+          label: 'Best open-source FLORES BLEU (bn\u2192en)',
+          data: [18, 22, 28, 34, 44, 44],
+          borderColor: '#4fc3f7',
+          backgroundColor: 'rgba(79,195,247,0.15)',
+          pointRadius: 5,
+          tension: 0.3,
+        }]
+      },
+      options: {
+        responsive: false,
+        plugins: { legend: { labels: { color: '#eee' } } },
+        scales: {
+          x: { ticks: { color: '#eee' }, grid: { color: 'rgba(255,255,255,0.1)' } },
+          y: { ticks: { color: '#eee' }, grid: { color: 'rgba(255,255,255,0.1)' },
+               min: 0, max: 50, title: { display: true, text: 'BLEU', color: '#eee' } }
+        }
+      }
+    });
+
+    // Pareto chart
+    var ctx2 = document.getElementById('paretoChart').getContext('2d');
+    new Chart(ctx2, {
+      type: 'scatter',
+      data: {
+        datasets: [
+          {
+            label: 'FLORES-200 (published)',
+            data: [
+              {x: 2.0, y: 22.8},
+              {x: 2.6, y: 25.8},
+              {x: 3.0, y: 44.1},
+              {x: 3.0, y: 36.0},
+              {x: 3.5, y: 39.0}
+            ],
+            backgroundColor: '#4fc3f7',
+            pointRadius: 7,
+          },
+          {
+            label: 'bn-en-translate in-domain',
+            data: [{x: 2.0, y: 56.2}],
+            backgroundColor: '#ff5555',
+            pointRadius: 10,
+            pointStyle: 'triangle',
+          }
+        ]
+      },
+      options: {
+        responsive: false,
+        plugins: { legend: { labels: { color: '#eee' } } },
+        scales: {
+          x: { ticks: { color: '#eee' }, grid: { color: 'rgba(255,255,255,0.1)' },
+               min: 0, max: 8, title: { display: true, text: 'VRAM (GB)', color: '#eee' } },
+          y: { ticks: { color: '#eee' }, grid: { color: 'rgba(255,255,255,0.1)' },
+               min: 10, max: 65, title: { display: true, text: 'BLEU', color: '#eee' } }
+        }
+      }
+    });
+  });
+</script>
+</body>
+</html>
