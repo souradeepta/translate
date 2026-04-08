@@ -18,7 +18,10 @@ from bn_en_translate.utils.cuda_check import get_best_device
     "-m",
     default="nllb-600M",
     show_default=True,
-    help="Model name: nllb-600M | nllb-1.3B | indicTrans2-1B | ollama",
+    help=(
+        "Translation model: nllb-600M | nllb-1.3B | indicTrans2-1B | "
+        "madlad-3b | seamless-medium | ollama"
+    ),
 )
 @click.option(
     "--device",
@@ -27,16 +30,28 @@ from bn_en_translate.utils.cuda_check import get_best_device
     help="Device: cuda | cpu | auto (auto picks cuda if available)",
 )
 @click.option("--batch-size", default=8, show_default=True, help="Translation batch size")
-@click.option("--beam-size", default=4, show_default=True, help="Beam search width")
+@click.option(
+    "--beam-size",
+    default=None,
+    type=int,
+    help="Beam search width (default: model-specific; NLLB=4, IndicTrans2/SeamlessM4T=5)",
+)
 @click.option("--ollama-polish", is_flag=True, default=False, help="Run Ollama polishing pass after translation")
+@click.option(
+    "--ollama-model",
+    default="gemma3:12b",
+    show_default=True,
+    help="Ollama model tag for the polish pass (e.g. gemma3:4b, gemma3:12b, qwen2.5:7b-instruct-q4_K_M)",
+)
 def main(
     input_path: str,
     output_path: str,
     model: str,
     device: str,
     batch_size: int,
-    beam_size: int,
+    beam_size: int | None,
     ollama_polish: bool,
+    ollama_model: str,
 ) -> None:
     """Translate a Bengali story file to English using a local open-source model."""
 
@@ -50,6 +65,7 @@ def main(
             beam_size=beam_size,
         ),
         ollama_polish=ollama_polish,
+        ollama_model=ollama_model,
     )
 
     translator = get_translator(config)
