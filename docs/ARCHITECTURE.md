@@ -230,13 +230,21 @@ Five dataclasses, all validated at construction time — no lazy validation. Inv
 
 ```python
 ChunkConfig(max_tokens_per_chunk=400, batch_size=8, min_chunk_sentences=1, overlap_sentences=0)
-ModelConfig(model_name="nllb-600M", device="cuda", compute_type="int8", beam_size=4)
+ModelConfig(model_name="nllb-600M", device="cuda", compute_type="int8", beam_size=None)
 PipelineConfig(model=ModelConfig(), chunk=ChunkConfig(), ollama_polish=False)
 FineTuneConfig(lora_r=16, lora_alpha=32, num_epochs=3, learning_rate=2e-4, fp16=True)
 MonitorConfig(sample_interval_s=2.0, db_path=Path("monitor/runs.db"), gpu_backend="pynvml")
 ```
 
 `ModelConfig.device` accepts `"auto"` — resolved to `"cuda"` or `"cpu"` at load time. `ModelConfig.compute_type` is overridden at runtime by `_best_compute_type()` regardless of what the config says; it exists to allow CPU-path overrides.
+
+**New fields added in model-expansion branch:**
+
+| Field | Type | Default | Purpose |
+|-------|------|---------|---------|
+| `beam_size` | `int \| None` | `None` | `None` means use each translator's `DEFAULT_BEAM_SIZE`; pass an integer to override for all models. |
+| `use_flash_attention` | `bool` | `True` | Enable Flash Attention 2 on models that support it (MADLAD, IndicTrans2) if `flash-attn` is installed. |
+| `max_ct2_batch_size` | `int` | `32` | Guards CTranslate2 `translate_batch()` against CUDA OOM on large inputs — see [CT2 OOM fix](#ct2-oom-fix). |
 
 ### Model Layer (`models/`)
 
@@ -250,16 +258,22 @@ instantiate → load() → translate() [×N] → unload()
 
 **Factory routing** (`factory.py`):
 
+The factory uses a `@register_model` decorator registry — no if/elif chain. Each model name maps to a factory function that returns the correct `TranslatorBase` subclass.
+
 ```
 get_translator(config)
-├── model_name = "nllb-600M" or "nllb-1.3B"
+├── "nllb-600M" / "nllb-1.3B"
 │   ├── models/nllb-{N}-ct2/ exists? → NLLBCt2Translator
-│   └── else                          → NLLBTranslator (HuggingFace)
-├── model_name = "indicTrans2-1B"
+│   └── else                          → NLLBTranslator (HuggingFace pipeline)
+├── "indicTrans2-1B" / "indictrans2"
 │   ├── models/indicTrans2-1B-ct2/ exists? → IndicTrans2Ct2Translator
 │   └── else                                → IndicTrans2Translator (HuggingFace)
-└── model_name = "ollama"              → OllamaTranslator
+├── "madlad-3b" / "madlad"           → MADLADTranslator (HF native, T5-based)
+├── "seamless-medium" / "seamless"   → SeamlessTranslator (HF native, SeamlessM4Tv2)
+└── "ollama"                          → OllamaTranslator (local Ollama daemon)
 ```
+
+`MADLADTranslator` and `SeamlessTranslator` always use HuggingFace native inference — there is no CT2 path for these models.
 
 **CTranslate2 source tokenisation format (M2M-100 / NLLB):**
 
@@ -268,6 +282,14 @@ get_translator(config)
 ```
 
 Target prefix: `[tgt_lang_token]` (forces the output language as BOS). Using `[src_lang, text_tokens...]` (reversed) produces degenerate looping output with no error.
+
+**Beam size resolution** (`DEFAULT_BEAM_SIZE` / `_effective_beam_size()`):
+
+Each translator class declares a `DEFAULT_BEAM_SIZE` class variable (NLLB: 4, IndicTrans2: 5, MADLAD: 4, Seamless: 5). The `_effective_beam_size()` method on `TranslatorBase` checks `ModelConfig.beam_size` first; if it is `None` (the default), it falls back to the class-level `DEFAULT_BEAM_SIZE`. To override, pass `ModelConfig(beam_size=6)`.
+
+**CT2 OOM fix** (`max_ct2_batch_size`): <a name="ct2-oom-fix"></a>
+
+Calling CT2 `translate_batch()` with 900+ sentences in a single call causes CUDA OOM on the RTX 5050 8 GB. `NLLBCt2Translator._translate_batch()` passes `max_batch_size=config.max_ct2_batch_size` (default 32) to CT2, which internally splits the work into smaller GPU batches. The default of 32 was measured to be safe on 8 GB VRAM with float16 NLLB-600M.
 
 **Compute type probe** (`_best_compute_type()`):  
 On CUDA, the method runs a real ~20-token translation with each compute type in preference order (`int8_float16 → int8 → float16 → bfloat16 → float32`) and returns the first one that succeeds. Short probes (fewer than ~15 tokens) do not trigger the INT8 cuBLAS matmuls that fail on sm_120, so they produce false positives. The probe uses a sentence of ~20 tokens to avoid this.
@@ -289,7 +311,7 @@ On CUDA, the method runs a real ~20-token translation with each compute type in 
 
 ### Training Layer (`training/`)
 
-`NLLBFineTuner` wraps the HuggingFace base model with PEFT LoRA adapters and drives `Seq2SeqTrainer`. It always loads on CPU first to avoid CUDA device errors on sm_120, then moves to GPU after LoRA wrapping. After training, `export_ct2()` merges the adapters into the base weights via `merge_and_unload()` and converts the result to CTranslate2 float16.
+`Seq2SeqFineTuner` (formerly `NLLBFineTuner` — the old name remains as an alias) wraps the HuggingFace base model with PEFT LoRA adapters and drives `Seq2SeqTrainer`. It always loads on CPU first to avoid CUDA device errors on sm_120, then moves to GPU after LoRA wrapping. After training, `export_ct2()` merges the adapters into the base weights via `merge_and_unload()` and converts the result to CTranslate2 float16. Supported fine-tunable models: `nllb-600M`, `nllb-1.3B`, `indicTrans2-1B`, `madlad-3b` (T5-compatible LoRA path).
 
 ### Monitoring Layer (`utils/`)
 
@@ -351,7 +373,9 @@ Samanantar pairs (bn.txt / en.txt)
 | NLLB-600M CT2 float16 | ~2.0 GB | ~2.1 GB | ~5.9 GB |
 | NLLB-1.3B CT2 float16 | ~2.6 GB | ~2.7 GB | ~5.3 GB |
 | IndicTrans2-1B CT2 float16 | ~3.0 GB | ~3.1 GB | ~4.9 GB |
-| Ollama qwen2.5:7b | ~4.7 GB | ~4.7 GB | ~3.3 GB |
+| MADLAD-400-3B HF float16 | ~3.0 GB | ~3.1 GB | ~4.9 GB |
+| SeamlessM4T-v2 HF float16 | ~3.5 GB | ~3.6 GB | ~4.4 GB |
+| Ollama gemma3:12b | ~4.7 GB | ~4.7 GB | ~3.3 GB |
 | IndicTrans2 + Ollama | ~7.7 GB | OOM risk | unload before switching |
 
 The pipeline unloads the translator before running the Ollama polish pass when `--ollama-polish` is set.
@@ -362,13 +386,23 @@ The pipeline unloads the translator before running the Ollama polish pass when `
 
 ### Adding a new model backend
 
+**CT2-based backend (M2M-100 family: NLLB, IndicTrans2):**
+
 1. Create `src/bn_en_translate/models/<name>_ct2.py` extending `TranslatorBase`
 2. Implement `load()`, `unload()`, `_translate_batch()`
 3. In `load()`: load SPM first, call `_best_compute_type(device, sp)`, then load CT2 Translator
-4. Use the M2M source format: `tokens + ["</s>", src_lang]`
-5. Register in `factory.py` with CT2-first path check
-6. Add to `scripts/download_models.py` MODELS dict
-7. Write unit tests for tokenisation format and compute type probe
+4. Use the M2M source format: `tokens + ["</s>", src_lang]`; pass `max_batch_size=config.max_ct2_batch_size`
+5. Set `DEFAULT_BEAM_SIZE` on the class; use `self._effective_beam_size()` in `translate_batch()`
+6. Register in `factory.py` via `@register_model("name")` — no if/elif chain to touch
+7. Add a `"type": "nllb"` or `"type": "indictrans2"` entry to `scripts/download_models.py` MODELS dict
+
+**HF-native backend (T5, SeamlessM4T, or other architectures):**
+
+1. Create `src/bn_en_translate/models/<name>.py` extending `TranslatorBase`
+2. Implement `load()` using `from_pretrained()`; check `config.use_flash_attention` and `_flash_attn_available()` for `attn_implementation`
+3. Set `DEFAULT_BEAM_SIZE` on the class; use `self._effective_beam_size()` in `generate()`
+4. Register in `factory.py` via `@register_model("name")`
+5. Add a `"type": "hf_only"` entry to `scripts/download_models.py` — uses `snapshot_download`, no CT2 conversion
 
 ### Adding a new pipeline stage
 

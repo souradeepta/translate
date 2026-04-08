@@ -1,6 +1,6 @@
 # Training Guide
 
-Fine-tuning adapts the pre-trained NLLB-600M model to produce better Bengali-to-English translations on domain-specific text, using Low-Rank Adaptation (LoRA) for parameter efficiency.
+Fine-tuning adapts a pre-trained seq2seq model to produce better Bengali-to-English translations on domain-specific text, using Low-Rank Adaptation (LoRA) for parameter efficiency. The trainer supports `nllb-600M`, `nllb-1.3B`, `indicTrans2-1B`, and `madlad-3b`.
 
 ---
 
@@ -137,11 +137,15 @@ python scripts/download_corpus.py
 ### 4. Run fine-tuning
 
 ```bash
-# Full run — ~20-30 min on RTX 5050 with GPU
+# Full run on nllb-600M (default) — ~20-30 min on RTX 5050 with GPU
 python scripts/finetune.py
+
+# Fine-tune MADLAD-400-3B (T5-based, same LoRA approach)
+python scripts/finetune.py --model madlad-3b
 
 # With explicit settings
 python scripts/finetune.py \
+    --model nllb-600M \
     --epochs 3 \
     --lr 2e-4 \
     --train-batch-size 4 \
@@ -154,14 +158,16 @@ python scripts/finetune.py \
 python scripts/finetune.py --epochs 1 --max-train-pairs 500 --skip-baseline
 ```
 
+Supported `--model` values: `nllb-600M`, `madlad-3b`. The MADLAD fine-tuning uses the same LoRA approach — PEFT wraps the T5 attention projections with the same `r=16, α=32` defaults.
+
 ### What happens at each step
 
 | Step | What `finetune.py` does |
 |------|------------------------|
 | Baseline | Loads `models/nllb-600M-ct2/`, translates 984 test sentences, computes BLEU. Records result to `monitor/runs.db`. |
-| Load | `NLLBFineTuner.load()` — loads NLLB-600M from HuggingFace in float32 on CPU, enables gradient checkpointing, wraps with PEFT LoRA adapters, moves to CUDA. |
-| Train | `NLLBFineTuner.train()` — creates `BengaliEnglishDataset` for train/val, constructs `Seq2SeqTrainingArguments` with bf16, runs `Trainer.train()`, saves best checkpoint, saves adapter to `output_dir/adapter/`. |
-| Export | `NLLBFineTuner.export_ct2()` — merges LoRA adapters into base weights, saves merged HF model to a temp directory, runs `ct2-transformers-converter --quantization float16`, copies SPM tokenizer into CT2 output dir. |
+| Load | `Seq2SeqFineTuner.load()` — loads the selected model from HuggingFace in float32 on CPU, enables gradient checkpointing, wraps with PEFT LoRA adapters, moves to CUDA. |
+| Train | `Seq2SeqFineTuner.train()` — creates `BengaliEnglishDataset` for train/val, constructs `Seq2SeqTrainingArguments` with bf16, runs `Trainer.train()`, saves best checkpoint, saves adapter to `output_dir/adapter/`. |
+| Export | `Seq2SeqFineTuner.export_ct2()` — merges LoRA adapters into base weights, saves merged HF model to a temp directory, runs `ct2-transformers-converter --quantization float16`, copies SPM tokenizer into CT2 output dir. |
 | Post-eval | Loads the fine-tuned CT2 model, translates the same 984 test sentences, computes BLEU, records to `monitor/runs.db`. |
 
 ### 5. Use the fine-tuned model
@@ -221,7 +227,7 @@ Training with `train_batch_size=8` and `gradient_accumulation_steps=4` fits with
 
 ### During training
 
-The `Seq2SeqTrainer` logs `eval_loss` every `eval_steps=500` steps to the console and to the checkpoint directory. After all epochs complete, `NLLBFineTuner.train()` also computes a full corpus BLEU score on the validation set and returns it in the metrics dict.
+The `Seq2SeqTrainer` logs `eval_loss` every `eval_steps=500` steps to the console and to the checkpoint directory. After all epochs complete, `Seq2SeqFineTuner.train()` also computes a full corpus BLEU score on the validation set and returns it in the metrics dict.
 
 ### After training — compare with show_stats.py
 
@@ -263,5 +269,6 @@ python scripts/show_stats.py regressions --run-type benchmark
 src/bn_en_translate/training/
 ├── corpus.py    # load_corpus_files, filter_corpus, split_corpus, save_corpus_files
 ├── dataset.py   # BengaliEnglishDataset (PyTorch Dataset), collate_fn
-└── trainer.py   # NLLBFineTuner (LoRA via PEFT + HF Seq2SeqTrainer), compute_corpus_bleu
+└── trainer.py   # Seq2SeqFineTuner (LoRA via PEFT + HF Seq2SeqTrainer), compute_corpus_bleu
+                 # NLLBFineTuner = Seq2SeqFineTuner  (backward-compat alias)
 ```
