@@ -1,0 +1,103 @@
+"""SeamlessM4T-v2 translator — Meta's multilingual text translation model."""
+
+from __future__ import annotations
+
+from bn_en_translate.config import ModelConfig
+from bn_en_translate.models.base import TranslatorBase
+
+# Map FLORES-200 codes to SeamlessM4T short codes
+_SEAMLESS_LANG_MAP: dict[str, str] = {
+    "ben_Beng": "ben",
+    "eng_Latn": "eng",
+    "hin_Deva": "hin",
+    "urd_Arab": "urd",
+    "tam_Taml": "tam",
+    "tel_Telu": "tel",
+}
+
+
+def _to_seamless_lang(flores_code: str) -> str:
+    """Convert FLORES-200 language code to SeamlessM4T short code."""
+    return _SEAMLESS_LANG_MAP.get(flores_code, flores_code.split("_")[0])
+
+
+class SeamlessTranslator(TranslatorBase):
+    """
+    Meta SeamlessM4T-v2 translation model (text-only mode).
+
+    Architecture: Custom encoder-decoder (SeamlessM4Tv2ForTextToText)
+    HF ID: facebook/seamless-m4t-v2-large
+    VRAM (float16): ~3.5 GB
+    FLORES-200 bn->en BLEU: ~38-40
+
+    Note: SeamlessM4T uses short language codes (e.g. 'ben', 'eng') rather
+    than FLORES-200 codes. This class handles the mapping automatically.
+
+    Setup:
+        python scripts/download_models.py --model seamless-medium
+    """
+
+    HF_MODEL_ID = "facebook/seamless-m4t-v2-large"
+    DEFAULT_BEAM_SIZE: int = 5
+
+    def __init__(self, config: ModelConfig | None = None) -> None:
+        super().__init__()
+        self.config = config or ModelConfig(
+            model_name="seamless-medium",
+            model_path="",  # HF cache only — no CT2 conversion
+            src_lang="ben_Beng",
+            tgt_lang="eng_Latn",
+        )
+        self._model: object | None = None
+        self._processor: object | None = None
+
+    def load(self) -> None:
+        from transformers import AutoProcessor, SeamlessM4Tv2ForTextToText  # type: ignore[import-untyped]
+
+        self._processor = AutoProcessor.from_pretrained(self.HF_MODEL_ID)
+        self._model = SeamlessM4Tv2ForTextToText.from_pretrained(self.HF_MODEL_ID)
+
+        import torch  # type: ignore[import-untyped]
+
+        if self.config.device == "cuda" and torch.cuda.is_available():
+            self._model.to("cuda")  # type: ignore[union-attr]
+
+        self._loaded = True
+
+    def unload(self) -> None:
+        self._model = None
+        self._processor = None
+        self._loaded = False
+        try:
+            import torch  # type: ignore[import-untyped]
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except ImportError:
+            pass
+
+    def _translate_batch(self, texts: list[str], src_lang: str, tgt_lang: str) -> list[str]:
+        import torch  # type: ignore[import-untyped]
+
+        device = "cuda" if self.config.device == "cuda" and torch.cuda.is_available() else "cpu"
+
+        seamless_src = _to_seamless_lang(src_lang)
+        seamless_tgt = _to_seamless_lang(tgt_lang)
+
+        inputs = self._processor(  # type: ignore[operator]
+            text=texts,
+            src_lang=seamless_src,
+            return_tensors="pt",
+        ).to(device)
+
+        with torch.no_grad():
+            output_tokens = self._model.generate(  # type: ignore[union-attr]
+                **inputs,
+                tgt_lang=seamless_tgt,
+                generate_speech=False,
+                num_beams=self._effective_beam_size(),
+                max_new_tokens=self.config.max_decoding_length,
+            )
+
+        return self._processor.batch_decode(  # type: ignore[union-attr]
+            output_tokens, skip_special_tokens=True
+        )
