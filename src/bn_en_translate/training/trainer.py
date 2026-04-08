@@ -1,7 +1,7 @@
-"""LoRA fine-tuner for NLLB-200 seq2seq models.
+"""LoRA fine-tuner for seq2seq models (NLLB-200, MADLAD-400, etc.).
 
 Workflow:
-    tuner = NLLBFineTuner(model_config, finetune_config)
+    tuner = Seq2SeqFineTuner(model_config, finetune_config)
     tuner.load()                              # loads HF model + wraps with LoRA
     tuner.train(train_src, train_tgt,
                 val_src, val_tgt)             # fine-tunes, saves checkpoints
@@ -48,8 +48,8 @@ def compute_corpus_bleu(hypotheses: list[str], references: list[str]) -> float:
 # Fine-tuner
 # ---------------------------------------------------------------------------
 
-class NLLBFineTuner:
-    """LoRA fine-tuner for NLLB-200 distilled models.
+class Seq2SeqFineTuner:
+    """LoRA fine-tuner for seq2seq models (NLLB-200, MADLAD-400, etc.).
 
     Uses HuggingFace Seq2SeqTrainer + PEFT LoRA adapters.
     After training, merges adapters and exports to CTranslate2 float16.
@@ -374,3 +374,7 @@ class NLLBFineTuner:
                 logger.warning("SPM tokenizer not found in merged model dir — copy it manually")
 
         logger.info("CT2 model exported to %s", output_dir)
+
+
+# Backwards compatibility alias — do not remove until all call sites are updated
+NLLBFineTuner = Seq2SeqFineTuner

@@ -37,6 +37,16 @@ HF_MODEL_ID = "facebook/nllb-200-distilled-600M"
 DEFAULT_OUTPUT_DIR = "models/nllb-600M-finetuned"
 DEFAULT_CT2_OUTPUT = "models/nllb-600M-finetuned-ct2"
 
+MODEL_HF_IDS: dict[str, str] = {
+    "nllb-600M": "facebook/nllb-200-distilled-600M",
+    "madlad-3b": "google/madlad400-3b-mt",
+}
+
+MODEL_CT2_OUTPUTS: dict[str, str] = {
+    "nllb-600M": "models/nllb-600M-finetuned-ct2",
+    "madlad-3b": "models/madlad-3b-finetuned-ct2",
+}
+
 
 def _load_corpus_split(split: str) -> tuple[list[str], list[str]]:
     from bn_en_translate.training.corpus import load_corpus_files
@@ -97,11 +107,13 @@ def _run_finetune(
     import torch
 
     from bn_en_translate.config import FineTuneConfig, ModelConfig
-    from bn_en_translate.training.trainer import NLLBFineTuner
+    from bn_en_translate.training.trainer import Seq2SeqFineTuner
+
+    hf_model_id = MODEL_HF_IDS[args.model]
 
     model_cfg = ModelConfig(
-        model_name="nllb-600M",
-        model_path=HF_MODEL_ID,
+        model_name=args.model,
+        model_path=hf_model_id,
         device="auto",
         compute_type="float16",
         src_lang="ben_Beng",
@@ -131,7 +143,7 @@ def _run_finetune(
         ft_cfg.lora_r, ft_cfg.fp16,
     )
 
-    tuner = NLLBFineTuner(model_cfg, ft_cfg)
+    tuner = Seq2SeqFineTuner(model_cfg, ft_cfg)
     tuner.load()
 
     metrics = tuner.train(train_src, train_tgt, val_src, val_tgt)
@@ -140,9 +152,9 @@ def _run_finetune(
 
 
 def _export_ct2(tuner: object, ct2_output: str) -> None:
-    from bn_en_translate.training.trainer import NLLBFineTuner
+    from bn_en_translate.training.trainer import Seq2SeqFineTuner
 
-    assert isinstance(tuner, NLLBFineTuner)
+    assert isinstance(tuner, Seq2SeqFineTuner)
     out = Path(ct2_output)
     logger.info("Exporting fine-tuned model to CT2 at %s …", out)
     tuner.export_ct2(out, quantization="float16")
@@ -179,7 +191,13 @@ def _post_finetune_bleu(test_src: list[str], test_tgt: list[str], ct2_dir: str) 
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="LoRA fine-tune NLLB-600M on Bengali-English corpus")
+    parser = argparse.ArgumentParser(description="LoRA fine-tune seq2seq model on Bengali-English corpus")
+    parser.add_argument(
+        "--model",
+        default="nllb-600M",
+        choices=list(MODEL_HF_IDS.keys()),
+        help="Base model to fine-tune (default: nllb-600M)",
+    )
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--lr", type=float, default=2e-4)
     parser.add_argument("--train-batch-size", type=int, default=4)
@@ -188,7 +206,8 @@ def main() -> None:
                         help="Gradient accumulation steps (effective batch = batch * grad_accum)")
     parser.add_argument("--lora-r", type=int, default=16)
     parser.add_argument("--output-dir", default=DEFAULT_OUTPUT_DIR)
-    parser.add_argument("--ct2-output", default=DEFAULT_CT2_OUTPUT)
+    parser.add_argument("--ct2-output", default=None,
+                        help="CT2 output directory (default: model-specific)")
     parser.add_argument("--skip-baseline", action="store_true",
                         help="Skip baseline BLEU computation (faster)")
     parser.add_argument("--export-only", action="store_true",
@@ -198,6 +217,9 @@ def main() -> None:
     parser.add_argument("--max-train-pairs", type=int, default=None,
                         help="Cap training corpus (e.g. 500 for a quick CPU demo)")
     args = parser.parse_args()
+    # Resolve ct2_output default based on chosen model
+    if args.ct2_output is None:
+        args.ct2_output = MODEL_CT2_OUTPUTS[args.model]
 
     from bn_en_translate.config import MonitorConfig
     from bn_en_translate.utils.monitor import ResourceMonitor, format_summary
@@ -219,11 +241,11 @@ def main() -> None:
 
         if args.export_only:
             from bn_en_translate.config import FineTuneConfig, ModelConfig
-            from bn_en_translate.training.trainer import NLLBFineTuner
+            from bn_en_translate.training.trainer import Seq2SeqFineTuner
 
-            model_cfg = ModelConfig(model_path=HF_MODEL_ID, device="auto")
+            model_cfg = ModelConfig(model_path=MODEL_HF_IDS[args.model], device="auto")
             ft_cfg = FineTuneConfig(output_dir=args.output_dir)
-            tuner = NLLBFineTuner(model_cfg, ft_cfg)
+            tuner = Seq2SeqFineTuner(model_cfg, ft_cfg)
             tuner.load()
             _export_ct2(tuner, args.ct2_output)
             tuner.unload()
@@ -260,7 +282,7 @@ def main() -> None:
                 db.save_run(
                     run_id=monitor.run_id,
                     run_type="finetune",
-                    model_name="nllb-600M",
+                    model_name=args.model,
                     started_at=started_at,
                     finished_at=finished_at,
                     status="ok",
