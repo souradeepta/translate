@@ -17,6 +17,8 @@ class NLLBTranslator(TranslatorBase):
     Language codes use the FLORES-200 format: ben_Beng, eng_Latn, etc.
     """
 
+    DEFAULT_BEAM_SIZE: int = 4
+
     def __init__(self, config: ModelConfig | None = None) -> None:
         super().__init__()
         self.config = config or ModelConfig(model_name="nllb-600M")
@@ -35,6 +37,7 @@ class NLLBTranslator(TranslatorBase):
             src_lang=self.config.src_lang,
             tgt_lang=self.config.tgt_lang,
             max_length=self.config.max_decoding_length,
+            num_beams=self._effective_beam_size(),
         )
         self._loaded = True
 
