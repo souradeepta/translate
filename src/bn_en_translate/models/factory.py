@@ -58,6 +58,20 @@ def _make_ollama(config: PipelineConfig) -> TranslatorBase:
     return OllamaTranslator(config)
 
 
+@register_model("madlad-3b")
+@register_model("madlad")
+def _make_madlad(config: PipelineConfig) -> TranslatorBase:
+    from bn_en_translate.models.madlad import MADLADTranslator
+    return MADLADTranslator(config.model)
+
+
+@register_model("seamless-medium")
+@register_model("seamless")
+def _make_seamless(config: PipelineConfig) -> TranslatorBase:
+    from bn_en_translate.models.seamless import SeamlessTranslator
+    return SeamlessTranslator(config.model)
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -71,6 +85,8 @@ def get_translator(config: PipelineConfig) -> TranslatorBase:
       - "nllb-1.3B"       -> NLLBCt2Translator if CT2 model exists, else NLLBTranslator
       - "indicTrans2-1B"  -> IndicTrans2Ct2Translator if CT2 exists, else IndicTrans2Translator
       - "ollama"          -> OllamaTranslator (local Ollama LLM)
+      - "madlad-3b"       -> MADLADTranslator (Google MADLAD-400-3B)
+      - "seamless-medium" -> SeamlessTranslator (Meta SeamlessM4T-v2)
 
     Extend by calling @register_model("new-name") on a new factory function.
     """

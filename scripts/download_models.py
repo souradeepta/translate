@@ -12,20 +12,32 @@ MODELS: dict[str, dict[str, str]] = {
     "nllb-600M": {
         "hf_id": "facebook/nllb-200-distilled-600M",
         "output_dir": "models/nllb-600M-ct2",
-        "quantization": "int8",
+        "quantization": "float16",
         "type": "nllb",
     },
     "nllb-1.3B": {
         "hf_id": "facebook/nllb-200-distilled-1.3B",
         "output_dir": "models/nllb-1.3B-ct2",
-        "quantization": "int8",
+        "quantization": "float16",
         "type": "nllb",
     },
     "indicTrans2-1B": {
         "hf_id": "ai4bharat/indictrans2-indic-en-1B",
         "output_dir": "models/indicTrans2-1B-ct2",
-        "quantization": "int8",
+        "quantization": "float16",
         "type": "indictrans2",
+    },
+    "madlad-3b": {
+        "hf_id": "google/madlad400-3b-mt",
+        "output_dir": "models/madlad-3b-hf",
+        "quantization": "float16",
+        "type": "hf_only",
+    },
+    "seamless-medium": {
+        "hf_id": "facebook/seamless-m4t-v2-large",
+        "output_dir": "models/seamless-medium-hf",
+        "quantization": "float16",
+        "type": "hf_only",
     },
 }
 
@@ -43,6 +55,19 @@ def download_and_convert(model_name: str, force: bool = False) -> None:
         return
 
     hf_id = cfg["hf_id"]
+    model_type = cfg.get("type", "nllb")
+
+    if model_type == "hf_only":
+        print(f"Pre-downloading {hf_id} to HF cache (no CT2 conversion)...")
+        try:
+            from huggingface_hub import snapshot_download  # type: ignore[import-untyped]
+            local = snapshot_download(hf_id, local_dir=str(output_dir))
+            print(f"Done. Model saved to: {local}")
+        except Exception as e:
+            print(f"ERROR: download failed: {e}")
+            sys.exit(1)
+        return
+
     print(f"Converting {hf_id} → {output_dir} ({cfg['quantization']})...")
     print("This downloads the model from HuggingFace Hub first (1–3 GB).")
 
