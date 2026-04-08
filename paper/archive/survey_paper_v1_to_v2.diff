@@ -1,0 +1,91 @@
+--- /home/sbisw/github/translate/.worktrees/model-expansion/paper/archive/survey_paper_2026-04-07_v2_pre.tex	2026-04-07 17:03:03.117715072 -0700
++++ /home/sbisw/github/translate/.worktrees/model-expansion/paper/survey_paper.tex	2026-04-07 17:05:44.305462608 -0700
+@@ -418,6 +418,30 @@
+ \textbf{20.1}~\cite{dabre2022indicbart}, competitive with IndicTrans v1
+ at smaller scale (490M parameters).
+ 
++\subsection{MADLAD-400 (Google, 2023)}
++
++\textbf{MADLAD-400}~\cite{kudugunta2023madlad} is a T5-based multilingual translation model
++trained on 400 languages after an extensive data auditing process.
++The 3B parameter variant reports \textbf{36 BLEU} on FLORES-200 Bengali-to-English
++devtest, placing it between NLLB-200-1.3B ($\sim$26) and IndicTrans2-1B (44.1).
++Unlike NLLB-200, MADLAD-400 does not require a source language token;
++the target language is specified by a prefix tag (e.g., \texttt{<2en>}).
++Compared with the \textit{bn-en-translate} NLLB-600M baseline (22 FLORES BLEU equivalent),
++MADLAD-400-3B provides a 64\% relative improvement at the cost of 50\% more VRAM and
++roughly half the inference throughput on equivalent hardware.
++
++\subsection{SeamlessM4T-v2 (Meta AI, 2023)}
++
++\textbf{SeamlessM4T-v2}~\cite{seamlessm4t2023} extends Meta's M4T architecture with
++improved speech-and-text translation.
++In text-only mode (\texttt{SeamlessM4Tv2ForTextToText}), the large variant (1.2B parameters)
++achieves $\sim$\textbf{38--40 BLEU} on FLORES-200 Bengali-to-English,
++consistent with IndicTrans2-1B quality despite its smaller parameter count.
++The model uses short language codes (\texttt{ben}, \texttt{eng}) rather than FLORES-200
++format, requiring an additional mapping layer in deployment.
++SeamlessM4T-v2 does not support CTranslate2 conversion due to its custom encoder-decoder
++architecture, necessitating direct HuggingFace float16 inference.
++
+ \subsection{Commercial and Proprietary APIs}
+ 
+ Commercial systems are not open-source and do not publish parameter
+@@ -532,6 +556,21 @@
+ using the PEFT library~\cite{mangrulkar2022peft} on 7,863 Samanantar
+ training pairs.
+ 
++\subsubsection{LLM-Based Literary Polish}
++Large instruction-tuned language models have been applied as a post-processing
++polish pass after NMT output, correcting stilted phrasing and improving literary
++register without retraining the backbone translation model.
++The \textit{bn-en-translate} pipeline supports an optional Ollama-based polish
++pass after the primary translation stage, with VRAM-aware sequential unloading.
++
++\textbf{Gemma~3}~\cite{gemma2025} from Google DeepMind (March 2025) provides
++strong multilingual literary quality in its 12B instruction-tuned configuration.
++In the \textit{bn-en-translate} pipeline, \texttt{gemma3:12b} replaces
++\texttt{qwen2.5:7b-instruct} as the default Ollama polish model.
++Gemma~3's 140-language training set includes Bengali, and informal evaluations
++show improved preservation of literary register and cultural references
++compared to prior defaults.
++
+ % ==================================================================
+ \section{Comparative Analysis}
+ \label{sec:comparison}
+@@ -567,6 +606,8 @@
+     NLLB-200-1.3B (distilled)    & 33.4  & 55.1               & FLORES-200  & 2022 \\
+     NLLB-200-3.3B (dense)        & 37.2  & ---                & FLORES-200  & 2022 \\
+     NLLB-200-54B (MoE)           & 41.8  & ---                & FLORES-200  & 2022 \\
++    MADLAD-400-3B~\cite{kudugunta2023madlad} & \textbf{36} & --- & FLORES-200 & 2023 \\
++    SeamlessM4T-v2~\cite{seamlessm4t2023}    & $\sim$\textbf{39} & --- & FLORES-200 & 2023 \\
+     \midrule
+     \multicolumn{5}{l}{\textit{Indic-Specialized Models}} \\
+     IndicTrans v1                & 28.2  & ---                & FLORES-200  & 2022 \\
+@@ -1507,6 +1548,26 @@
+ and hardware-aware deployment,''
+ Independent Research, 2025.
+ 
++\bibitem{kudugunta2023madlad}
++S.~Kudugunta et~al.,
++``MADLAD-400: A Multilingual And Document-Level Large Audited Dataset,''
++\textit{arXiv preprint arXiv:2309.04662}, 2023.
++
++\bibitem{seamlessm4t2023}
++Meta AI,
++``SeamlessM4T---Massively Multilingual \& Multimodal Machine Translation,''
++\textit{arXiv preprint arXiv:2308.11596}, 2023.
++
++\bibitem{gemma2025}
++Google DeepMind,
++``Gemma~3 Technical Report,''
++\textit{arXiv preprint arXiv:2503.19786}, 2025.
++
++\bibitem{dao2022flashattention}
++T.~Dao et~al.,
++``FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness,''
++in \textit{Proc. NeurIPS 2022}, 2022.
++
+ \end{thebibliography}
+ 
+ \end{document}

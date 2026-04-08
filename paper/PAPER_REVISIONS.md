@@ -39,3 +39,13 @@ Archived:
 
 Archived: paper/archive/ieee_paper_2026-04-07_v2_pre.tex
 Diff: paper/archive/ieee_paper_v1_to_v2.diff
+
+### survey_paper.tex
+- Added MADLAD-400 subsection (36 FLORES BLEU, T5 architecture, target-language prefix)
+- Added SeamlessM4T-v2 subsection (~38-40 FLORES BLEU, custom arch, no CT2)
+- Added Gemma 3 paragraph in LLM-based translation section
+- Added MADLAD-400 and SeamlessM4T-v2 rows to main BLEU comparison table
+- 4 bibliography entries added (same as ieee_paper.tex)
+
+Archived: paper/archive/survey_paper_2026-04-07_v2_pre.tex
+Diff: paper/archive/survey_paper_v1_to_v2.diff
