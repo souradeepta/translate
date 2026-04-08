@@ -49,3 +49,19 @@ Diff: paper/archive/ieee_paper_v1_to_v2.diff
 
 Archived: paper/archive/survey_paper_2026-04-07_v2_pre.tex
 Diff: paper/archive/survey_paper_v1_to_v2.diff
+
+---
+
+## v1-slides — 2026-04-08 (initial slide decks)
+
+### Slides created
+- `ieee_slides.tex` — Beamer (Madrid/seahorse), ~10 slides: motivation, pipeline, models, BLEU results, fine-tuning, hardware constraints, monitoring, conclusion
+- `survey_slides.tex` — Beamer (Copenhagen/crane), ~12 slides: landscape, BLEU trend, comparison table, Pareto, domain variance, challenges, gaps, future
+- `overview.md` — Marp, 15 slides: quick-start, pipeline, models table, results, fine-tuning, hardware, monitoring, architecture
+- `survey_reveal.html` — Reveal.js (moon theme), ~9 slides: interactive Chart.js BLEU trend and Pareto frontier charts
+
+Archived:
+- `paper/archive/slides/ieee_slides_2026-04-07_v1.tex`
+- `paper/archive/slides/survey_slides_2026-04-07_v1.tex`
+- `paper/archive/slides/overview_2026-04-07_v1.md`
+- `paper/archive/slides/survey_reveal_2026-04-07_v1.html`
