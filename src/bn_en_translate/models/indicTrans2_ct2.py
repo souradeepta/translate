@@ -27,6 +27,7 @@ class IndicTrans2Ct2Translator(TranslatorBase):
 
     HF_MODEL_ID = "ai4bharat/indictrans2-indic-en-1B"
     SPM_FILENAME = "sentencepiece.bpe.model"
+    DEFAULT_BEAM_SIZE: int = 5
 
     def __init__(self, config: ModelConfig | None = None) -> None:
         super().__init__()
@@ -140,8 +141,9 @@ class IndicTrans2Ct2Translator(TranslatorBase):
         results = self._translator.translate_batch(  # type: ignore[union-attr]
             tokenized,
             target_prefix=target_prefix,
-            beam_size=self.config.beam_size,
+            beam_size=self._effective_beam_size(),
             max_decoding_length=self.config.max_decoding_length,
+            max_batch_size=self.config.max_ct2_batch_size,
         )
 
         decoded: list[str] = []
