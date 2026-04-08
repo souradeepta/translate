@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
+import importlib.util
+
 from bn_en_translate.config import ModelConfig
 from bn_en_translate.models.base import TranslatorBase
+
+
+def _flash_attn_available() -> bool:
+    return importlib.util.find_spec("flash_attn") is not None
 
 
 class IndicTrans2Translator(TranslatorBase):
@@ -24,6 +30,7 @@ class IndicTrans2Translator(TranslatorBase):
     """
 
     HF_MODEL_ID = "ai4bharat/indictrans2-indic-en-1B"
+    DEFAULT_BEAM_SIZE: int = 5
 
     def __init__(self, config: ModelConfig | None = None) -> None:
         super().__init__()
@@ -55,8 +62,13 @@ class IndicTrans2Translator(TranslatorBase):
         self._tokenizer = AutoTokenizer.from_pretrained(
             self.HF_MODEL_ID, trust_remote_code=True
         )
+        attn_impl = (
+            "flash_attention_2"
+            if self.config.use_flash_attention and _flash_attn_available()
+            else "eager"
+        )
         self._model = AutoModelForSeq2SeqLM.from_pretrained(
-            self.HF_MODEL_ID, trust_remote_code=True
+            self.HF_MODEL_ID, trust_remote_code=True, attn_implementation=attn_impl
         )
         self._processor = IndicProcessor(inference=True)
 
@@ -70,7 +82,14 @@ class IndicTrans2Translator(TranslatorBase):
         from transformers import AutoModelForSeq2SeqLM, AutoTokenizer  # type: ignore[import-untyped]
 
         self._tokenizer = AutoTokenizer.from_pretrained(self.HF_MODEL_ID)
-        self._model = AutoModelForSeq2SeqLM.from_pretrained(self.HF_MODEL_ID)
+        attn_impl = (
+            "flash_attention_2"
+            if self.config.use_flash_attention and _flash_attn_available()
+            else "eager"
+        )
+        self._model = AutoModelForSeq2SeqLM.from_pretrained(
+            self.HF_MODEL_ID, attn_implementation=attn_impl
+        )
         self._processor = None
 
         import torch  # type: ignore[import-untyped]
@@ -117,7 +136,7 @@ class IndicTrans2Translator(TranslatorBase):
         with torch.no_grad():
             generated = self._model.generate(  # type: ignore[union-attr]
                 **inputs,
-                num_beams=self.config.beam_size,
+                num_beams=self._effective_beam_size(),
                 num_return_sequences=1,
                 max_length=self.config.max_decoding_length,
             )
