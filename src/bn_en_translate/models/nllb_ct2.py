@@ -20,6 +20,8 @@ class NLLBCt2Translator(TranslatorBase):
     Falls back to int8 on CPU if CUDA is unavailable.
     """
 
+    DEFAULT_BEAM_SIZE: int = 4
+
     def __init__(self, config: ModelConfig | None = None) -> None:
         super().__init__()
         self.config = config or ModelConfig(model_name="nllb-600M")
@@ -114,9 +116,9 @@ class NLLBCt2Translator(TranslatorBase):
         results = self._translator.translate_batch(  # type: ignore[union-attr]
             tokenized,
             target_prefix=target_prefix,
-            beam_size=self.config.beam_size,
+            beam_size=self._effective_beam_size(),
             max_decoding_length=self.config.max_decoding_length,
-            max_batch_size=32,
+            max_batch_size=self.config.max_ct2_batch_size,
         )
 
         output_texts: list[str] = []
