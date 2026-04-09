@@ -52,6 +52,48 @@ Diff: paper/archive/survey_paper_v1_to_v2.diff
 
 ---
 
+## v3 — 2026-04-08 (publishability overhaul + journal versions)
+
+### ieee_paper.tex
+- Anti-AI writing pass: removed vague adjectives; quantified all performance claims
+- Abstract tightened to ≤150 words (from ~164): dropped redundant phrasing, tightened sentence structure
+- GPU speedup paragraph in Discussion rewritten to be hardware-specific and quantitative
+- Numbered contributions list in Introduction preserved; all BLEU numbers retained
+
+### survey_paper.tex
+- Abstract tightened to ≤150 words (from ~200+): five findings preserved in compact form
+- "Novel Contributions" section header renamed to "Specific Contributions vs. Prior Work"
+- "novel and reproducible contribution" rewritten as "reproducible, previously unpublished contribution"
+- All BLEU claims in comparison table (Table tab:bleu) now carry inline \cite{} on every row:
+  mBART-50 → \cite{liu2020mbart50}, mT5 → \cite{xue2021mt5}, M2M-100 → \cite{fan2021m2m100},
+  NLLB family → \cite{nllb2022}, IndicTrans v1 → \cite{ramesh2022samanantar},
+  IndicBART → \cite{dabre2022indicbart}, IndicTrans2 → \cite{gala2023indictrans2},
+  commercial APIs → \cite{nllb2022}, domain-specific rows → respective author citations,
+  "This Work" rows → \cite{biswas2025bnentr}
+- n/r entries verified; no truly empty cells found
+
+### New files
+- `ieee_transactions_paper.tex` — IEEE journal version (`\documentclass[journal]{IEEEtran}`):
+  targets TASLP/IEEE Access; includes \IEEEpeerreviewmaketitle, \IEEEraisesectionheading intro,
+  full Related Work section (~600 words covering low-resource NMT, PEFT, quantized inference,
+  Bengali resources), expanded Experimental Setup with hardware/software table, per-domain BLEU
+  table (10 domains, 4.7–80.6 BLEU), throughput comparison table, full fine-tuning results table,
+  new Limitations section, two-paragraph Conclusion; 200–250 word abstract; 30 bibliography entries
+- `acm_paper.tex` — ACM TALLIP version (`\documentclass[sigconf]{acmart}`):
+  CCS concepts block, ACM keywords, prose-heavy TALLIP structure across 9 sections,
+  full inline bibliography in ACM format; all BLEU numbers, hardware specs, and
+  experimental results identical to IEEE version; \begin{acks} acknowledgments block
+
+Archived pre-v3 snapshots (created in prior session):
+- `paper/archive/ieee_paper_2026-04-08_v3_pre.tex`
+- `paper/archive/survey_paper_2026-04-08_v3_pre.tex`
+
+Diffs (require Bash regeneration after this pass):
+- `paper/archive/ieee_paper_v2_to_v3.diff` — update with: diff -u paper/archive/ieee_paper_2026-04-08_v3_pre.tex paper/ieee_paper.tex
+- `paper/archive/survey_paper_v2_to_v3.diff` — update with: diff -u paper/archive/survey_paper_2026-04-08_v3_pre.tex paper/survey_paper.tex
+
+---
+
 ## v1-slides — 2026-04-08 (initial slide decks)
 
 ### Slides created
