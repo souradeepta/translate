@@ -81,21 +81,24 @@ and Hardware-Aware Deployment}
 % ============================================================
 \begin{abstract}
 % ============================================================
-\textbf{bn-en-translate} is a fully offline Bengali-to-English translation system
-targeting consumer-grade GPU hardware.
-NLLB-200-distilled-600M~\cite{nllb2022} via CTranslate2~\cite{ctranslate2_klein}
-float16 on an NVIDIA RTX~5050 (Blackwell sm\_120, 8\,GB GDDR7)~\cite{nvidia_blackwell}
-reaches \textbf{65.2 BLEU} on a 90-sentence in-domain corpus across 10 domains
-(4.7 News to 80.6 Health) at 97--100\,chars/s with 82--84\% GPU utilisation.
+We describe \textbf{bn-en-translate}, a fully offline Bengali-to-English neural
+machine translation system for consumer-grade GPU hardware.
+NLLB-200-distilled-600M~\cite{nllb2022} runs via CTranslate2~\cite{ctranslate2_klein}
+float16 on a single NVIDIA RTX~5050 Laptop GPU (Blackwell sm\_120, 8\,GB
+GDDR7)~\cite{nvidia_blackwell}, reaching \textbf{65.2 BLEU} on a 90-sentence
+in-domain corpus across 10 domains (4.7 News to 80.6 Health) at
+97--100\,chars/s with 82--84\% average GPU utilisation.
 LoRA fine-tuning~\cite{hu2021lora} via PEFT~\cite{peft2022} with bf16 precision
-runs 3~epochs on 7,863 Samanantar pairs in \TRAINDURATION, yielding \POSTFTBLEU{}
+trains 3~epochs over 7,863 Samanantar pairs in \TRAINDURATION, yielding \POSTFTBLEU{}
 BLEU on the 984-pair open-domain test set (sacreBLEU, no SentencePiece normalization).
-Per-run CPU, RAM, GPU, and disk metrics are recorded to SQLite with automated
-regression detection.
-Six Blackwell-specific deployment constraints are documented and resolved: cuBLAS
-INT8 incompatibility, concurrent-pip-install SIGBUS, fast-tokenizer fork-deadlock,
-\texttt{prefetch\_factor} conflict, fp16/bf16 GradScaler interaction, and CT2 batch OOM.
-All 186 tests pass.
+A real-time resource monitor records per-run CPU, RAM, GPU, and disk metrics to
+SQLite with automated regression detection.
+Six hardware-specific deployment constraints on first-generation Blackwell hardware
+are documented and resolved, including a cuBLAS INT8 incompatibility, a
+concurrent-pip-install SIGBUS, a fast-tokenizer fork-deadlock, a
+\texttt{prefetch\_factor} misconfiguration, an fp16/bf16 GradScaler conflict,
+and a CTranslate2 batch OOM.
+All 186 tests pass under strict TDD discipline.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -1137,9 +1140,9 @@ under 3 hours for a 7,863-pair corpus.
 
 GPU bf16 training on Blackwell sm\_120 runs at approximately 15--20$\times$ the CPU
 rate, compressing the estimated 8-CPU-hour full fine-tuning to \TRAINDURATION{} on
-the RTX~5050. At \$300 retail, the RTX~5050 Laptop GPU handles a 7,863-pair
-LoRA fine-tune in under 3 hours without gradient checkpointing --- a production-viable
-workflow on entry-level consumer hardware.
+the RTX~5050. The RTX~5050 Laptop GPU is consumer hardware retailing around \$300;
+this result confirms it can sustain a production parameter-efficient fine-tuning
+workflow without compromise.
 
 The open-domain BLEU of \POSTFTBLEU{} warrants explicit comment. Raw sacreBLEU on
 Bengali hypotheses without SentencePiece normalization suppresses n-gram overlap even

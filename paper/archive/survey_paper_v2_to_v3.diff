@@ -1,0 +1,45 @@
+--- /home/sbisw/github/translate/paper/archive/survey_paper_2026-04-08_v3_pre.tex	2026-04-08 09:11:29.039636225 -0700
++++ /home/sbisw/github/translate/paper/survey_paper.tex	2026-04-08 09:14:15.343649030 -0700
+@@ -38,8 +38,9 @@
+ \author{%
+   \IEEEauthorblockN{Souradeepta Biswas}
+   \IEEEauthorblockA{%
+-    \textit{Independent Researcher}\\
+-    souradeepta.biswas@example.com}
++    \textit{M.S. Computer Science, Syracuse University}\\
++    Independent Researcher\\
++    \url{https://github.com/sbisw/translate}}
+ }
+ 
+ \maketitle
+@@ -627,7 +628,7 @@
+     IndicTrans v1 (Samanantar)   & 22.4  & ---  & Samanantar  & 2022 \\
+     \midrule
+     \multicolumn{5}{l}{\textit{This Work}} \\
+-    NLLB-600M CT2 (in-domain)    & \textbf{56.2} & TBD & Custom 90-sent. & 2025 \\
++    NLLB-600M CT2 (in-domain)    & \textbf{56.2} & ---$^\S$ & Custom 90-sent. & 2025 \\
+     NLLB-600M CT2 (open-domain)  & 0.15$^\ddagger$ & --- & Samanantar 984 & 2025 \\
+     \bottomrule
+     \multicolumn{5}{p{13cm}}{\scriptsize
+@@ -635,7 +636,7 @@
+       similar architecture; see text.
+       $^\ddagger$ Raw sacreBLEU without SentencePiece normalization; see
+       Section~\ref{sec:ours} for discussion of this metric anomaly.
+-      TBD = not yet computed; planned as future work.}
++      $^\S$ chrF on custom corpus not yet computed; planned as future work.}
+   \end{tabular}
+ \end{table*}
+ 
+@@ -1340,9 +1341,9 @@
+ The primary challenges remaining for Bengali NMT are consistent named
+ entity transliteration, robustness to code-switched input, and evaluation
+ beyond BLEU.
+-We hope this survey provides a useful reference point for both practitioners
+-deploying Bengali NMT in production and researchers seeking to understand
+-the current state of the art.
++We hope this survey provides a useful reference for practitioners deploying
++Bengali NMT in production and researchers seeking to understand current
++system capabilities, limitations, and open problems in the field.
+ 
+ % ------------------------------------------------------------------
+ \bibliographystyle{IEEEtran}

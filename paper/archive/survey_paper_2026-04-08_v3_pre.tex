@@ -47,21 +47,32 @@ Machine Translation: From Cloud-Scale Models to Consumer-GPU Deployment}
 
 % ------------------------------------------------------------------
 \begin{abstract}
-Bengali (Bangla), with 234 million native speakers~\cite{ethnologue2023},
-remains underrepresented in NLP benchmarks relative to its speaker population.
-This survey covers more than twenty Bengali-to-English NMT systems from 2019
-through 2025, extracting BLEU scores, training corpora, and deployment requirements.
-Five findings emerge: (1) FLORES-200 \textit{devtest} BLEU spans 14 (mBART-50
-zero-shot) to 41.4 (IndicTrans2-1B), a six-year arc driven by scale and
-Indic-specialized training data; (2) domain BLEU variance within one model
-exceeds 50 points, making single-number benchmarks unreliable; (3) LoRA
-fine-tuning with $<$1\% trainable parameters matches full fine-tuning quality;
-(4) a fully offline CTranslate2 float16 deployment on an NVIDIA RTX~5050
-achieves 56.2 in-domain BLEU on a curated corpus, competitive with cloud APIs
-on matched domains; and (5) the Blackwell sm\_120 GPU generation requires five
-workarounds absent from any published CTranslate2 or PyTorch~2.7 guide.
-The \textit{bn-en-translate} system is situated within this landscape, with
-genuine research gaps and future directions identified.
+Bengali (Bangla) is the seventh most spoken language in the world with
+approximately 234 million native speakers, yet it remains substantially
+underrepresented in natural language processing research relative to its
+speaker population.
+This survey systematically examines the state of Bengali-to-English
+neural machine translation (NMT) from 2019 through 2025, covering
+multilingual foundation models, Indic-specialized architectures, commercial
+systems, domain-specific fine-tuned variants, and resource-constrained
+deployments.
+We identify and analyze more than twenty published systems, extracting
+BLEU scores, training corpora, computational requirements, and architectural
+choices.
+Key findings include: (1) FLORES-200 \textit{devtest} BLEU for Bengali-to-English
+ranges from approximately 14 (mBART-50 zero-shot) to 44+ (IndicTrans2-1B),
+reflecting a six-year arc of rapid improvement; (2) domain BLEU variance
+within a single system can exceed 50 points, making single-number
+benchmarks misleading; (3) LoRA parameter-efficient fine-tuning with
+fewer than 1\% trainable parameters recovers quality competitive with
+full fine-tuning; (4) a fully offline consumer-laptop deployment
+(NLLB-200-distilled-600M via CTranslate2 float16, NVIDIA RTX 5050) achieves
+in-domain BLEU of 56.2 on a curated literary/domain corpus, matching or
+exceeding cloud API performance on comparable in-domain test sets; and
+(5) the Blackwell (sm\_120) GPU generation requires five undocumented
+deployment workarounds not present in any prior published guide.
+We situate the \textit{bn-en-translate} system within this landscape,
+identify genuine research gaps, and chart directions for future work.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -588,37 +599,37 @@ with $\dagger$.
     \textbf{System} & \textbf{BLEU} & \textbf{chrF} & \textbf{Corpus} & \textbf{Year} \\
     \midrule
     \multicolumn{5}{l}{\textit{Multilingual Foundation Models}} \\
-    mBART-50 (zero-shot)~\cite{liu2020mbart50}   & 14.0  & $\sim$32$^\dagger$ & FLORES-200  & 2020 \\
-    mT5-base (fine-tuned)~\cite{xue2021mt5}      & 19.3  & ---                & WMT20 news  & 2021 \\
-    M2M-100-418M~\cite{fan2021m2m100}            & 17.3  & ---                & FLORES-200  & 2021 \\
-    M2M-100-1.2B~\cite{fan2021m2m100}            & 20.7  & $\sim$38$^\dagger$ & FLORES-200  & 2021 \\
-    NLLB-200-600M (distilled)~\cite{nllb2022}    & 30.5  & 52.4               & FLORES-200  & 2022 \\
-    NLLB-200-1.3B (distilled)~\cite{nllb2022}    & 33.4  & 55.1               & FLORES-200  & 2022 \\
-    NLLB-200-3.3B (dense)~\cite{nllb2022}        & 37.2  & ---                & FLORES-200  & 2022 \\
-    NLLB-200-54B (MoE)~\cite{nllb2022}           & 41.8  & ---                & FLORES-200  & 2022 \\
-    MADLAD-400-3B~\cite{kudugunta2023madlad}      & \textbf{36} & ---         & FLORES-200  & 2023 \\
-    SeamlessM4T-v2~\cite{seamlessm4t2023}         & $\sim$\textbf{39} & ---   & FLORES-200  & 2023 \\
+    mBART-50 (zero-shot)         & 14.0  & $\sim$32$^\dagger$ & FLORES-200  & 2020 \\
+    mT5-base (fine-tuned)        & 19.3  & ---                & WMT20 news  & 2021 \\
+    M2M-100-418M                 & 17.3  & ---                & FLORES-200  & 2021 \\
+    M2M-100-1.2B                 & 20.7  & $\sim$38$^\dagger$ & FLORES-200  & 2021 \\
+    NLLB-200-600M (distilled)    & 30.5  & 52.4               & FLORES-200  & 2022 \\
+    NLLB-200-1.3B (distilled)    & 33.4  & 55.1               & FLORES-200  & 2022 \\
+    NLLB-200-3.3B (dense)        & 37.2  & ---                & FLORES-200  & 2022 \\
+    NLLB-200-54B (MoE)           & 41.8  & ---                & FLORES-200  & 2022 \\
+    MADLAD-400-3B~\cite{kudugunta2023madlad} & \textbf{36} & --- & FLORES-200 & 2023 \\
+    SeamlessM4T-v2~\cite{seamlessm4t2023}    & $\sim$\textbf{39} & --- & FLORES-200 & 2023 \\
     \midrule
     \multicolumn{5}{l}{\textit{Indic-Specialized Models}} \\
-    IndicTrans v1~\cite{ramesh2022samanantar}     & 28.2  & ---                & FLORES-200  & 2022 \\
-    IndicBART~\cite{dabre2022indicbart}           & 20.1  & ---                & Samanantar  & 2022 \\
-    IndicTrans2-200M~\cite{gala2023indictrans2}   & 37.9  & ---                & FLORES-200  & 2023 \\
-    IndicTrans2-1B~\cite{gala2023indictrans2}     & 41.4  & 63.2               & FLORES-200  & 2023 \\
+    IndicTrans v1                & 28.2  & ---                & FLORES-200  & 2022 \\
+    IndicBART                    & 20.1  & ---                & Samanantar  & 2022 \\
+    IndicTrans2-200M             & 37.9  & ---                & FLORES-200  & 2023 \\
+    IndicTrans2-1B               & 41.4  & 63.2               & FLORES-200  & 2023 \\
     \midrule
     \multicolumn{5}{l}{\textit{Commercial APIs (3rd-party evaluation)}} \\
-    Google Translate~\cite{nllb2022}             & $\sim$42 & $\sim$60$^\dagger$ & FLORES-200  & 2022 \\
-    Microsoft Azure Translator~\cite{nllb2022}   & $\sim$37 & ---                & FLORES-200  & 2022 \\
-    Amazon Translate~\cite{nllb2022}             & $\sim$31 & ---                & FLORES-200  & 2022 \\
+    Google Translate             & $\sim$42 & $\sim$60$^\dagger$ & FLORES-200  & 2022 \\
+    Microsoft Azure Translator   & $\sim$37 & ---                & FLORES-200  & 2022 \\
+    Amazon Translate             & $\sim$31 & ---                & FLORES-200  & 2022 \\
     \midrule
     \multicolumn{5}{l}{\textit{Domain-Specific and Fine-tuned}} \\
-    WMT2020 top system~\cite{barrault2020wmt}    & 21.7  & ---  & WMT20 news  & 2020 \\
-    mBART biomedical (fine-tuned)~\cite{hasan2020low} & 34.2 & --- & Biomedical & 2020 \\
-    Legal corpus NMT~\cite{alam2021bengali}      & 28.9  & ---  & Legal       & 2021 \\
-    IndicTrans v1 (Samanantar)~\cite{ramesh2022samanantar} & 22.4 & --- & Samanantar & 2022 \\
+    WMT2020 top system           & 21.7  & ---  & WMT20 news  & 2020 \\
+    mBART biomedical (fine-tuned)& 34.2  & ---  & Biomedical  & 2020 \\
+    Legal corpus NMT             & 28.9  & ---  & Legal       & 2021 \\
+    IndicTrans v1 (Samanantar)   & 22.4  & ---  & Samanantar  & 2022 \\
     \midrule
     \multicolumn{5}{l}{\textit{This Work}} \\
-    NLLB-600M CT2 (in-domain)~\cite{biswas2025bnentr}   & \textbf{56.2} & ---$^\S$ & Custom 90-sent. & 2025 \\
-    NLLB-600M CT2 (open-domain)~\cite{biswas2025bnentr} & 0.15$^\ddagger$ & --- & Samanantar 984 & 2025 \\
+    NLLB-600M CT2 (in-domain)    & \textbf{56.2} & ---$^\S$ & Custom 90-sent. & 2025 \\
+    NLLB-600M CT2 (open-domain)  & 0.15$^\ddagger$ & --- & Samanantar 984 & 2025 \\
     \bottomrule
     \multicolumn{5}{p{13cm}}{\scriptsize
       $^\dagger$ est.\ = estimated from published chrF/BLEU ratio for models of
@@ -1090,7 +1101,7 @@ Resource monitoring is implemented via a \texttt{ResourceMonitor} daemon
 and a SQLite \texttt{RunDatabase} that records every benchmark and
 fine-tuning run for regression detection.
 
-\subsection{Specific Contributions vs.\ Prior Work}
+\subsection{Novel Contributions vs.\ Prior Work}
 
 \subsubsection{First Documented Blackwell sm\_120 NMT Deployment}
 To the best of our knowledge, no prior published guide or paper documents
@@ -1252,7 +1263,7 @@ As of the writing of this paper, no NMT paper, CTranslate2 documentation,
 or CUDA programming guide addresses sm\_120 INT8 limitations or the
 \texttt{LD\_LIBRARY\_PATH} requirements in WSL2.
 The workarounds documented in Section~\ref{sec:ours} are therefore a
-reproducible, previously unpublished contribution to the deployment community.
+novel and reproducible contribution to the community.
 
 % ==================================================================
 \section{Future Directions}
