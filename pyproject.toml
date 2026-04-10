@@ -31,7 +31,7 @@ train = [
 ]
 monitor = [
     "psutil>=6.0.0",
-    "pynvml>=11.5.0",
+    "nvidia-ml-py>=12.535.77",
 ]
 dev = [
     "pytest>=8.3.0",
