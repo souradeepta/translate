@@ -52,15 +52,23 @@ class SeamlessTranslator(TranslatorBase):
         self._processor: object | None = None
 
     def load(self) -> None:
+        import torch  # type: ignore[import-untyped]
         from transformers import AutoProcessor, SeamlessM4Tv2ForTextToText  # type: ignore[import-untyped]
 
+        from bn_en_translate.utils.cuda_check import get_best_device
+
+        device = (
+            get_best_device() if self.config.device == "auto" else self.config.device
+        )
+        # Use device_map="auto" to stream weights directly to GPU — avoids double-copy OOM
+        device_map = "auto" if device == "cuda" and torch.cuda.is_available() else None
+
         self._processor = AutoProcessor.from_pretrained(self.HF_MODEL_ID)
-        self._model = SeamlessM4Tv2ForTextToText.from_pretrained(self.HF_MODEL_ID)
-
-        import torch  # type: ignore[import-untyped]
-
-        if self.config.device == "cuda" and torch.cuda.is_available():
-            self._model.to("cuda")  # type: ignore[union-attr]
+        self._model = SeamlessM4Tv2ForTextToText.from_pretrained(
+            self.HF_MODEL_ID,
+            dtype=torch.float16,
+            device_map=device_map,
+        )
 
         self._loaded = True
 
@@ -78,7 +86,8 @@ class SeamlessTranslator(TranslatorBase):
     def _translate_batch(self, texts: list[str], src_lang: str, tgt_lang: str) -> list[str]:
         import torch  # type: ignore[import-untyped]
 
-        device = "cuda" if self.config.device == "cuda" and torch.cuda.is_available() else "cpu"
+        # When using device_map="auto", move inputs to the model's first-parameter device
+        model_device = next(self._model.parameters()).device  # type: ignore[union-attr]
 
         seamless_src = _to_seamless_lang(src_lang)
         seamless_tgt = _to_seamless_lang(tgt_lang)
@@ -87,7 +96,7 @@ class SeamlessTranslator(TranslatorBase):
             text=texts,
             src_lang=seamless_src,
             return_tensors="pt",
-        ).to(device)
+        ).to(model_device)
 
         with torch.no_grad():
             output_tokens = self._model.generate(  # type: ignore[union-attr]
