@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import importlib.util
 
-from bn_en_translate.config import ModelConfig
+from bn_en_translate.config import REPO_ROOT, ModelConfig
 from bn_en_translate.models.base import TranslatorBase
 
 # Human-readable language names used in the MiLMMT prompt template.
@@ -61,7 +61,7 @@ class MiLMMTTranslator(TranslatorBase):
     """
 
     HF_MODEL_ID: str = "xiaomi-research/MiLMMT-46-1B-v0.1"
-    _LOCAL_PATH: str = "models/milmmt-46-1B-hf"
+    _LOCAL_PATH: str = str(REPO_ROOT / "models/milmmt-46-1B-hf")
     DEFAULT_BEAM_SIZE: int = 1  # Greedy by default; causal LMs rarely benefit from beam search
 
     def __init__(self, config: ModelConfig | None = None) -> None:
@@ -116,7 +116,7 @@ class MiLMMTTranslator(TranslatorBase):
             dtype=torch.bfloat16,  # Gemma3 native dtype; float16 risks NaN
         )
         if device == "cuda":
-            require_cuda("MiLMMTTranslator")
+            require_cuda(type(self).__name__)
             self._model = self._model.to("cuda")  # type: ignore[union-attr]
 
         self._loaded = True

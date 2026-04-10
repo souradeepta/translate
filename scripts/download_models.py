@@ -1,4 +1,4 @@
-"""Download and convert models to CTranslate2 INT8 format."""
+"""Download and convert models to CTranslate2 format."""
 
 from __future__ import annotations
 
@@ -8,22 +8,24 @@ import subprocess
 import sys
 from pathlib import Path
 
+from bn_en_translate.config import CT2_MODEL_PATHS, REPO_ROOT
+
 MODELS: dict[str, dict[str, str]] = {
     "nllb-600M": {
         "hf_id": "facebook/nllb-200-distilled-600M",
-        "output_dir": "models/nllb-600M-ct2",
+        "output_dir": CT2_MODEL_PATHS["nllb-600m"],
         "quantization": "float16",
         "type": "nllb",
     },
     "nllb-1.3B": {
         "hf_id": "facebook/nllb-200-distilled-1.3B",
-        "output_dir": "models/nllb-1.3B-ct2",
+        "output_dir": CT2_MODEL_PATHS["nllb-1.3b"],
         "quantization": "float16",
         "type": "nllb",
     },
     "indicTrans2-1B": {
         "hf_id": "ai4bharat/indictrans2-indic-en-1B",
-        "output_dir": "models/indicTrans2-1B-ct2",
+        "output_dir": CT2_MODEL_PATHS["indictrans2-1b"],
         "quantization": "float16",
         "type": "indictrans2",
     },

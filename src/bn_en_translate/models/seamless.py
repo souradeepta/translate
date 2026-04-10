@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from bn_en_translate.config import ModelConfig
+from bn_en_translate.config import REPO_ROOT, ModelConfig
 from bn_en_translate.models.base import TranslatorBase
 
 # Map FLORES-200 codes to SeamlessM4T short codes
@@ -43,7 +43,7 @@ class SeamlessTranslator(TranslatorBase):
     """
 
     HF_MODEL_ID: str = "facebook/seamless-m4t-v2-large"
-    _LOCAL_PATH: str = "models/seamless-medium-hf"
+    _LOCAL_PATH: str = str(REPO_ROOT / "models/seamless-medium-hf")
     DEFAULT_BEAM_SIZE: int = 5
 
     def __init__(self, config: ModelConfig | None = None) -> None:
@@ -62,7 +62,7 @@ class SeamlessTranslator(TranslatorBase):
         from pathlib import Path
         from transformers import AutoProcessor, SeamlessM4Tv2ForTextToText  # type: ignore[import-untyped]
 
-        from bn_en_translate.utils.cuda_check import get_best_device
+        from bn_en_translate.utils.cuda_check import get_best_device, require_cuda
 
         # Prefer local download; fall back to HF Hub
         model_id = self._LOCAL_PATH if Path(self._LOCAL_PATH).exists() else self.HF_MODEL_ID
@@ -78,7 +78,8 @@ class SeamlessTranslator(TranslatorBase):
             model_id,
             dtype=torch.float16,
         )
-        if device == "cuda" and torch.cuda.is_available():
+        if device == "cuda":
+            require_cuda(type(self).__name__)
             self._model = self._model.to("cuda")  # type: ignore[union-attr]
 
         self._loaded = True

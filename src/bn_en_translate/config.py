@@ -5,6 +5,19 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+# Repo root — anchored to this file's location so path resolution is
+# cwd-independent regardless of where the process is started from.
+REPO_ROOT: Path = Path(__file__).parents[2]
+
+# Canonical on-disk paths for CTranslate2 model directories.
+# Single source of truth used by factory.py (routing) and download_models.py (output).
+CT2_MODEL_PATHS: dict[str, str] = {
+    "nllb-600m":      str(REPO_ROOT / "models/nllb-600M-ct2"),
+    "nllb-1.3b":      str(REPO_ROOT / "models/nllb-1.3B-ct2"),
+    "indictrans2-1b": str(REPO_ROOT / "models/indicTrans2-1B-ct2"),
+    "indictrans2":    str(REPO_ROOT / "models/indicTrans2-1B-ct2"),
+}
+
 
 @dataclass
 class ChunkConfig:

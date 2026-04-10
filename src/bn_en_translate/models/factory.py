@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable
 
-from bn_en_translate.config import ModelConfig, PipelineConfig
+from bn_en_translate.config import CT2_MODEL_PATHS, ModelConfig, PipelineConfig
 from bn_en_translate.models.base import TranslatorBase
 
 # ---------------------------------------------------------------------------
@@ -109,21 +109,13 @@ def get_translator(config: PipelineConfig) -> TranslatorBase:
     return factory(config)
 
 
-_CT2_DIRS: dict[str, str] = {
-    "nllb-600m":     "models/nllb-600M-ct2",
-    "nllb-1.3b":     "models/nllb-1.3B-ct2",
-    "indictrans2-1b": "models/indicTrans2-1B-ct2",
-    "indictrans2":    "models/indicTrans2-1B-ct2",
-}
-
-
 def _ct2_path(model_config: ModelConfig) -> Path:
     """Return the CTranslate2 model directory for a given ModelConfig.
 
-    Known models always resolve to their canonical path from _CT2_DIRS.
+    Known models resolve to their canonical absolute path from CT2_MODEL_PATHS.
     Unknown models fall back to model_config.model_path.
     """
     name = model_config.model_name.lower()
-    if name in _CT2_DIRS:
-        return Path(_CT2_DIRS[name])
+    if name in CT2_MODEL_PATHS:
+        return Path(CT2_MODEL_PATHS[name])
     return Path(model_config.model_path)

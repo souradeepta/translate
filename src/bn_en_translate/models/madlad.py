@@ -11,7 +11,7 @@ from __future__ import annotations
 import importlib.util
 import warnings
 
-from bn_en_translate.config import ModelConfig
+from bn_en_translate.config import REPO_ROOT, ModelConfig
 from bn_en_translate.models.base import TranslatorBase
 
 
@@ -58,7 +58,7 @@ class MADLADTranslator(TranslatorBase):
         self._model: object | None = None
         self._tokenizer: object | None = None
 
-    _LOCAL_PATH = "models/madlad-3b-hf"
+    _LOCAL_PATH: str = str(REPO_ROOT / "models/madlad-3b-hf")
 
     def load(self) -> None:
         import torch  # type: ignore[import-untyped]

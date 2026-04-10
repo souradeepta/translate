@@ -80,7 +80,7 @@ class IndicTrans2Translator(TranslatorBase):
         self._processor = IndicProcessor(inference=True)
 
         if self.config.device == "cuda":
-            require_cuda("IndicTrans2Translator")
+            require_cuda(type(self).__name__)
             self._model.to("cuda")  # type: ignore[union-attr]
 
     def _load_via_transformers_fallback(self) -> None:
@@ -103,7 +103,7 @@ class IndicTrans2Translator(TranslatorBase):
         )
 
         if self.config.device == "cuda":
-            require_cuda("IndicTrans2Translator")
+            require_cuda(type(self).__name__)
             self._model.to("cuda")  # type: ignore[union-attr]
 
     def unload(self) -> None:
