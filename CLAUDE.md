@@ -4,17 +4,20 @@
 
 ```bash
 source .venv/bin/activate && export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH
-make test          # 186 tests, ~12s — confirms env is working
+make test          # 212 tests, ~27s — confirms env is working
 python scripts/benchmark.py --models nllb-600M --sentences 5   # quick GPU smoke test
 ```
 
-**State as of 2026-04-01:**
-- `models/nllb-600M-ct2/` ✅ downloaded, working via CT2 float16 (BLEU 56.2 on 90-sentence corpus)
+**State as of 2026-04-09:**
+- `models/nllb-600M-ct2/` ✅ CT2 float16, BLEU 55.3 / chrF 72.8 on FLORES-200 90-sentence corpus
+- `models/madlad-3b-hf/` ✅ downloaded, device_map="auto" float16 (~7.6 GB VRAM) — benchmarked
+- `models/seamless-medium-hf/` ✅ downloaded, device_map="auto" float16 — benchmarked
 - `corpus/` ✅ 90-sentence built-in + 9,829 Samanantar pairs (train/val/test splits)
-- All 186 unit/integration tests passing
+- All 212 unit/integration tests passing
 - **PyTorch 2.7.0+cu128** installed — GPU training FULLY UNLOCKED (6/6 sm_120 probes pass)
-- Resource monitoring: `ResourceMonitor` + `RunDatabase` (SQLite) record every benchmark/finetune run
-- Next: run GPU fine-tuning `python scripts/finetune.py` (expected ~20–30 min on RTX 5050)
+- LoRA fine-tune done: 2.46h, 3 epochs, eval_loss 1.992, post-FT BLEU 0.17 (open-domain)
+- Both papers updated: `paper/ieee_paper.tex`, `paper/survey_paper.tex`
+- Figures: `python scripts/gen_paper_figures.py` → `paper/figures/`
 
 **Never do these (painful lessons):**
 - ❌ PyTorch cu124 for training → `no kernel image` on `.ne()` and all element-wise ops on sm_120
@@ -29,6 +32,10 @@ python scripts/benchmark.py --models nllb-600M --sentences 5   # quick GPU smoke
 - ❌ `torch_dtype` in transformers ≥5.x → renamed to `dtype`
 - ❌ `.half()` model weights + `fp16=True` training → GradScaler raises `ValueError: Attempting to unscale FP16 gradients`; use `bf16=True` instead (no GradScaler needed, Blackwell sm_120 supports bf16)
 - ❌ CT2 `translate_batch()` with 900+ sentences at once → CUDA OOM; always pass `max_batch_size=32`
+- ❌ MADLAD/Seamless `.to("cuda")` after float32 load → double-copy OOM; use `device_map="auto"` + `dtype=torch.float16`
+- ❌ MADLAD `tie_word_embeddings` default → noisy warning; set `tie_word_embeddings=False`
+- ❌ `pynvml` package → deprecated; use `nvidia-ml-py` (same `import pynvml` API, no code changes)
+- ❌ RunDatabase schema migration → new columns added after deploy; use `_apply_migrations()` with `ALTER TABLE ADD COLUMN`
 
 ---
 
