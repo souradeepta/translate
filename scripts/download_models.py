@@ -39,6 +39,12 @@ MODELS: dict[str, dict[str, str]] = {
         "quantization": "float16",
         "type": "hf_only",
     },
+    "milmmt-46-1B": {
+        "hf_id": "xiaomi-research/MiLMMT-46-1B-v0.1",
+        "output_dir": "models/milmmt-46-1B-hf",
+        "quantization": "bfloat16",
+        "type": "hf_only",
+    },
 }
 
 

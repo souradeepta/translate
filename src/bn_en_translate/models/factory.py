@@ -72,6 +72,13 @@ def _make_seamless(config: PipelineConfig) -> TranslatorBase:
     return SeamlessTranslator(config.model)
 
 
+@register_model("milmmt-46-1b")
+@register_model("milmmt")
+def _make_milmmt(config: PipelineConfig) -> TranslatorBase:
+    from bn_en_translate.models.milmmt import MiLMMTTranslator
+    return MiLMMTTranslator(config.model)
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -87,6 +94,7 @@ def get_translator(config: PipelineConfig) -> TranslatorBase:
       - "ollama"          -> OllamaTranslator (local Ollama LLM)
       - "madlad-3b"       -> MADLADTranslator (Google MADLAD-400-3B)
       - "seamless-medium" -> SeamlessTranslator (Meta SeamlessM4T-v2)
+      - "milmmt-46-1b"    -> MiLMMTTranslator (Xiaomi MiLMMT-46-1B, Gemma3-based)
 
     Extend by calling @register_model("new-name") on a new factory function.
     """
