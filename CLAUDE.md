@@ -32,6 +32,10 @@ python scripts/benchmark.py --models nllb-600M --sentences 5   # quick GPU smoke
 - ❌ `torch_dtype` in transformers ≥5.x → renamed to `dtype`
 - ❌ `.half()` model weights + `fp16=True` training → GradScaler raises `ValueError: Attempting to unscale FP16 gradients`; use `bf16=True` instead (no GradScaler needed, Blackwell sm_120 supports bf16)
 - ❌ CT2 `translate_batch()` with 900+ sentences at once → CUDA OOM; always pass `max_batch_size=32`
+- ❌ MADLAD-3B: local checkpoint has shared.weight ≠ decoder.embed_tokens.weight → garbage output + 8 GB VRAM insufficient (CPU offload → degenerate sequences)
+- ❌ `SeamlessM4Tv2ForTextToText.generate()` does NOT accept `generate_speech=False` (that's the combined model); remove it
+- ❌ `SeamlessM4Tv2ForTextToText` does NOT support `device_map="auto"` → use `.to("cuda")` after load
+- ❌ SeamlessM4T processor call without `padding=True, truncation=True` → ValueError on batches with unequal lengths
 - ❌ MADLAD/Seamless `.to("cuda")` after float32 load → double-copy OOM; use `device_map="auto"` + `dtype=torch.float16`
 - ⚠️ MADLAD-3B with `device_map="auto"` on 8 GB VRAM → triggers CPU layer offload (weights fit, but activations+KV cache overflow); inference becomes extremely slow (~45+ min for 90 sentences). Acceptable for benchmarking, not for interactive use.
 - ❌ MADLAD `tie_word_embeddings=False` → randomises encoder embedding matrix (checkpoint has only shared weights); leave at default (True) and accept the informational warning
