@@ -171,7 +171,7 @@ Stored at `models/seamless-medium-hf/`. Loaded via HuggingFace Transformers; no 
 | Backend | Models | Inference path | Quantization |
 |---------|--------|---------------|-------------|
 | CTranslate2 (CT2) | `nllb-600M`, `nllb-1.3B`, `indicTrans2-1B` | `ctranslate2.Translator` | float16 (INT8 fails on sm_120) |
-| HuggingFace native | `madlad-3b`, `seamless-medium` | `transformers.generate()` | float16 (auto, via `.to("cuda")`) |
+| HuggingFace native | `madlad-3b`, `seamless-medium` | `transformers.generate()` | float16 via `dtype=torch.float16`, `device_map="auto"` |
 
 MADLAD and Seamless do not have a CT2 conversion path — their architectures (T5 and SeamlessM4T) are fully supported by standard HuggingFace Transformers inference.
 
