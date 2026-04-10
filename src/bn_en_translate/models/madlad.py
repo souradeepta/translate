@@ -79,7 +79,6 @@ class MADLADTranslator(TranslatorBase):
             attn_implementation=attn_impl,
             dtype=torch.float16,
             device_map=device_map,
-            tie_word_embeddings=False,  # suppress warning: saved weights differ, don't tie
         )
 
         self._loaded = True
@@ -120,7 +119,7 @@ class MADLADTranslator(TranslatorBase):
             generated = self._model.generate(  # type: ignore[union-attr]
                 **inputs,
                 num_beams=self._effective_beam_size(),
-                max_length=self.config.max_decoding_length,
+                max_new_tokens=256,
             )
 
         return self._tokenizer.batch_decode(  # type: ignore[union-attr]
