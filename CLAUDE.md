@@ -33,6 +33,7 @@ python scripts/benchmark.py --models nllb-600M --sentences 5   # quick GPU smoke
 - ❌ `.half()` model weights + `fp16=True` training → GradScaler raises `ValueError: Attempting to unscale FP16 gradients`; use `bf16=True` instead (no GradScaler needed, Blackwell sm_120 supports bf16)
 - ❌ CT2 `translate_batch()` with 900+ sentences at once → CUDA OOM; always pass `max_batch_size=32`
 - ❌ MADLAD/Seamless `.to("cuda")` after float32 load → double-copy OOM; use `device_map="auto"` + `dtype=torch.float16`
+- ⚠️ MADLAD-3B with `device_map="auto"` on 8 GB VRAM → triggers CPU layer offload (weights fit, but activations+KV cache overflow); inference becomes extremely slow (~45+ min for 90 sentences). Acceptable for benchmarking, not for interactive use.
 - ❌ MADLAD `tie_word_embeddings` default → noisy warning; set `tie_word_embeddings=False`
 - ❌ `pynvml` package → deprecated; use `nvidia-ml-py` (same `import pynvml` API, no code changes)
 - ❌ RunDatabase schema migration → new columns added after deploy; use `_apply_migrations()` with `ALTER TABLE ADD COLUMN`
