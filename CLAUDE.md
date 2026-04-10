@@ -4,7 +4,7 @@
 
 ```bash
 source .venv/bin/activate && export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH
-make test          # 212 tests, ~27s — confirms env is working
+make test          # 217 tests, ~27s — confirms env is working
 python scripts/benchmark.py --models nllb-600M --sentences 5   # quick GPU smoke test
 make papers        # regenerate figures + compile all 4 PDFs
 ```
@@ -13,9 +13,11 @@ make papers        # regenerate figures + compile all 4 PDFs
 - `models/nllb-600M-ct2/` ✅ CT2 float16 — **BLEU 55.3 / chrF 72.8** on FLORES-200 90-sentence
 - `models/seamless-medium-hf/` ✅ HF float16, `.to("cuda")` — **BLEU 67.0 / chrF 80.2** on FLORES-200
 - `models/madlad-3b-hf/` ✅ downloaded but **EXCLUDED** — local checkpoint weight mismatch causes garbage output; 8 GB VRAM insufficient for 3B float16 (CPU offload → degenerate sequences)
+- `models/indicTrans2-1B-ct2/` — needs download: `python scripts/download_models.py --model indicTrans2-1B`
+- `models/milmmt-46-1B-hf/` — needs download: `python scripts/download_models.py --model milmmt-46-1B`
 - `corpus/` ✅ 90-sentence built-in + 9,829 Samanantar pairs (train/val/test splits)
 - `paper/pdf/` — run `make papers` to rebuild all 4 PDFs (tectonic, no sudo needed)
-- All 212 unit/integration tests passing
+- All 217 unit/integration tests passing
 - **PyTorch 2.7.0+cu128** — GPU training FULLY UNLOCKED (6/6 sm_120 probes pass)
 - LoRA fine-tune done: 2.46h, 3 epochs, eval_loss 1.992, post-FT BLEU 0.17 (open-domain)
 - Papers: `paper/ieee_paper.tex`, `paper/survey_paper.tex`, `paper/ieee_transactions_paper.tex`, `paper/acm_paper.tex`
@@ -24,6 +26,12 @@ make papers        # regenerate figures + compile all 4 PDFs
 ---
 
 ## Never Do These (Painful Lessons)
+
+### GPU-Only Rule (user explicit preference)
+- ❌ **Never fall back to CPU for inference** — GPU is REQUIRED, not optional
+- ❌ **Never silently degrade to CPU** when CUDA unavailable — raise `RuntimeError` instead
+- ❌ **Never add `device_map="auto"`** — forces CPU offload when VRAM is tight, produces degenerate output
+- ✅ Default: `device="cuda"` for all model configs; resolve "auto" → "cuda" if CUDA available, else raise
 
 ### PyTorch / CUDA
 - ❌ PyTorch cu124 for **training** → `no kernel image` on `.ne()` and all element-wise ops on sm_120
@@ -41,6 +49,14 @@ make papers        # regenerate figures + compile all 4 PDFs
 - ❌ `max_length` in generate() → counts input + output tokens; use `max_new_tokens=256`
 - ❌ `device_map="auto"` on 8 GB VRAM → CPU offload → ~30 s/sentence → degenerate sequences
 - ⚠️ Local checkpoint at `models/madlad-3b-hf/` has `shared.weight ≠ decoder.embed_tokens.weight` — garbage output even on CPU. **Do not benchmark MADLAD-3B** until checkpoint is re-downloaded cleanly.
+
+### MiLMMT-46-1B (Gemma3-based causal LM)
+- ❌ Right-padding in tokenizer → broken batch generation; use `tokenizer.padding_side = "left"`
+- ❌ `float16` dtype → Gemma3 was trained in bf16; float16 risks NaN; use `dtype=torch.bfloat16`
+- ❌ Decoding `output_ids` directly → includes echoed prompt tokens; slice at `output_ids[:, input_len:]`
+- ❌ `device_map="auto"` → not needed for 1B model (~2 GB); use `.to("cuda")` after load
+- ✅ Prompt format: `"Translate this from Bengali to English:\nBengali: {text}\nEnglish:"`
+- ✅ `add_special_tokens=False` in tokenizer call (prompt is plain text, not a model-specific format)
 
 ### Seamless M4T
 - ❌ `SeamlessM4Tv2ForTextToText` does NOT support `device_map="auto"` → use `.to("cuda")` after float16 load
@@ -205,6 +221,7 @@ Bengali .txt  →  [Preprocessor]  →  [Chunker]  →  [Translator]  →  [Post
 | `nllb-1.3B` | `facebook/nllb-200-distilled-1.3B` | CT2 float16 | 2.6 GB | 33.4 (published) | Needs download |
 | `indicTrans2-1B` | `ai4bharat/indictrans2-indic-en-1B` | CT2 float16 | 3.0 GB | 41.4 (published) | Needs download |
 | `madlad-3b` | `google/madlad400-3b-mt` | HF T5 float16 | 8.1 GB | ❌ EXCLUDED | Checkpoint corrupted |
+| `milmmt-46-1b` | `xiaomi-research/MiLMMT-46-1B-v0.1` | HF causal LM bfloat16 | ~2 GB | TBD | Needs download |
 | `ollama` | `gemma3:12b` via Ollama | HTTP | ~4.7 GB | subjective | Optional polish |
 
 ---
