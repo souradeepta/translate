@@ -13,8 +13,8 @@ make papers        # regenerate figures + compile all 4 PDFs
 - `models/nllb-600M-ct2/` ✅ CT2 float16 — **BLEU 55.3 / chrF 72.8** on FLORES-200 90-sentence
 - `models/seamless-medium-hf/` ✅ HF float16, `.to("cuda")` — **BLEU 67.0 / chrF 80.2** on FLORES-200
 - `models/madlad-3b-hf/` ✅ downloaded but **EXCLUDED** — local checkpoint weight mismatch causes garbage output; 8 GB VRAM insufficient for 3B float16 (CPU offload → degenerate sequences)
-- `models/indicTrans2-1B-ct2/` — needs download: `python scripts/download_models.py --model indicTrans2-1B`
-- `models/milmmt-46-1B-hf/` — needs download: `python scripts/download_models.py --model milmmt-46-1B`
+- `models/indicTrans2-1B-ct2/` — **gated repo**: accept terms at huggingface.co/ai4bharat/indictrans2-indic-en-1B then `! huggingface-cli login` and `python scripts/download_models.py --model indicTrans2-1B`
+- `models/milmmt-46-1B-hf/` ✅ 2.5 GB downloaded — benchmark TBD
 - `corpus/` ✅ 90-sentence built-in + 9,829 Samanantar pairs (train/val/test splits)
 - `paper/pdf/` — run `make papers` to rebuild all 4 PDFs (tectonic, no sudo needed)
 - All 217 unit/integration tests passing
@@ -78,6 +78,8 @@ make papers        # regenerate figures + compile all 4 PDFs
 
 ### Miscellaneous
 - ❌ `pynvml` package → deprecated; use `nvidia-ml-py` (same `import pynvml` API, no code changes)
+- ❌ `python -m ctranslate2.tools.transformers` → module removed in CT2 4.x; use `ct2-transformers-converter` CLI
+- ⚠️ `ai4bharat/indictrans2-indic-en-1B` is a gated HF repo — requires login: `! huggingface-cli login` then accept terms at huggingface.co/ai4bharat/indictrans2-indic-en-1B
 - ❌ RunDatabase schema migration → new columns added after deploy; use `_apply_migrations()` with `ALTER TABLE ADD COLUMN`
 - ❌ `models/` in .gitignore (bare) → also matches `src/bn_en_translate/models/`; use `/models/`
 - ❌ `\usepackage{pgfplotsset}` in LaTeX → `pgfplotsset` is NOT a .sty file; it's a command inside pgfplots. Only use `\usepackage{pgfplots}` then `\pgfplotsset{compat=1.18}`
