@@ -14,7 +14,7 @@ make papers        # regenerate figures + compile all 4 PDFs
 - `models/seamless-medium-hf/` ✅ HF float16, `.to("cuda")` — **BLEU 67.0 / chrF 80.2** on FLORES-200
 - `models/madlad-3b-hf/` ✅ downloaded but **EXCLUDED** — local checkpoint weight mismatch causes garbage output; 8 GB VRAM insufficient for 3B float16 (CPU offload → degenerate sequences)
 - `models/indicTrans2-1B-ct2/` — **gated repo**: accept terms at huggingface.co/ai4bharat/indictrans2-indic-en-1B then `! huggingface-cli login` and `python scripts/download_models.py --model indicTrans2-1B`
-- `models/milmmt-46-1B-hf/` ✅ 2.5 GB downloaded — benchmark TBD
+- `models/milmmt-46-1B-hf/` ✅ HF bfloat16 — **BLEU 65.0 / chrF 79.3** on FLORES-200 (2nd best, 3.3 GB VRAM, 28 ch/s)
 - `corpus/` ✅ 90-sentence built-in + 9,829 Samanantar pairs (train/val/test splits)
 - `paper/pdf/` — run `make papers` to rebuild all 4 PDFs (tectonic, no sudo needed)
 - All 217 unit/integration tests passing
@@ -91,8 +91,9 @@ make papers        # regenerate figures + compile all 4 PDFs
 
 | Model | BLEU | chrF | VRAM | Speed | Notes |
 |-------|------|------|------|-------|-------|
-| NLLB-600M CT2 float16 | **55.3** | **72.8** | 2.0 GB | 197 ch/s | Primary model |
-| Seamless-medium float16 | **67.0** | **80.2** | 3.9 GB | 32 ch/s | Best quality |
+| NLLB-600M CT2 float16 | **55.3** | **72.8** | 2.3 GB | 191 ch/s | Fastest |
+| MiLMMT-46-1B bfloat16 | **65.0** | **79.3** | 3.3 GB | 28 ch/s | 2nd best, efficient |
+| Seamless-medium float16 | **67.0** | **80.2** | 4.0 GB | 31 ch/s | Best quality |
 | MADLAD-3B float16 | ~~0.0~~ | — | 8.1 GB | ~2 ch/s | Excluded — checkpoint corrupted |
 
 ---
@@ -223,7 +224,7 @@ Bengali .txt  →  [Preprocessor]  →  [Chunker]  →  [Translator]  →  [Post
 | `nllb-1.3B` | `facebook/nllb-200-distilled-1.3B` | CT2 float16 | 2.6 GB | 33.4 (published) | Needs download |
 | `indicTrans2-1B` | `ai4bharat/indictrans2-indic-en-1B` | CT2 float16 | 3.0 GB | 41.4 (published) | Needs download |
 | `madlad-3b` | `google/madlad400-3b-mt` | HF T5 float16 | 8.1 GB | ❌ EXCLUDED | Checkpoint corrupted |
-| `milmmt-46-1b` | `xiaomi-research/MiLMMT-46-1B-v0.1` | HF causal LM bfloat16 | ~2 GB | TBD | Needs download |
+| `milmmt-46-1b` | `xiaomi-research/MiLMMT-46-1B-v0.1` | HF causal LM bfloat16 | 3.3 GB | **65.0 / 79.3** (measured) | ✅ Working |
 | `ollama` | `gemma3:12b` via Ollama | HTTP | ~4.7 GB | subjective | Optional polish |
 
 ---
