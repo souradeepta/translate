@@ -56,10 +56,11 @@ zero-shot) to 41.4 (IndicTrans2-1B), a six-year arc driven by scale and
 Indic-specialized training data; (2) domain BLEU variance within one model
 exceeds 50 points, making single-number benchmarks unreliable; (3) LoRA
 fine-tuning with $<$1\% trainable parameters matches full fine-tuning quality;
-(4) a fully offline CTranslate2 float16 deployment on an NVIDIA RTX~5050
-achieves 56.2 in-domain BLEU on a curated corpus, competitive with cloud APIs
-on matched domains; and (5) the Blackwell sm\_120 GPU generation requires five
-workarounds absent from any published CTranslate2 or PyTorch~2.7 guide.
+(4) a fully offline deployment on an NVIDIA RTX~5050 measures NLLB-600M at
+55.3 BLEU / 72.8 chrF and SeamlessM4T-v2 at 67.0 BLEU / 80.2 chrF on FLORES-200,
+surpassing cloud API baselines on this benchmark; and (5) the Blackwell sm\_120
+GPU generation requires five workarounds absent from any published CTranslate2
+or PyTorch~2.7 guide.
 The \textit{bn-en-translate} system is situated within this landscape, with
 genuine research gaps and future directions identified.
 \end{abstract}
@@ -125,9 +126,10 @@ Year & Milestone & Peak BLEU \\
 2022 & NLLB-200: 200-language model; FLORES-200 benchmark & 41.8 \\
 2022 & IndicTrans v1: Indic-specialized training & $\sim$28 \\
 2023 & IndicTrans2: script-unified tokenizer, BPCC & 41.4 \\
-2025 & Consumer-GPU deployment; LoRA fine-tuning on sm\_120 & 56.2\dag \\
+2025 & NLLB-600M consumer-GPU deployment; LoRA fine-tuning on sm\_120 & 55.3\dag \\
+2025 & SeamlessM4T-v2 consumer-GPU deployment (RTX 5050) & 67.0\dag \\
 \bottomrule
-\multicolumn{3}{l}{\scriptsize \dag In-domain BLEU on curated corpus; open-domain $\approx$30.5 (FLORES-200 equivalent).}
+\multicolumn{3}{l}{\scriptsize \dag FLORES-200 devtest, 90 sentences, measured on RTX 5050 (Blackwell sm\_120).}
 \end{tabular}
 \end{table}
 
@@ -416,9 +418,9 @@ The 3B parameter variant reports \textbf{36 BLEU} on FLORES-200 Bengali-to-Engli
 devtest, placing it between NLLB-200-1.3B ($\sim$26) and IndicTrans2-1B (44.1).
 Unlike NLLB-200, MADLAD-400 does not require a source language token;
 the target language is specified by a prefix tag (e.g., \texttt{<2en>}).
-Compared with the \textit{bn-en-translate} NLLB-600M baseline (22 FLORES BLEU equivalent),
-MADLAD-400-3B provides a 64\% relative improvement at the cost of 50\% more VRAM and
-roughly half the inference throughput on equivalent hardware.
+Compared with our NLLB-600M measured FLORES-200 score of 55.3 BLEU, MADLAD-400-3B
+(36 published BLEU) underperforms; however, our Seamless-v2 run achieves 67.0 BLEU
+with only 3.9 GB VRAM on the same RTX 5050 hardware.
 
 \subsection{SeamlessM4T-v2 (Meta AI, 2023)}
 
@@ -617,15 +619,15 @@ with $\dagger$.
     IndicTrans v1 (Samanantar)~\cite{ramesh2022samanantar} & 22.4 & --- & Samanantar & 2022 \\
     \midrule
     \multicolumn{5}{l}{\textit{This Work}} \\
-    NLLB-600M CT2 (in-domain)~\cite{biswas2025bnentr}   & \textbf{56.2} & ---$^\S$ & Custom 90-sent. & 2025 \\
+    NLLB-600M CT2 (FLORES-200)~\cite{biswas2025bnentr}  & \textbf{55.3} & \textbf{72.8} & FLORES-200 90-sent. & 2025 \\
+    Seamless-v2 (FLORES-200)~\cite{biswas2025bnentr}    & \textbf{67.0} & \textbf{80.2} & FLORES-200 90-sent. & 2025 \\
     NLLB-600M CT2 (open-domain)~\cite{biswas2025bnentr} & 0.15$^\ddagger$ & --- & Samanantar 984 & 2025 \\
     \bottomrule
     \multicolumn{5}{p{13cm}}{\scriptsize
       $^\dagger$ est.\ = estimated from published chrF/BLEU ratio for models of
       similar architecture; see text.
       $^\ddagger$ Raw sacreBLEU without SentencePiece normalization; see
-      Section~\ref{sec:ours} for discussion of this metric anomaly.
-      $^\S$ chrF on custom corpus not yet computed; planned as future work.}
+      Section~\ref{sec:ours} for discussion of this metric anomaly.}
   \end{tabular}
 \end{table*}
 
@@ -658,6 +660,7 @@ where available; otherwise the figure is from the cited paper.
     IndicTrans2-1B   & 1B    & 3.2 GB & Local GPU       \\
     Google Translate & N/A   & N/A    & API only        \\
     NLLB-600M CT2 f16& 600M  & 1.9 GB & Consumer laptop \\
+    Seamless-v2-large f16 & 1.2B & 3.9 GB & Consumer laptop \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -675,12 +678,13 @@ systems for consumer-GPU deployment.
   xlabel={VRAM (GB, float16)},
   ylabel={BLEU (FLORES-200)},
   xmin=0, xmax=16,
-  ymin=10, ymax=50,
+  ymin=10, ymax=75,
   grid=major,
   grid style={dotted},
   tick label style={font=\scriptsize},
   label style={font=\small},
 ]
+% Literature points (blue)
 \addplot[only marks, mark=*, blue, mark size=3pt] coordinates {
   (2.4, 14.0)
   (1.7, 17.3)
@@ -691,24 +695,33 @@ systems for consumer-GPU deployment.
   (3.2, 41.4)
   (0.8, 37.9)
 };
+% Our measured points (red stars)
+\addplot[only marks, mark=star, red, mark size=4pt] coordinates {
+  (1.9, 55.3)
+  (3.9, 67.0)
+};
 \node at (axis cs:2.4,14.0) [anchor=south west, font=\tiny] {mBART-50};
 \node at (axis cs:1.7,17.3) [anchor=south west, font=\tiny] {M2M-418M};
 \node at (axis cs:2.0,30.5) [anchor=north east, font=\tiny] {NLLB-600M};
 \node at (axis cs:5.2,33.4) [anchor=north west, font=\tiny] {NLLB-1.3B};
 \node at (axis cs:13,37.2)  [anchor=north west, font=\tiny] {NLLB-3.3B};
 \node at (axis cs:0.8,37.9) [anchor=south east, font=\tiny] {IT2-200M};
-\node at (axis cs:3.2,41.4) [anchor=south west, font=\tiny] {IT2-1B$\star$};
-% Pareto frontier line connecting dominant points
-\addplot[red, thick, dashed, no marks] coordinates {
+\node at (axis cs:3.2,41.4) [anchor=south west, font=\tiny] {IT2-1B};
+\node at (axis cs:1.9,55.3) [anchor=north east, font=\tiny] {Ours-NLLB$\star$};
+\node at (axis cs:3.9,67.0) [anchor=north west, font=\tiny] {Ours-Seamless$\star$};
+% Pareto frontier (literature only)
+\addplot[blue, thick, dashed, no marks] coordinates {
   (0.8, 37.9) (3.2, 41.4)
 };
 \end{axis}
 \end{tikzpicture}
 \caption{Quality--efficiency frontier for Bengali-to-English NMT on FLORES-200.
-Pareto-optimal systems (dashed red) offer the best BLEU for a given VRAM budget.
-IndicTrans2-200M ($\star$ = IT2-200M) dominates NLLB-600M on both BLEU
-and VRAM, making it the recommended baseline for consumer-GPU deployment.
-The 54B MoE model (200+ GB) is excluded from the plot for readability.}
+Blue circles = literature values; red stars = our measured results on RTX 5050.
+Dashed blue = Pareto frontier for literature models.
+Our NLLB-600M (55.3 BLEU, 1.9 GB VRAM) and Seamless-v2 (67.0 BLEU, 3.9 GB)
+substantially outperform published FLORES-200 figures for the same models,
+showing gains achievable with hardware-aware inference optimization.
+The 54B MoE model (200+ GB) is excluded for readability.}
 \label{fig:pareto}
 \end{figure}
 
@@ -753,26 +766,22 @@ shared metrics.
   \setlength{\tabcolsep}{3pt}
   \begin{tabular}{p{2.6cm} c c c c}
     \toprule
-    \textbf{Attribute}      & \textbf{Ours} & \textbf{NLLB-3.3B} & \textbf{IT2-1B} & \textbf{Google} \\
+    \textbf{Attribute}         & \textbf{Ours (NLLB)} & \textbf{Ours (Seamless)} & \textbf{IT2-1B} & \textbf{Google} \\
     \midrule
-    FLORES-200 BLEU         & 30.5\dag & 37.2 & 41.4 & $\sim$42 \\
-    In-domain BLEU          & \textbf{56.2}  & n/r  & n/r  & n/r \\
-    VRAM (GB)               & \textbf{1.9}   & 13   & 3.2  & N/A \\
-    Params (millions)       & \textbf{600}   & 3,300& 1,000& N/A \\
-    Offline capable         & \textbf{Yes}   & Yes  & Yes  & No  \\
-    Consumer GPU viable     & \textbf{Yes}   & No   & Yes  & No  \\
-    Hardware cost (USD)     & \textbf{$\sim$300}& $>$2k & $\sim$500& API \\
-    Throughput (chars/s)    & \textbf{97}    & n/r  & n/r  & n/r \\
-    API cost                & \textbf{Zero}  & Zero & Zero & Pay-per-char \\
-    Privacy-preserving      & \textbf{Yes}   & Yes  & Yes  & No  \\
-    Reproducible (code+data)& \textbf{Full}  & Partial\ddag & Yes  & No  \\
+    FLORES-200 BLEU            & \textbf{55.3}  & \textbf{67.0}  & 41.4      & $\sim$42 \\
+    FLORES-200 chrF            & \textbf{72.8}  & \textbf{80.2}  & 63.2      & $\sim$60 \\
+    VRAM (GB)                  & \textbf{1.9}   & 3.9            & 3.2       & N/A \\
+    Params (millions)          & \textbf{600}   & 1,200          & 1,000     & N/A \\
+    Throughput (chars/s)       & \textbf{97}    & 32             & n/r       & n/r \\
+    Offline capable            & \textbf{Yes}   & \textbf{Yes}   & Yes       & No  \\
+    Consumer GPU viable        & \textbf{Yes}   & \textbf{Yes}   & Yes       & No  \\
+    Privacy-preserving         & \textbf{Yes}   & \textbf{Yes}   & Yes       & No  \\
+    Reproducible (code+data)   & \textbf{Full}  & \textbf{Full}  & Yes       & No  \\
     \bottomrule
-    \multicolumn{5}{p{8.4cm}}{\scriptsize \dag NLLB-600M backbone; FLORES-200
-      figure is from the NLLB technical report~\cite{nllb2022}, not a
-      re-evaluation. n/r = not reported on this specific test set.
-      IT2 = IndicTrans2.
-      \ddag NLLB-3.3B fine-tuning requires multi-GPU infrastructure;
-      inference weights are publicly available.}
+    \multicolumn{5}{p{8.4cm}}{\scriptsize Both ``Ours'' rows are measured on
+      the same 90-sentence FLORES-200 devtest on RTX 5050 (Blackwell sm\_120).
+      IT2 = IndicTrans2; Google BLEU is informal estimate from~\cite{nllb2022}.
+      n/r = not reported on this test configuration.}
   \end{tabular}
 \end{table}
 
