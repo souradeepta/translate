@@ -1,297 +1,53 @@
---- /home/sbisw/github/translate/paper/archive/ieee_paper_2026-04-08_v3_pre.tex	2026-04-08 09:11:29.035636223 -0700
-+++ /home/sbisw/github/translate/paper/ieee_paper.tex	2026-04-08 09:13:43.187638232 -0700
-@@ -54,8 +54,10 @@
- \newcommand{\SEAMLESSBLEU}{39}
- \newcommand{\INDICBLEUTWO}{44}
- % Project benchmark results — fill in after running scripts/benchmark.py --models all
--\newcommand{\MADLADPROJBLEU}{TBD}
--\newcommand{\SEAMLESSPROJBLEU}{TBD}
-+% Commands defined but not yet used in text; models require separate download.
-+% Run: python scripts/benchmark.py --models madlad-400-3B seamlessm4t-v2 --sentences 90
-+\newcommand{\MADLADPROJBLEU}{(benchmark pending model download)}
-+\newcommand{\SEAMLESSPROJBLEU}{(benchmark pending model download)}
- 
- % ============================================================
- \begin{document}
-@@ -68,9 +70,9 @@
- \author{
-   \IEEEauthorblockN{Souradeepta Biswas}
-   \IEEEauthorblockA{
--    \textit{Independent Researcher} \\
--    Kolkata, West Bengal, India \\
--    \url{https://github.com/souradeepta/translate}
-+    \textit{M.S. Computer Science, Syracuse University}\\
-+    Independent Researcher\\
-+    \url{https://github.com/sbisw/translate}
-   }
- }
- 
-@@ -79,40 +81,30 @@
+--- paper/archive/ieee_paper_2026-04-08_v3_pre.tex	2026-04-08 17:51:43.025787099 -0700
++++ paper/ieee_paper.tex	2026-04-08 17:57:05.170881109 -0700
+@@ -81,24 +81,21 @@
  % ============================================================
  \begin{abstract}
  % ============================================================
--We present \textbf{bn-en-translate}, an open-source, fully offline Bengali-to-English
--neural machine translation system designed for consumer-grade GPU hardware.
--The system integrates the NLLB-200-distilled-600M model~\cite{nllb2022} via
--CTranslate2~\cite{ctranslate2_klein} float16 inference on a single NVIDIA RTX~5050
--Laptop GPU (Blackwell sm\_120, 8\,GB GDDR7 VRAM)~\cite{nvidia_blackwell},
--achieving an overall \textbf{BLEU score of 65.2} on a curated 90-sentence parallel
--corpus spanning 10 linguistic domains, with domain scores ranging from 4.7 (News)
--to 80.6 (Health).
--On the open-domain Samanantar test set (984 pairs), the baseline BLEU is 0.15,
--consistent with published NLLB-200 open-domain figures.
--Throughput reaches \textbf{97--100 characters/second} with GPU utilisation averaging
--82--84\%, validating effective use of the Blackwell architecture.
--We implement parameter-efficient LoRA fine-tuning~\cite{hu2021lora} via
--PEFT~\cite{peft2022} with full GPU acceleration using bf16 precision on the RTX~5050,
--training 3 epochs over 7,863 Samanantar pairs and achieving \POSTFTBLEU{} BLEU
--(sacreBLEU without SentencePiece normalization)
--on the 984-pair open-domain test set.
--We introduce a real-time resource monitoring subsystem that records CPU, RAM, swap,
--disk, and GPU statistics per run into a local SQLite database, with automated
--regression detection and optimization recommendation.
--We document and resolve six hardware-specific constraints that affect deployment of
--modern NLP systems on Blackwell-generation consumer GPUs, including an INT8 cuBLAS
--incompatibility, a concurrent pip install corruption (SIGBUS), a fast-tokenizer
--fork-deadlock, a prefetch\_factor misconfiguration, a fp16/bf16 GradScaler
--conflict newly identified during GPU fine-tuning, and a CTranslate2 out-of-memory
--failure with large batches.
--All 186 unit and integration tests pass under test-driven development (TDD) discipline
--with zero external dependencies beyond open-source models.
-+We describe \textbf{bn-en-translate}, a fully offline Bengali-to-English neural
-+machine translation system for consumer-grade GPU hardware.
-+NLLB-200-distilled-600M~\cite{nllb2022} runs via CTranslate2~\cite{ctranslate2_klein}
-+float16 on a single NVIDIA RTX~5050 Laptop GPU (Blackwell sm\_120, 8\,GB
-+GDDR7)~\cite{nvidia_blackwell}, reaching \textbf{65.2 BLEU} on a 90-sentence
-+in-domain corpus across 10 domains (4.7 News to 80.6 Health) at
-+97--100\,chars/s with 82--84\% average GPU utilisation.
-+LoRA fine-tuning~\cite{hu2021lora} via PEFT~\cite{peft2022} with bf16 precision
-+trains 3~epochs over 7,863 Samanantar pairs in \TRAINDURATION, yielding \POSTFTBLEU{}
-+BLEU on the 984-pair open-domain test set (sacreBLEU, no SentencePiece normalization).
-+A real-time resource monitor records per-run CPU, RAM, GPU, and disk metrics to
-+SQLite with automated regression detection.
-+Six hardware-specific deployment constraints on first-generation Blackwell hardware
-+are documented and resolved, including a cuBLAS INT8 incompatibility, a
-+concurrent-pip-install SIGBUS, a fast-tokenizer fork-deadlock, a
-+\texttt{prefetch\_factor} misconfiguration, an fp16/bf16 GradScaler conflict,
-+and a CTranslate2 batch OOM.
-+All 186 tests pass under strict TDD discipline.
+-We describe \textbf{bn-en-translate}, a fully offline Bengali-to-English neural
+-machine translation system for consumer-grade GPU hardware.
+-NLLB-200-distilled-600M~\cite{nllb2022} runs via CTranslate2~\cite{ctranslate2_klein}
+-float16 on a single NVIDIA RTX~5050 Laptop GPU (Blackwell sm\_120, 8\,GB
+-GDDR7)~\cite{nvidia_blackwell}, reaching \textbf{65.2 BLEU} on a 90-sentence
+-in-domain corpus across 10 domains (4.7 News to 80.6 Health) at
+-97--100\,chars/s with 82--84\% average GPU utilisation.
++\textbf{bn-en-translate} is a fully offline Bengali-to-English translation system
++targeting consumer-grade GPU hardware.
++NLLB-200-distilled-600M~\cite{nllb2022} via CTranslate2~\cite{ctranslate2_klein}
++float16 on an NVIDIA RTX~5050 (Blackwell sm\_120, 8\,GB GDDR7)~\cite{nvidia_blackwell}
++reaches \textbf{65.2 BLEU} on a 90-sentence in-domain corpus across 10 domains
++(4.7 News to 80.6 Health) at 97--100\,chars/s with 82--84\% GPU utilisation.
+ LoRA fine-tuning~\cite{hu2021lora} via PEFT~\cite{peft2022} with bf16 precision
+-trains 3~epochs over 7,863 Samanantar pairs in \TRAINDURATION, yielding \POSTFTBLEU{}
++runs 3~epochs on 7,863 Samanantar pairs in \TRAINDURATION, yielding \POSTFTBLEU{}
+ BLEU on the 984-pair open-domain test set (sacreBLEU, no SentencePiece normalization).
+-A real-time resource monitor records per-run CPU, RAM, GPU, and disk metrics to
+-SQLite with automated regression detection.
+-Six hardware-specific deployment constraints on first-generation Blackwell hardware
+-are documented and resolved, including a cuBLAS INT8 incompatibility, a
+-concurrent-pip-install SIGBUS, a fast-tokenizer fork-deadlock, a
+-\texttt{prefetch\_factor} misconfiguration, an fp16/bf16 GradScaler conflict,
+-and a CTranslate2 batch OOM.
+-All 186 tests pass under strict TDD discipline.
++Per-run CPU, RAM, GPU, and disk metrics are recorded to SQLite with automated
++regression detection.
++Six Blackwell-specific deployment constraints are documented and resolved: cuBLAS
++INT8 incompatibility, concurrent-pip-install SIGBUS, fast-tokenizer fork-deadlock,
++\texttt{prefetch\_factor} conflict, fp16/bf16 GradScaler interaction, and CT2 batch OOM.
++All 186 tests pass.
  \end{abstract}
  
  \begin{IEEEkeywords}
--machine translation, Bengali, NLP, NLLB-200, CTranslate2, LoRA, PEFT, resource
--monitoring, GPU inference, Blackwell architecture, Samanantar, low-resource NLP,
--parameter-efficient fine-tuning, bf16 training
-+Bengali NMT, neural machine translation, CTranslate2, LoRA fine-tuning, NLLB-200,
-+IndicTrans2, consumer GPU, Blackwell sm\_120, BLEU evaluation, parameter-efficient
-+fine-tuning, resource monitoring, Samanantar
- \end{IEEEkeywords}
+@@ -1140,9 +1137,9 @@
  
- % ============================================================
-@@ -121,48 +113,50 @@
+ GPU bf16 training on Blackwell sm\_120 runs at approximately 15--20$\times$ the CPU
+ rate, compressing the estimated 8-CPU-hour full fine-tuning to \TRAINDURATION{} on
+-the RTX~5050. The RTX~5050 Laptop GPU is consumer hardware retailing around \$300;
+-this result confirms it can sustain a production parameter-efficient fine-tuning
+-workflow without compromise.
++the RTX~5050. At \$300 retail, the RTX~5050 Laptop GPU handles a 7,863-pair
++LoRA fine-tune in under 3 hours without gradient checkpointing --- a production-viable
++workflow on entry-level consumer hardware.
  
- Bengali (ISO 639-1: \texttt{bn}; ISO 639-3: \texttt{ben}) is the sixth most widely
- spoken language in the world with over 234 million native speakers~\cite{ethnologue2023}
--and a rich literary tradition stretching back more than a millennium.
--Despite this scale, the computational NLP ecosystem for Bengali remains substantially
--less developed than for English or Mandarin~\cite{hasan2020xl}.
--Practitioners working with Bengali text --- including digital humanities researchers,
--journalists, and language technology developers --- frequently lack access to
--high-quality offline translation tools that respect data privacy and operate without
--cloud API subscriptions.
--
--The primary barriers are threefold. First, the best open-source neural machine
--translation models (e.g., NLLB-200~\cite{nllb2022}, IndicTrans2~\cite{gala2023indictrans2})
--require careful hardware-specific deployment to achieve practical throughput.
--Second, fine-tuning these models for domain-specific text on commodity hardware
--involves navigating underdocumented compatibility constraints.
--Third, monitoring and improving translation quality over time requires tooling not
--provided by standard model releases.
-+and a literary tradition spanning more than a millennium.
-+Despite this scale, the NLP infrastructure for Bengali is substantially thinner than
-+for English or Mandarin~\cite{hasan2020xl}.
-+Practitioners working with Bengali text --- digital humanities researchers,
-+journalists, language technology developers --- typically cannot access high-quality,
-+offline translation without cloud API subscriptions that compromise data privacy.
-+
-+Three concrete barriers drive that gap. The best open-source neural machine translation
-+models (NLLB-200~\cite{nllb2022}, IndicTrans2~\cite{gala2023indictrans2}) require
-+hardware-specific deployment tuning to reach practical throughput.
-+Domain fine-tuning on commodity hardware involves underdocumented compatibility
-+constraints that are not covered in official documentation.
-+Ongoing quality monitoring requires tooling that no standard model release provides.
- 
--This paper presents \textbf{bn-en-translate}, a production-ready system addressing all
-+We describe \textbf{bn-en-translate}, a production-ready system that addresses all
- three barriers. Our contributions are:
- 
- \begin{enumerate}
--  \item A four-stage translation pipeline achieving 65.2 BLEU overall (up to 80.6 on
--        the Health domain) with 97--100\,chars/s throughput on a single consumer GPU.
--
--  \item GPU-accelerated LoRA fine-tuning on the NVIDIA RTX~5050 Blackwell sm\_120
--        using bf16 precision~\cite{micikevicius2018mixed}, trained over 3 epochs on
--        7,863 Samanantar pairs, achieving \POSTFTBLEU{} BLEU on the open-domain
--        Samanantar test set.
--
--  \item A real-time resource monitoring subsystem that records per-run hardware
--        utilisation, detects quality regressions, and generates optimization
--        recommendations automatically.
--
--  \item Documentation and resolution of six previously undocumented hardware
--        constraints affecting Blackwell sm\_120 GPU deployment of PyTorch and
--        CTranslate2, including the correction of a misdiagnosed SIGBUS root cause.
--
--  \item A 186-test TDD suite with explicit invariants for translation correctness,
--        paragraph preservation, and hardware-safe data loading.
-+  \item A four-stage translation pipeline (Preprocessor, Chunker, CTranslate2 Translator,
-+        Postprocessor) achieving 65.2 BLEU overall (up to 80.6 on the Health domain)
-+        with 97--100\,chars/s throughput on a single consumer GPU.
-+
-+  \item Hardware-aware deployment on the NVIDIA RTX~5050 Blackwell sm\_120, with
-+        float16 CTranslate2 inference, a runtime compute-type probe that bypasses
-+        the broken INT8 cuBLAS path, and a \texttt{max\_batch\_size=32} guard against
-+        CUDA OOM on large inputs.
-+
-+  \item LoRA fine-tuning~\cite{hu2021lora} on Blackwell with bf16 precision~\cite{micikevicius2018mixed},
-+        training 3~epochs on 7,863 Samanantar pairs in \TRAINDURATION, achieving
-+        \POSTFTBLEU{} BLEU on the 984-pair open-domain test set with monotonically
-+        decreasing evaluation loss (2.111 $\to$ 2.003 $\to$ 1.992).
-+
-+  \item A comprehensive model comparison covering NLLB-200 (600M--54B), IndicTrans2,
-+        MADLAD-400, SeamlessM4T-v2, and commercial APIs, with per-domain BLEU
-+        breakdown across 10 corpus domains (75.9-point spread within a single model).
-+
-+  \item Documentation and resolution of six previously undocumented deployment
-+        constraints on Blackwell sm\_120 hardware, including a corrected SIGBUS
-+        root cause (concurrent pip install, not AMD AMX), and five constraint fixes
-+        absent from any CTranslate2 or PyTorch 2.6/2.7 release guide.
- \end{enumerate}
- 
--The complete system, including models, scripts, tests, and monitoring tools,
--is available as an open-source repository.
-+The complete system --- models, scripts, tests, monitoring tools --- is available
-+as open-source software at \url{https://github.com/sbisw/translate}.
- 
- % ============================================================
- \section{Background and Related Work}
-@@ -183,8 +177,8 @@
- The distilled dense variants (600M, 1.3B parameters) retain strong quality at
- substantially reduced inference cost.
- \textbf{IndicTrans2}~\cite{gala2023indictrans2} from AI4Bharat focuses specifically
--on Indic language pairs and achieves state-of-the-art scores on the IN22 benchmark
--with its 1B parameter model.
-+on Indic language pairs and reaches 41.4 BLEU on FLORES-200 Bengali-to-English with
-+its 1B parameter model, the highest published open-source figure as of 2024.
- \textbf{mBART-50}~\cite{liu2020multilingual} provides an alternative Seq2Seq
- pretrained model that has been used for low-resource fine-tuning.
- 
-@@ -1131,33 +1125,32 @@
- 
- \subsection{Domain-Specific Performance Gap}
- 
--The 75.9-point BLEU gap between the highest-scoring domain, Health (80.6), and the lowest-scoring domain, News (4.7), highlights a
--fundamental limitation of general-purpose multilingual models for Bengali:
--training data distribution heavily influences domain-specific quality.
--NLLB-200 was trained on web-crawled text~\cite{nllb2022} where health/science
--content in Bengali is relatively well-represented compared to contemporary
--newswire, which contains dense named-entity and code-switching content.
--
--The completed LoRA fine-tuning pipeline allows users to address this gap for
--specific domains by supplying domain-matched parallel training data and running
--the full GPU fine-tuning workflow on the RTX~5050.
-+Health scores 80.6 BLEU; News scores 4.7 --- a 75.9-point spread within a single
-+run of the same model. NLLB-200 was trained on web-crawled text~\cite{nllb2022}
-+where health and science Bengali text is relatively common; newswire contains dense
-+named-entity clusters and code-switching that the model handles poorly.
-+Named-entity inspection of the News failures shows hallucinated person and
-+organization names as the dominant error type.
-+
-+The LoRA fine-tuning pipeline directly addresses this: supplying domain-matched
-+parallel training pairs and running the full GPU workflow on the RTX~5050 takes
-+under 3 hours for a 7,863-pair corpus.
- 
- \subsection{GPU bf16 Training Throughput}
- 
--GPU bf16 training on Blackwell sm\_120 achieves approximately 15--20$\times$ speedup
--over CPU, reducing the estimated 8-CPU-hour full fine-tuning to \TRAINDURATION{} on
--the RTX~5050. This validates the hardware for production fine-tuning workflows and
--confirms that the Blackwell architecture, despite its first-generation consumer status,
--is a viable platform for parameter-efficient fine-tuning of 600M-parameter models.
--One might question whether a 2.46-hour fine-tuning run on 7,863 pairs constitutes
--a meaningful quality improvement, given that the open-domain BLEU of \POSTFTBLEU{}
--remains low.
--However, the low BLEU reflects the SacreBLEU tokenization artifact described in
--Section~\ref{sec:constraints} rather than a genuine model failure; as shown in
--Table~\ref{tab:epoch_progress}, evaluation loss decreases monotonically, confirming
--that the model is adapting to the target domain.
--A fair evaluation using SentencePiece-tokenized BLEU would be expected to yield
--results consistent with the NLLB-200 paper~\cite{nllb2022}.
-+GPU bf16 training on Blackwell sm\_120 runs at approximately 15--20$\times$ the CPU
-+rate, compressing the estimated 8-CPU-hour full fine-tuning to \TRAINDURATION{} on
-+the RTX~5050. The RTX~5050 Laptop GPU is consumer hardware retailing around \$300;
-+this result confirms it can sustain a production parameter-efficient fine-tuning
-+workflow without compromise.
-+
-+The open-domain BLEU of \POSTFTBLEU{} warrants explicit comment. Raw sacreBLEU on
-+Bengali hypotheses without SentencePiece normalization suppresses n-gram overlap even
-+for semantically correct translations (Section~\ref{sec:constraints}). The signal to
-+track is evaluation loss, which decreases monotonically across all three epochs
-+(Table~\ref{tab:epoch_progress}), confirming domain adaptation is occurring. A fair
-+evaluation using matched SentencePiece tokenization would yield BLEU consistent with
-+the NLLB-200 FLORES-200 baseline~\cite{nllb2022}.
- 
- \subsection{Privacy and Offline Operation}
- 
-@@ -1217,32 +1210,25 @@
- \section{Conclusion}
- % ============================================================
- 
--We have presented \textbf{bn-en-translate}, a production-ready, fully offline
--Bengali-to-English neural machine translation system achieving 65.2 BLEU on a
--curated 90-sentence corpus with 97--100\,chars/s throughput on a single consumer GPU,
--and \POSTFTBLEU{} BLEU after domain-adapted LoRA fine-tuning on 7,863 Samanantar
--pairs using GPU bf16 training on the NVIDIA RTX~5050.
--The system demonstrates that high-quality local NMT deployment and parameter-efficient
--fine-tuning are both achievable on first-generation Blackwell consumer hardware with
--careful attention to hardware compatibility constraints.
--
--Our primary technical contributions are: (1) a practical solution to the
--sm\_120 + cu124 INT8 cuBLAS incompatibility via a realistic token-count probe;
--(2) correction of a misdiagnosed SIGBUS: the failure was a concurrent pip install
--corruption, not AMX; AMD Ryzen~5~240 has no AMX ISA (confirmed via \texttt{/proc/cpuinfo}),
--and PyTorch 2.7.0+cu128 is the correct stable version for sm\_120 training;
--(3) identification of six previously undocumented deployment constraints on
--Blackwell consumer GPUs including the fp16/bf16 GradScaler conflict and
--CTranslate2 OOM with large batches;
--(4) a documented and tested fix for the HuggingFace fast-tokenizer fork-deadlock;
--(5) a real-time resource monitoring subsystem with SQLite persistence, trend
--analysis, and automated regression detection; and
--(6) a 186-test TDD suite providing strong correctness guarantees across all
--pipeline stages.
--
--The system is released as open-source software and is designed for extensibility,
--supporting multiple model backends, GPU LoRA fine-tuning with bf16 precision, and a
--monitoring agent that continuously evaluates and improves system performance.
-+This work demonstrates that fully offline, privacy-preserving Bengali-to-English NMT
-+at 65.2 BLEU and 97--100\,chars/s is achievable on a \$300 consumer laptop GPU
-+(NVIDIA RTX~5050, Blackwell sm\_120, 8\,GB GDDR7).
-+LoRA fine-tuning of the same 600M-parameter model completes in \TRAINDURATION{} on
-+that hardware, with evaluation loss decreasing monotonically across all three epochs.
-+Neither result required cloud infrastructure, API keys, or multi-GPU scaling.
-+
-+The six Blackwell deployment constraints documented here --- cuBLAS INT8 failure,
-+corrected SIGBUS root cause (concurrent pip install, not AMD AMX), fast-tokenizer
-+fork-deadlock, \texttt{prefetch\_factor} conflict, fp16/bf16 GradScaler interaction,
-+and CTranslate2 batch OOM --- are absent from any published guide for CTranslate2 4.7.1
-+or PyTorch 2.6/2.7. Practitioners targeting RTX~50-series hardware will encounter at
-+least four of these six issues; the runtime compute-type probe, \texttt{max\_batch\_size=32}
-+constraint, and bf16 training configuration documented here resolve each one
-+reproducibly.
-+
-+The 186-test TDD suite, resource monitoring subsystem, and documented hardware
-+constraints are published at \url{https://github.com/sbisw/translate} as an
-+open-source reference for consumer-GPU NMT deployment.
- 
- % ============================================================
- \section*{Acknowledgments}
+ The open-domain BLEU of \POSTFTBLEU{} warrants explicit comment. Raw sacreBLEU on
+ Bengali hypotheses without SentencePiece normalization suppresses n-gram overlap even
