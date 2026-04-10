@@ -42,6 +42,7 @@ class IndicTrans2Translator(TranslatorBase):
         )
         self._model: object | None = None
         self._tokenizer: object | None = None
+        self._processor: object | None = None
 
     def load(self) -> None:
         """
@@ -60,6 +61,8 @@ class IndicTrans2Translator(TranslatorBase):
         from IndicTransToolkit import IndicProcessor  # type: ignore[import-untyped]
         from transformers import AutoModelForSeq2SeqLM, AutoTokenizer  # type: ignore[import-untyped]
 
+        from bn_en_translate.utils.cuda_check import require_cuda
+
         self._tokenizer = AutoTokenizer.from_pretrained(
             self.HF_MODEL_ID, trust_remote_code=True
         )
@@ -76,13 +79,16 @@ class IndicTrans2Translator(TranslatorBase):
         )
         self._processor = IndicProcessor(inference=True)
 
-        if self.config.device == "cuda" and torch.cuda.is_available():
+        if self.config.device == "cuda":
+            require_cuda("IndicTrans2Translator")
             self._model.to("cuda")  # type: ignore[union-attr]
 
     def _load_via_transformers_fallback(self) -> None:
         """Fallback: load as a standard seq2seq model (lower quality tokenization)."""
         import torch  # type: ignore[import-untyped]
         from transformers import AutoModelForSeq2SeqLM, AutoTokenizer  # type: ignore[import-untyped]
+
+        from bn_en_translate.utils.cuda_check import require_cuda
 
         self._tokenizer = AutoTokenizer.from_pretrained(self.HF_MODEL_ID)
         attn_impl = (
@@ -95,9 +101,9 @@ class IndicTrans2Translator(TranslatorBase):
             attn_implementation=attn_impl,
             dtype=torch.float16,
         )
-        self._processor = None
 
-        if self.config.device == "cuda" and torch.cuda.is_available():
+        if self.config.device == "cuda":
+            require_cuda("IndicTrans2Translator")
             self._model.to("cuda")  # type: ignore[union-attr]
 
     def unload(self) -> None:
@@ -115,7 +121,7 @@ class IndicTrans2Translator(TranslatorBase):
     def _translate_batch(self, texts: list[str], src_lang: str, tgt_lang: str) -> list[str]:
         import torch  # type: ignore[import-untyped]
 
-        device = "cuda" if self.config.device == "cuda" and torch.cuda.is_available() else "cpu"
+        model_device = next(self._model.parameters()).device  # type: ignore[union-attr]
 
         if self._processor is not None:
             # Use IndicTransToolkit preprocessing
@@ -126,7 +132,7 @@ class IndicTrans2Translator(TranslatorBase):
                 padding="longest",
                 return_tensors="pt",
                 return_attention_mask=True,
-            ).to(device)
+            ).to(model_device)
         else:
             inputs = self._tokenizer(  # type: ignore[operator]
                 texts,
@@ -134,7 +140,7 @@ class IndicTrans2Translator(TranslatorBase):
                 padding=True,
                 truncation=True,
                 max_length=512,
-            ).to(device)
+            ).to(model_device)
 
         with torch.no_grad():
             generated = self._model.generate(  # type: ignore[union-attr]

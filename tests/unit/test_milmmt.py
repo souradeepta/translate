@@ -8,11 +8,6 @@ import torch
 from bn_en_translate.config import ModelConfig
 
 
-def test_milmmt_import() -> None:
-    from bn_en_translate.models.milmmt import MiLMMTTranslator
-    assert MiLMMTTranslator is not None
-
-
 def test_milmmt_default_config() -> None:
     from bn_en_translate.models.milmmt import MiLMMTTranslator
     t = MiLMMTTranslator()
@@ -80,3 +75,55 @@ def test_milmmt_custom_config() -> None:
     cfg = ModelConfig(model_name="milmmt-46-1b", model_path="", src_lang="ben_Beng", tgt_lang="eng_Latn")
     t = MiLMMTTranslator(cfg)
     assert t.config.src_lang == "ben_Beng"
+
+
+def test_milmmt_unload_clears_state() -> None:
+    from bn_en_translate.models.milmmt import MiLMMTTranslator
+    t = MiLMMTTranslator()
+    t._loaded = True
+    t._model = MagicMock()
+    t._tokenizer = MagicMock()
+    t.unload()
+    assert t._model is None
+    assert t._tokenizer is None
+    assert not t._loaded
+
+
+def test_milmmt_translate_batch_slices_prompt_tokens() -> None:
+    """_translate_batch must strip echoed prompt tokens from generated output."""
+    from bn_en_translate.models.milmmt import MiLMMTTranslator
+
+    t = MiLMMTTranslator()
+    t._loaded = True
+
+    # Simulate tokenizer: encodes prompts to 5-token tensors (input_len=5),
+    # generates 8 tokens total (first 5 are prompt, last 3 are translation).
+    mock_tokenizer = MagicMock()
+    mock_tokenizer.padding_side = "right"  # will be overridden in load(); test batch only
+    prompt_ids = torch.zeros((1, 5), dtype=torch.long)
+    mock_inputs = MagicMock()
+    mock_inputs.__getitem__ = MagicMock(return_value=prompt_ids)
+    mock_inputs["input_ids"] = prompt_ids
+    mock_inputs.to = MagicMock(return_value=mock_inputs)
+    mock_tokenizer.return_value = mock_inputs
+
+    # generate() returns 8 tokens: prompt (5) + translation (3)
+    full_output = torch.zeros((1, 8), dtype=torch.long)
+    mock_model = MagicMock()
+    mock_model.parameters = MagicMock(return_value=iter([torch.zeros(1)]))
+    mock_model.generate = MagicMock(return_value=full_output)
+
+    mock_tokenizer.batch_decode = MagicMock(return_value=["I eat rice."])
+
+    t._model = mock_model
+    t._tokenizer = mock_tokenizer
+
+    result = t._translate_batch(["আমি ভাত খাই।"], "ben_Beng", "eng_Latn")
+
+    assert result == ["I eat rice."]
+    # Verify only the 3 generated tokens (not all 8) were decoded
+    decoded_arg = mock_tokenizer.batch_decode.call_args[0][0]
+    assert decoded_arg.shape[1] == 3, f"Expected 3 new tokens, got {decoded_arg.shape[1]}"
+    # Verify do_sample=False was passed
+    generate_kwargs = mock_model.generate.call_args[1]
+    assert generate_kwargs.get("do_sample") is False

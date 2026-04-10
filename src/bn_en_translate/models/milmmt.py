@@ -93,7 +93,7 @@ class MiLMMTTranslator(TranslatorBase):
         from pathlib import Path
         from transformers import AutoModelForCausalLM, AutoTokenizer  # type: ignore[import-untyped]
 
-        from bn_en_translate.utils.cuda_check import get_best_device
+        from bn_en_translate.utils.cuda_check import get_best_device, require_cuda
 
         model_id = self._LOCAL_PATH if Path(self._LOCAL_PATH).exists() else self.HF_MODEL_ID
 
@@ -115,7 +115,8 @@ class MiLMMTTranslator(TranslatorBase):
             attn_implementation=attn_impl,
             dtype=torch.bfloat16,  # Gemma3 native dtype; float16 risks NaN
         )
-        if device == "cuda" and torch.cuda.is_available():
+        if device == "cuda":
+            require_cuda("MiLMMTTranslator")
             self._model = self._model.to("cuda")  # type: ignore[union-attr]
 
         self._loaded = True

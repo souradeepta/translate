@@ -18,6 +18,19 @@ def get_best_device() -> str:
     return "cuda" if is_cuda_available() else "cpu"
 
 
+def require_cuda(model_name: str) -> None:
+    """Raise RuntimeError if CUDA is not available.
+
+    Call at the end of model load() when device='cuda' is configured.
+    GPU inference is required — CPU fallback is explicitly prohibited.
+    """
+    if not is_cuda_available():
+        raise RuntimeError(
+            f"{model_name}: device='cuda' configured but CUDA is not available. "
+            "GPU inference is required — do not fall back to CPU."
+        )
+
+
 def get_free_vram_mib() -> int:
     """
     Return free VRAM in MiB for the default CUDA device.
