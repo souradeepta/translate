@@ -56,6 +56,7 @@ class IndicTrans2Translator(TranslatorBase):
         self._loaded = True
 
     def _load_via_indictrans2_interface(self) -> None:
+        import torch  # type: ignore[import-untyped]
         from IndicTransToolkit import IndicProcessor  # type: ignore[import-untyped]
         from transformers import AutoModelForSeq2SeqLM, AutoTokenizer  # type: ignore[import-untyped]
 
@@ -68,17 +69,19 @@ class IndicTrans2Translator(TranslatorBase):
             else "eager"
         )
         self._model = AutoModelForSeq2SeqLM.from_pretrained(
-            self.HF_MODEL_ID, trust_remote_code=True, attn_implementation=attn_impl
+            self.HF_MODEL_ID,
+            trust_remote_code=True,
+            attn_implementation=attn_impl,
+            dtype=torch.float16,
         )
         self._processor = IndicProcessor(inference=True)
-
-        import torch  # type: ignore[import-untyped]
 
         if self.config.device == "cuda" and torch.cuda.is_available():
             self._model.to("cuda")  # type: ignore[union-attr]
 
     def _load_via_transformers_fallback(self) -> None:
         """Fallback: load as a standard seq2seq model (lower quality tokenization)."""
+        import torch  # type: ignore[import-untyped]
         from transformers import AutoModelForSeq2SeqLM, AutoTokenizer  # type: ignore[import-untyped]
 
         self._tokenizer = AutoTokenizer.from_pretrained(self.HF_MODEL_ID)
@@ -88,11 +91,11 @@ class IndicTrans2Translator(TranslatorBase):
             else "eager"
         )
         self._model = AutoModelForSeq2SeqLM.from_pretrained(
-            self.HF_MODEL_ID, attn_implementation=attn_impl
+            self.HF_MODEL_ID,
+            attn_implementation=attn_impl,
+            dtype=torch.float16,
         )
         self._processor = None
-
-        import torch  # type: ignore[import-untyped]
 
         if self.config.device == "cuda" and torch.cuda.is_available():
             self._model.to("cuda")  # type: ignore[union-attr]
@@ -137,8 +140,7 @@ class IndicTrans2Translator(TranslatorBase):
             generated = self._model.generate(  # type: ignore[union-attr]
                 **inputs,
                 num_beams=self._effective_beam_size(),
-                num_return_sequences=1,
-                max_length=self.config.max_decoding_length,
+                max_new_tokens=self.config.max_decoding_length,
             )
 
         decoded = self._tokenizer.batch_decode(  # type: ignore[union-attr]
