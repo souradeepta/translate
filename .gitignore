@@ -18,8 +18,9 @@ build/
 # Git worktrees
 .worktrees/
 
-# Paper PDFs (compiled output — generate locally with: cd paper && tectonic ieee_paper.tex)
+# Paper PDFs (compiled output — generate locally with: make papers)
 /paper/*.pdf
+/paper/pdf/
 /paper/*.aux
 /paper/*.log
 /paper/*.out

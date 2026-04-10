@@ -1,4 +1,4 @@
-.PHONY: install test test-fast test-slow test-e2e lint typecheck clean setup-cuda
+.PHONY: install test test-fast test-slow test-e2e lint typecheck clean setup-cuda papers figures
 
 # Install dev dependencies
 install:
@@ -53,6 +53,20 @@ benchmark:
 
 benchmark-all:
 	python scripts/benchmark.py --models nllb-600M nllb-1.3B indicTrans2-1B --sentences 100
+
+# Regenerate paper figures (requires venv + monitor/runs.db)
+figures:
+	python scripts/gen_paper_figures.py
+
+# Compile all LaTeX papers to PDF (requires tectonic: ~/.local/bin/tectonic)
+papers: figures
+	mkdir -p paper/pdf
+	@for f in paper/ieee_paper.tex paper/survey_paper.tex paper/ieee_transactions_paper.tex paper/acm_paper.tex; do \
+		echo "  compiling $$f ..."; \
+		~/.local/bin/tectonic "$$f" -o paper/pdf/ 2>&1 | grep -E "^note:|^error:|^warning: .*error" || true; \
+	done
+	@echo "PDFs in paper/pdf/"
+	@ls -lh paper/pdf/*.pdf
 
 clean:
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null; true
