@@ -102,13 +102,14 @@ class SeamlessTranslator(TranslatorBase):
             text=texts,
             src_lang=seamless_src,
             return_tensors="pt",
+            padding=True,
+            truncation=True,
         ).to(model_device)
 
         with torch.no_grad():
             output_tokens = self._model.generate(  # type: ignore[union-attr]
                 **inputs,
                 tgt_lang=seamless_tgt,
-                generate_speech=False,
                 num_beams=self._effective_beam_size(),
                 max_new_tokens=self.config.max_decoding_length,
             )
