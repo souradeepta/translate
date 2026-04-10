@@ -18,13 +18,14 @@ build/
 # Git worktrees
 .worktrees/
 
-# Paper PDFs (compiled output — generate locally with: make papers)
-/paper/*.pdf
+# Paper PDFs and LaTeX build artifacts (compiled output — generate locally with: make papers)
 /paper/pdf/
-/paper/*.aux
-/paper/*.log
-/paper/*.out
-/paper/*.toc
-/paper/*.bbl
-/paper/*.blg
-/paper/*.synctex.gz
+paper/**/*.pdf
+paper/**/*.aux
+paper/**/*.log
+paper/**/*.out
+paper/**/*.toc
+paper/**/*.bbl
+paper/**/*.blg
+paper/**/*.synctex.gz
+paper/**/comment.cut
