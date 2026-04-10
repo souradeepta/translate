@@ -6,6 +6,7 @@ from pathlib import Path
 
 from bn_en_translate.config import ModelConfig
 from bn_en_translate.models.base import TranslatorBase
+from bn_en_translate.utils.ct2_utils import probe_compute_type
 
 
 class NLLBCt2Translator(TranslatorBase):
@@ -46,13 +47,26 @@ class NLLBCt2Translator(TranslatorBase):
         if device == "auto":
             device = "cuda" if ctranslate2.get_cuda_device_count() > 0 else "cpu"
 
-        # Load tokenizer first (needed by compute type probe)
         sp_path = model_path / "sentencepiece.bpe.model"
         self._sp = spm.SentencePieceProcessor()
         self._sp.load(str(sp_path))  # type: ignore[union-attr]
 
-        # Probe to find the best working compute type (INT8 fails on Blackwell+cu124)
-        compute_type = self._best_compute_type(device, self._sp)
+        # Probe to find the best working compute type.
+        # INT8 fails on Blackwell sm_120 + CUDA 12.x; probe catches it at load time.
+        probe_src = (
+            self._sp.encode(  # type: ignore[union-attr]
+                "Rabindranath Tagore is an unforgettable poet of Bengali literature.",
+                out_type=str,
+            )
+            + ["</s>", "ben_Beng"]
+        )
+        compute_type = probe_compute_type(
+            str(model_path),
+            device,
+            lambda t: t.translate_batch(
+                [probe_src], target_prefix=[["eng_Latn"]], beam_size=1, max_decoding_length=20
+            ),
+        )
 
         self._translator = ctranslate2.Translator(
             str(model_path),
@@ -61,42 +75,7 @@ class NLLBCt2Translator(TranslatorBase):
             inter_threads=1,
             intra_threads=4,
         )
-
         self._loaded = True
-
-    def _best_compute_type(self, device: str, sp: object) -> str:
-        """Find the best working compute type by running a realistic translation probe.
-
-        INT8 ops fail on Blackwell (sm_120) with CTranslate2 4.x + CUDA 12.4 cuBLAS
-        when given sequences long enough to trigger INT8 tensor core matmuls.
-        The probe uses a ~20-token sentence to catch this at load time.
-        """
-        if device == "cpu":
-            return "int8"
-        import ctranslate2  # type: ignore[import-untyped]
-        import sentencepiece as spm  # type: ignore[import-untyped]
-        assert isinstance(sp, spm.SentencePieceProcessor)
-
-        # Use a realistic-length sentence (short probes may not trigger INT8 ops)
-        probe_text = "Rabindranath Tagore is an unforgettable poet of Bengali literature."
-        probe_src = sp.encode(probe_text, out_type=str) + ["</s>", "ben_Beng"]
-        supported = ctranslate2.get_supported_compute_types(device)
-
-        for ct in ("int8_float16", "int8", "float16", "bfloat16", "float32"):
-            if ct not in supported:
-                continue
-            try:
-                probe = ctranslate2.Translator(
-                    str(Path(self.config.model_path)), device=device, compute_type=ct
-                )
-                probe.translate_batch(
-                    [probe_src], target_prefix=[["eng_Latn"]], beam_size=1, max_decoding_length=20
-                )
-                del probe
-                return ct
-            except Exception:
-                continue
-        return "float32"
 
     def unload(self) -> None:
         self._translator = None
@@ -107,13 +86,11 @@ class NLLBCt2Translator(TranslatorBase):
         assert self._translator is not None
         assert self._sp is not None
 
-        # NLLB-200 source format: [text_tokens..., </s>, src_lang]
-        # Target prefix: [tgt_lang]  (forced BOS)
+        # NLLB source format: [tokens..., </s>, src_lang]; target prefix: [tgt_lang]
         tokenized = [
             self._sp.encode(t, out_type=str) + ["</s>", src_lang]  # type: ignore[union-attr]
             for t in texts
         ]
-        # Target prefix: the language token that forces the output language
         target_prefix = [[tgt_lang]] * len(tokenized)
 
         results = self._translator.translate_batch(  # type: ignore[union-attr]
@@ -127,9 +104,7 @@ class NLLBCt2Translator(TranslatorBase):
         output_texts: list[str] = []
         for result in results:
             tokens = result.hypotheses[0]
-            # Strip the leading language token that CTranslate2 echoes back
             if tokens and tokens[0] == tgt_lang:
                 tokens = tokens[1:]
             output_texts.append(self._sp.decode(tokens))  # type: ignore[union-attr]
-
         return output_texts

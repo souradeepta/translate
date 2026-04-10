@@ -1,19 +1,20 @@
-"""IndicTrans2-1B via CTranslate2 INT8 — optimal quality + GPU efficiency."""
+"""IndicTrans2-1B via CTranslate2 float16 — optimal quality + GPU efficiency."""
 
 from __future__ import annotations
 
-from pathlib import Path  # noqa: F401 — used in _best_compute_type
+from pathlib import Path
 
 from bn_en_translate.config import ModelConfig
 from bn_en_translate.models.base import TranslatorBase
+from bn_en_translate.utils.ct2_utils import probe_compute_type
 
 
 class IndicTrans2Ct2Translator(TranslatorBase):
     """
-    AI4Bharat IndicTrans2-1B via CTranslate2 INT8.
+    AI4Bharat IndicTrans2-1B via CTranslate2 float16.
 
     This is the recommended path for production use:
-      - INT8 quantization: ~1.0–1.5 GB VRAM (vs ~3 GB float16)
+      - Compute type probed at load time: float16 on Blackwell sm_120 (INT8 fails)
       - CTranslate2 CUDA kernels: faster than HF generate() on Blackwell
       - IndicTransToolkit: proper Bengali script normalization + SentencePiece
 
@@ -65,7 +66,20 @@ class IndicTrans2Ct2Translator(TranslatorBase):
         self._sp = spm.SentencePieceProcessor()
         self._sp.load(str(sp_path))  # type: ignore[union-attr]
 
-        compute_type = self._best_compute_type(device, self._sp)
+        probe_src = (
+            self._sp.encode(  # type: ignore[union-attr]
+                "Rabindranath Tagore is an unforgettable poet of Bengali literature.",
+                out_type=str,
+            )
+            + ["</s>", "ben_Beng"]
+        )
+        compute_type = probe_compute_type(
+            str(model_path),
+            device,
+            lambda t: t.translate_batch(
+                [probe_src], target_prefix=[["eng_Latn"]], beam_size=1, max_decoding_length=20
+            ),
+        )
 
         self._translator = ctranslate2.Translator(
             str(model_path),
@@ -83,34 +97,6 @@ class IndicTrans2Ct2Translator(TranslatorBase):
             self._processor = None
 
         self._loaded = True
-
-    def _best_compute_type(self, device: str, sp: object) -> str:
-        """Probe with a realistic sentence to find the best working compute type."""
-        if device == "cpu":
-            return "int8"
-        import ctranslate2  # type: ignore[import-untyped]
-        import sentencepiece as spm  # type: ignore[import-untyped]
-        assert isinstance(sp, spm.SentencePieceProcessor)
-
-        probe_text = "Rabindranath Tagore is an unforgettable poet of Bengali literature."
-        probe_src = sp.encode(probe_text, out_type=str) + ["</s>", "ben_Beng"]
-        supported = ctranslate2.get_supported_compute_types(device)
-
-        for ct in ("int8_float16", "int8", "float16", "bfloat16", "float32"):
-            if ct not in supported:
-                continue
-            try:
-                probe = ctranslate2.Translator(
-                    str(Path(self.config.model_path)), device=device, compute_type=ct
-                )
-                probe.translate_batch(
-                    [probe_src], target_prefix=[["eng_Latn"]], beam_size=1, max_decoding_length=20
-                )
-                del probe
-                return ct
-            except Exception:
-                continue
-        return "float32"
 
     def unload(self) -> None:
         self._translator = None
