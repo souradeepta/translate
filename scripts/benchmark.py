@@ -41,6 +41,7 @@ def benchmark_model(
             elapsed = time.perf_counter() - t0
 
         bleu = sacrebleu.corpus_bleu(hypotheses, [references])
+        chrf = sacrebleu.corpus_chrf(hypotheses, [references])
         input_chars = sum(len(t) for t in bengali_texts)
         chars_per_sec = round(input_chars / elapsed) if elapsed > 0 else 0
 
@@ -48,6 +49,7 @@ def benchmark_model(
             "model": model_name,
             "backend": type(translator).__name__,
             "bleu": round(bleu.score, 2),
+            "chrf": round(chrf.score, 2),
             "seconds": round(elapsed, 2),
             "chars_per_sec": chars_per_sec,
             "output_preview": hypotheses[0][:80] if hypotheses else "",
@@ -68,6 +70,7 @@ def benchmark_model(
                         summary=monitor.summary,
                         input_chars=input_chars,
                         bleu_score=bleu.score,
+                        chrf_score=chrf.score,
                         chars_per_sec=float(chars_per_sec),
                         sample_interval_s=monitor_cfg.sample_interval_s,
                     )
@@ -136,8 +139,8 @@ def main() -> None:
 
     bn_texts, en_refs = load_corpus(n=args.sentences)
 
-    print(f"\n{'Model':<22} {'Backend':<24} {'BLEU':>6} {'Time':>7} {'ch/s':>6}")
-    print("-" * 72)
+    print(f"\n{'Model':<22} {'Backend':<24} {'BLEU':>6} {'chrF':>6} {'Time':>7} {'ch/s':>6}")
+    print("-" * 80)
 
     for model_name in args.models:
         r = benchmark_model(model_name, bn_texts, en_refs, device=args.device)
@@ -146,12 +149,12 @@ def main() -> None:
         else:
             print(
                 f"{model_name:<22} {r['backend']:<24} "
-                f"{r['bleu']:>6.1f} {r['seconds']:>6.1f}s "
+                f"{r['bleu']:>6.1f} {r['chrf']:>6.1f} {r['seconds']:>6.1f}s "
                 f"{r['chars_per_sec']:>6}"
             )
             print(f"  Preview: {r['output_preview']}")
 
-    print("=" * 72)
+    print("=" * 80)
     print("Run history: python scripts/show_stats.py list")
 
 
