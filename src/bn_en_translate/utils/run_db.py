@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS runs (
     -- Translation / benchmark metadata
     input_chars         INTEGER,
     bleu_score          REAL,
+    chrf_score          REAL,
     chars_per_sec       REAL,
 
     -- CPU
@@ -107,6 +108,7 @@ class RunDatabase:
         summary: ResourceSummary,
         input_chars: int | None = None,
         bleu_score: float | None = None,
+        chrf_score: float | None = None,
         chars_per_sec: float | None = None,
         sample_interval_s: float = 2.0,
     ) -> None:
@@ -116,7 +118,7 @@ class RunDatabase:
             INSERT OR REPLACE INTO runs (
                 run_id, run_type, model_name, started_at, finished_at,
                 duration_s, status, error_msg,
-                input_chars, bleu_score, chars_per_sec,
+                input_chars, bleu_score, chrf_score, chars_per_sec,
                 cpu_peak_pct, cpu_avg_pct,
                 ram_peak_mib, ram_avg_mib,
                 swap_peak_mib, swap_avg_mib,
@@ -127,7 +129,7 @@ class RunDatabase:
             ) VALUES (
                 :run_id, :run_type, :model_name, :started_at, :finished_at,
                 :duration_s, :status, :error_msg,
-                :input_chars, :bleu_score, :chars_per_sec,
+                :input_chars, :bleu_score, :chrf_score, :chars_per_sec,
                 :cpu_peak_pct, :cpu_avg_pct,
                 :ram_peak_mib, :ram_avg_mib,
                 :swap_peak_mib, :swap_avg_mib,
@@ -148,6 +150,7 @@ class RunDatabase:
                 "error_msg": error_msg,
                 "input_chars": input_chars,
                 "bleu_score": bleu_score,
+                "chrf_score": chrf_score,
                 "chars_per_sec": chars_per_sec,
                 "cpu_peak_pct": summary.cpu_peak_pct,
                 "cpu_avg_pct": summary.cpu_avg_pct,
@@ -217,7 +220,7 @@ class RunDatabase:
         """
         # Validate metric name against known columns to prevent SQL injection
         valid_columns = {
-            "bleu_score", "chars_per_sec", "duration_s",
+            "bleu_score", "chrf_score", "chars_per_sec", "duration_s",
             "cpu_peak_pct", "cpu_avg_pct",
             "ram_peak_mib", "ram_avg_mib",
             "swap_peak_mib", "swap_avg_mib",
