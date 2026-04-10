@@ -286,13 +286,35 @@ pip install -e ".[dev,gpu,train,monitor]"
 
 ---
 
+## Superpowers Skills (invoke BEFORE any task — even 1% chance it applies)
+
+Skills override default behavior. Check for a matching skill before writing a single line of code,
+asking a clarifying question, or exploring files. Use the `Skill` tool.
+
+| Skill | Trigger |
+|-------|---------|
+| `brainstorming` | "I want to add X", new feature, new model integration |
+| `writing-plans` | Multi-step task needing a spec before implementation |
+| `requesting-code-review` | After completing a feature or major fix |
+| `finishing-a-development-branch` | Branch is ready — tests pass, feature complete |
+| `subagent-driven-development` | Long task that spans many files / steps |
+| `dispatching-parallel-agents` | Independent workstreams (benchmark + paper update + docs) |
+| `systematic-debugging` | Model produces garbage, CUDA errors, test failures |
+| `test-driven-development` | Adding new pipeline logic or model methods |
+| `verification-before-completion` | Before telling the user a task is done |
+
+**Cold-start rule:** At the start of every session, read this section and check if the user's first
+message maps to any skill above. Invoke it *before* responding.
+
+---
+
 ## Available Agents
 
 | Agent file | When to use |
 |------------|-------------|
 | `.claude/agents/coder.md` | Implementing new features, fixing bugs, refactoring |
 | `.claude/agents/tester.md` | Writing or running tests, debugging test failures |
-| `.claude/agents/architect.md` | Design decisions, new model integration, pipeline changes |
+| `.claude/agents/architect.md` | Design decisions, new model integration, pipeline changes — invoke **before** implementation |
 | `.claude/agents/monitor.md` | After any run: detect regressions, update `monitor/observations.md` |
 | `.claude/agents/paper_writer.md` | After benchmarks/training: update `paper/ieee_paper.tex` |
 | `.claude/agents/survey_writer.md` | When new Bengali NMT papers publish: update `paper/survey_paper.tex` |
