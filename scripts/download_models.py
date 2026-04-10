@@ -61,7 +61,12 @@ def download_and_convert(model_name: str, force: bool = False) -> None:
         print(f"Pre-downloading {hf_id} to HF cache (no CT2 conversion)...")
         try:
             from huggingface_hub import snapshot_download  # type: ignore[import-untyped]
-            local = snapshot_download(hf_id, local_dir=str(output_dir))
+            # Exclude GGUF quantizations — only safetensors + tokenizer needed for HF inference
+            local = snapshot_download(
+                hf_id,
+                local_dir=str(output_dir),
+                ignore_patterns=["*.gguf", "*.gguf.*", "*.msgpack", "flax_model*", "tf_model*"],
+            )
             print(f"Done. Model saved to: {local}")
         except Exception as e:
             print(f"ERROR: download failed: {e}")
