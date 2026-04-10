@@ -49,14 +49,17 @@ class MADLADTranslator(TranslatorBase):
         self._model: object | None = None
         self._tokenizer: object | None = None
 
+    _LOCAL_PATH = "models/madlad-3b-hf"
+
     def load(self) -> None:
+        import torch  # type: ignore[import-untyped]
+        from pathlib import Path
         from transformers import T5ForConditionalGeneration, T5Tokenizer  # type: ignore[import-untyped]
 
-        model_id = (
-            self.config.model_path
-            if self.config.model_path and self.config.model_path != "models/madlad-3b-hf"
-            else self.HF_MODEL_ID
-        )
+        from bn_en_translate.utils.cuda_check import get_best_device
+
+        # Prefer local download; fall back to HF Hub (auto-downloads on first use)
+        model_id = self._LOCAL_PATH if Path(self._LOCAL_PATH).exists() else self.HF_MODEL_ID
 
         attn_impl = (
             "flash_attention_2"
@@ -64,15 +67,20 @@ class MADLADTranslator(TranslatorBase):
             else "eager"
         )
 
+        device = (
+            get_best_device() if self.config.device == "auto" else self.config.device
+        )
+        # Use device_map="auto" to stream weights directly to GPU — avoids double-copy OOM
+        device_map = "auto" if device == "cuda" and torch.cuda.is_available() else None
+
         self._tokenizer = T5Tokenizer.from_pretrained(model_id)
         self._model = T5ForConditionalGeneration.from_pretrained(
-            model_id, attn_implementation=attn_impl
+            model_id,
+            attn_implementation=attn_impl,
+            dtype=torch.float16,
+            device_map=device_map,
+            tie_word_embeddings=False,  # suppress warning: saved weights differ, don't tie
         )
-
-        import torch  # type: ignore[import-untyped]
-
-        if self.config.device == "cuda" and torch.cuda.is_available():
-            self._model.to("cuda")  # type: ignore[union-attr]
 
         self._loaded = True
 
@@ -95,7 +103,9 @@ class MADLADTranslator(TranslatorBase):
     def _translate_batch(self, texts: list[str], src_lang: str, tgt_lang: str) -> list[str]:
         import torch  # type: ignore[import-untyped]
 
-        device = "cuda" if self.config.device == "cuda" and torch.cuda.is_available() else "cpu"
+        # When using device_map="auto", the model manages its own device placement.
+        # Move inputs to the same device as the model's first parameter.
+        model_device = next(self._model.parameters()).device  # type: ignore[union-attr]
 
         input_texts = self._build_input_texts(texts, tgt_lang)
         inputs = self._tokenizer(  # type: ignore[operator]
@@ -104,7 +114,7 @@ class MADLADTranslator(TranslatorBase):
             padding=True,
             truncation=True,
             max_length=512,
-        ).to(device)
+        ).to(model_device)
 
         with torch.no_grad():
             generated = self._model.generate(  # type: ignore[union-attr]
