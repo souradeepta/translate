@@ -89,7 +89,22 @@ class RunDatabase:
         self._conn = sqlite3.connect(str(db_path), timeout=30.0)
         self._conn.row_factory = sqlite3.Row
         self._conn.executescript(_SCHEMA)
+        # Idempotent migrations: add columns introduced after initial schema.
+        self._apply_migrations()
         self._conn.commit()
+
+    def _apply_migrations(self) -> None:
+        """Add columns that were introduced after the initial schema deployment."""
+        existing = {
+            row[1]
+            for row in self._conn.execute("PRAGMA table_info(runs)")
+        }
+        migrations = [
+            ("chrf_score", "REAL"),
+        ]
+        for col, col_type in migrations:
+            if col not in existing:
+                self._conn.execute(f"ALTER TABLE runs ADD COLUMN {col} {col_type}")
 
     # ------------------------------------------------------------------
     # Write
