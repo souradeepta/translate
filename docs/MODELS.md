@@ -2,17 +2,17 @@
 
 ## Supported Models
 
-| Key | HuggingFace ID | Backend | VRAM (float16) | FLORES BLEU bn→en | Default Beams | Status |
-|-----|---------------|---------|---------------|-------------------|---------------|--------|
-| `nllb-600M` | `facebook/nllb-200-distilled-600M` | CT2 float16 | ~2.0 GB | 22 | 4 | Working — `models/nllb-600M-ct2/` |
-| `nllb-1.3B` | `facebook/nllb-200-distilled-1.3B` | CT2 float16 | ~2.6 GB | 26 | 4 | Needs download |
-| `indicTrans2-1B` | `ai4bharat/indictrans2-indic-en-1B` | CT2 float16 | ~3.0 GB | 44 | 5 | Needs download |
-| `madlad-3b` | `google/madlad400-3b-mt` | HF float16 | ~3.0 GB | 36 | 4 | Needs download |
-| `seamless-medium` | `facebook/seamless-m4t-v2-large` | HF float16 | ~3.5 GB | ~39 | 5 | Needs download |
-| `ollama` | N/A (local daemon) | Ollama HTTP | ~4.7 GB | subjective | N/A | Optional polish |
+| Key | HuggingFace ID | Backend | VRAM (float16) | FLORES BLEU | FLORES chrF | Throughput | Default Beams | Status |
+|-----|---------------|---------|---------------|-------------|-------------|------------|---------------|--------|
+| `nllb-600M` | `facebook/nllb-200-distilled-600M` | CT2 float16 | 2.0 GB | **55.3** ✅ | **72.8** ✅ | 197 ch/s | 4 | Working — `models/nllb-600M-ct2/` |
+| `seamless-medium` | `facebook/seamless-m4t-v2-large` | HF float16 | 3.9 GB | **67.0** ✅ | **80.2** ✅ | 32 ch/s | 5 | Working — `models/seamless-medium-hf/` |
+| `nllb-1.3B` | `facebook/nllb-200-distilled-1.3B` | CT2 float16 | ~2.6 GB | ~26 (lit.) | — | — | 4 | Needs download |
+| `indicTrans2-1B` | `ai4bharat/indictrans2-indic-en-1B` | CT2 float16 | ~3.0 GB | ~44 (lit.) | — | — | 5 | Needs download |
+| `madlad-3b` | `google/madlad400-3b-mt` | HF float16 | 8.1 GB actual | — | — | — | 4 | ❌ EXCLUDED — see MADLAD section |
+| `ollama` | N/A (local daemon) | Ollama HTTP | ~4.7 GB | subjective | — | — | N/A | Optional polish |
 
-> FLORES BLEU scores reflect zero-shot performance on FLORES-200 Bengali→English.  
-> The in-domain 90-sentence corpus BLEU for NLLB-600M is ~64 — substantially higher due to corpus overlap with literary Bengali.  
+> **FLORES BLEU / chrF** numbers marked ✅ are directly measured on FLORES-200 devtest (90 sentences) on this hardware.  
+> Literature figures (no ✅) are from published papers and may not reflect in-domain Bengali performance.  
 > "Default Beams" is each model's `DEFAULT_BEAM_SIZE`; override with `ModelConfig(beam_size=N)`.
 
 ---
@@ -128,6 +128,21 @@ Without `flash-attn` installed, both translators fall back to the standard `"eag
 
 ## MADLAD-400-3B
 
+> **EXCLUDED FROM THIS SYSTEM — DO NOT USE**
+>
+> MADLAD-3B has two unresolvable issues on this hardware:
+>
+> 1. **Checkpoint weight mismatch**: The local HF snapshot has `shared.weight` and `decoder.embed_tokens.weight` as two distinct tensors with different values. Transformers logs:
+>    ```
+>    The tied weights mapping specifies to tie shared.weight to decoder.embed_tokens.weight,
+>    but both are present in the checkpoints with different values, so we will NOT tie them.
+>    ```
+>    This breaks T5's embedding tying assumption. The encoder and decoder use different embedding matrices, producing degenerate output (e.g., repeated timestamps `"2020-01-07T00:00:00+00:00"`). BLEU = 0.0.
+>
+> 2. **VRAM constraint**: 3B parameters at float16 = ~6 GB weights + activations + KV cache > 8 GB. `device_map="auto"` offloads layers to CPU, reducing throughput to ~2 sentences/minute — unacceptable for 90+ sentence benchmarks.
+>
+> Use `seamless-medium` (BLEU 67.0, 3.9 GB) instead.
+
 **Architecture:** T5-based encoder-decoder  
 **Source:** Google Research  
 **License:** Apache 2.0  
@@ -135,6 +150,12 @@ Without `flash-attn` installed, both translators fall back to the standard `"eag
 **HF ID:** `google/madlad400-3b-mt`
 
 Source text is prefixed with a target-language tag (e.g. `<2en> <bengali text>`). No source language tag is required. The class handles this prefix automatically.
+
+### Critical Constraints
+
+- **`max_new_tokens`, not `max_length`**: T5's `max_length` caps total tokens (input + output). For long Bengali inputs, output budget = `max_length - encoder_length` ≈ 0. Always use `max_new_tokens=256`.
+- **Do not pass `tie_word_embeddings=False`**: This randomises the encoder embedding matrix — the checkpoint only has `shared.weight` with no separate encoder weights.
+- **Do not use `device_map="auto"` on 8 GB VRAM**: triggers CPU layer offload → ~45+ min for 90 sentences.
 
 ### Download
 
@@ -152,9 +173,40 @@ This uses `snapshot_download` from `huggingface_hub` — no CTranslate2 conversi
 **Source:** Meta AI  
 **License:** CC-BY-NC 4.0  
 **Languages:** 100+ languages — supports Bengali and English  
-**HF ID:** `facebook/seamless-m4t-v2-large`
+**HF ID:** `facebook/seamless-m4t-v2-large`  
+**Measured FLORES-200 (90-sent devtest):** BLEU **67.0** / chrF **80.2** — best model on this hardware  
+**Measured throughput:** 32 characters/second, 1.33 s/sentence, 3,919 MiB VRAM
 
 SeamlessM4T uses short language codes (`ben`, `eng`) rather than FLORES-200 codes (`ben_Beng`, `eng_Latn`). `SeamlessTranslator` handles the mapping automatically — callers always pass FLORES-200 codes.
+
+### Critical Loading Constraints
+
+**1. No `device_map="auto"`** — `SeamlessM4Tv2ForTextToText` does NOT support `device_map`. Load in float16 then move explicitly:
+
+```python
+from transformers import SeamlessM4Tv2ForTextToText, AutoProcessor
+import torch
+
+processor = AutoProcessor.from_pretrained(model_path)
+model = SeamlessM4Tv2ForTextToText.from_pretrained(model_path, dtype=torch.float16)
+model = model.to("cuda")   # explicit move — not device_map="auto"
+```
+
+Loading with `device_map="auto"` silently places weights but then errors or produces wrong outputs.
+
+**2. No `generate_speech=False` in `.generate()`** — `generate_speech` is only accepted by the combined `SeamlessM4Tv2Model` (text+speech). The text-only `SeamlessM4Tv2ForTextToText` raises `ValueError: The following model_kwargs are not used: ['generate_speech']`. Remove it entirely.
+
+**3. Always include `padding=True, truncation=True` in processor call** — batches with unequal-length sentences cannot be stacked into a tensor without padding:
+
+```python
+inputs = processor(
+    text=texts,
+    src_lang="ben",
+    return_tensors="pt",
+    padding=True,       # required for batches
+    truncation=True,    # required for long inputs
+)
+```
 
 ### Download
 
@@ -170,10 +222,11 @@ Stored at `models/seamless-medium-hf/`. Loaded via HuggingFace Transformers; no 
 
 | Backend | Models | Inference path | Quantization |
 |---------|--------|---------------|-------------|
-| CTranslate2 (CT2) | `nllb-600M`, `nllb-1.3B`, `indicTrans2-1B` | `ctranslate2.Translator` | float16 (INT8 fails on sm_120) |
-| HuggingFace native | `madlad-3b`, `seamless-medium` | `transformers.generate()` | float16 via `dtype=torch.float16`, `device_map="auto"` |
+| CTranslate2 (CT2) | `nllb-600M`, `nllb-1.3B`, `indicTrans2-1B` | `ctranslate2.Translator` | float16 only (INT8 fails on sm_120+CUDA 12.x) |
+| HuggingFace native | `seamless-medium` | `transformers.generate()` | `dtype=torch.float16` + explicit `.to("cuda")` |
+| HuggingFace native | `madlad-3b` | `transformers.generate()` | float16 — **EXCLUDED, see MADLAD section** |
 
-MADLAD and Seamless do not have a CT2 conversion path — their architectures (T5 and SeamlessM4T) are fully supported by standard HuggingFace Transformers inference.
+Seamless does not use `device_map="auto"` — it must be loaded in float16 then moved explicitly to CUDA. See the SeamlessM4T-v2 section for the correct load pattern.
 
 ---
 
