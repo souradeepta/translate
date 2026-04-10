@@ -51,24 +51,31 @@ class SeamlessTranslator(TranslatorBase):
         self._model: object | None = None
         self._processor: object | None = None
 
+    _LOCAL_PATH = "models/seamless-medium-hf"
+
     def load(self) -> None:
         import torch  # type: ignore[import-untyped]
+        from pathlib import Path
         from transformers import AutoProcessor, SeamlessM4Tv2ForTextToText  # type: ignore[import-untyped]
 
         from bn_en_translate.utils.cuda_check import get_best_device
 
+        # Prefer local download; fall back to HF Hub
+        model_id = self._LOCAL_PATH if Path(self._LOCAL_PATH).exists() else self.HF_MODEL_ID
+
         device = (
             get_best_device() if self.config.device == "auto" else self.config.device
         )
-        # Use device_map="auto" to stream weights directly to GPU — avoids double-copy OOM
-        device_map = "auto" if device == "cuda" and torch.cuda.is_available() else None
 
-        self._processor = AutoProcessor.from_pretrained(self.HF_MODEL_ID)
+        # SeamlessM4Tv2ForTextToText does not support device_map="auto" — load in float16
+        # then move to GPU explicitly. Text-only portion is ~3.5 GB, fits in 8 GB VRAM.
+        self._processor = AutoProcessor.from_pretrained(model_id)
         self._model = SeamlessM4Tv2ForTextToText.from_pretrained(
-            self.HF_MODEL_ID,
+            model_id,
             dtype=torch.float16,
-            device_map=device_map,
         )
+        if device == "cuda" and torch.cuda.is_available():
+            self._model = self._model.to("cuda")  # type: ignore[union-attr]
 
         self._loaded = True
 
@@ -86,7 +93,6 @@ class SeamlessTranslator(TranslatorBase):
     def _translate_batch(self, texts: list[str], src_lang: str, tgt_lang: str) -> list[str]:
         import torch  # type: ignore[import-untyped]
 
-        # When using device_map="auto", move inputs to the model's first-parameter device
         model_device = next(self._model.parameters()).device  # type: ignore[union-attr]
 
         seamless_src = _to_seamless_lang(src_lang)
