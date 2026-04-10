@@ -34,7 +34,8 @@ python scripts/benchmark.py --models nllb-600M --sentences 5   # quick GPU smoke
 - ❌ CT2 `translate_batch()` with 900+ sentences at once → CUDA OOM; always pass `max_batch_size=32`
 - ❌ MADLAD/Seamless `.to("cuda")` after float32 load → double-copy OOM; use `device_map="auto"` + `dtype=torch.float16`
 - ⚠️ MADLAD-3B with `device_map="auto"` on 8 GB VRAM → triggers CPU layer offload (weights fit, but activations+KV cache overflow); inference becomes extremely slow (~45+ min for 90 sentences). Acceptable for benchmarking, not for interactive use.
-- ❌ MADLAD `tie_word_embeddings` default → noisy warning; set `tie_word_embeddings=False`
+- ❌ MADLAD `tie_word_embeddings=False` → randomises encoder embedding matrix (checkpoint has only shared weights); leave at default (True) and accept the informational warning
+- ❌ MADLAD `max_length` in generate() → counts input + output tokens; use `max_new_tokens=256` to cap output only
 - ❌ `pynvml` package → deprecated; use `nvidia-ml-py` (same `import pynvml` API, no code changes)
 - ❌ RunDatabase schema migration → new columns added after deploy; use `_apply_migrations()` with `ALTER TABLE ADD COLUMN`
 
