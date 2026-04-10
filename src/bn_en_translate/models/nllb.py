@@ -30,13 +30,14 @@ class NLLBTranslator(TranslatorBase):
         model_id = self._resolve_model_id()
         device = 0 if self.config.device == "cuda" else -1  # HF pipeline convention
 
+        # Do not pass max_length here: for encoder-decoder models it caps total tokens
+        # (input + output), not just new tokens. Pass max_new_tokens per-call instead.
         self._pipeline = pipeline(
             "translation",
             model=model_id,
             device=device,
             src_lang=self.config.src_lang,
             tgt_lang=self.config.tgt_lang,
-            max_length=self.config.max_decoding_length,
             num_beams=self._effective_beam_size(),
         )
         self._loaded = True
@@ -60,6 +61,7 @@ class NLLBTranslator(TranslatorBase):
             src_lang=src_lang,
             tgt_lang=tgt_lang,
             batch_size=self.config.inference_batch_size,
+            max_new_tokens=self.config.max_decoding_length,
         )
         return [r["translation_text"] for r in results]  # type: ignore[index]
 

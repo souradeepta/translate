@@ -99,7 +99,9 @@ class FineTuneConfig:
     save_steps: int = 500
     eval_steps: int = 500
     logging_steps: int = 100
-    fp16: bool = True
+    # bf16=True is required on Blackwell sm_120; fp16+GradScaler raises ValueError.
+    # Keep fp16=False here — the trainer sets bf16=True explicitly.
+    fp16: bool = False
 
     def __post_init__(self) -> None:
         if self.learning_rate <= 0:

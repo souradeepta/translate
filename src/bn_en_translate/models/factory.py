@@ -101,15 +101,21 @@ def get_translator(config: PipelineConfig) -> TranslatorBase:
     return factory(config)
 
 
+_CT2_DIRS: dict[str, str] = {
+    "nllb-600m":     "models/nllb-600M-ct2",
+    "nllb-1.3b":     "models/nllb-1.3B-ct2",
+    "indictrans2-1b": "models/indicTrans2-1B-ct2",
+    "indictrans2":    "models/indicTrans2-1B-ct2",
+}
+
+
 def _ct2_path(model_config: ModelConfig) -> Path:
-    """Return the expected CTranslate2 model path for a given ModelConfig."""
-    if model_config.model_path and model_config.model_path != "models/nllb-600M-ct2":
-        return Path(model_config.model_path)
+    """Return the CTranslate2 model directory for a given ModelConfig.
+
+    Known models always resolve to their canonical path from _CT2_DIRS.
+    Unknown models fall back to model_config.model_path.
+    """
     name = model_config.model_name.lower()
-    mapping = {
-        "nllb-600m": "models/nllb-600M-ct2",
-        "nllb-1.3b": "models/nllb-1.3B-ct2",
-        "indictrans2-1b": "models/indicTrans2-1B-ct2",
-        "indictrans2": "models/indicTrans2-1B-ct2",
-    }
-    return Path(mapping.get(name, f"models/{model_config.model_name}-ct2"))
+    if name in _CT2_DIRS:
+        return Path(_CT2_DIRS[name])
+    return Path(model_config.model_path)

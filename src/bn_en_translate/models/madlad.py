@@ -1,7 +1,15 @@
-"""MADLAD-400-3B translator — Google's dedicated multilingual MT model."""
+"""MADLAD-400-3B translator — Google's dedicated multilingual MT model.
+
+WARNING: The local checkpoint at models/madlad-3b-hf/ has a known weight mismatch
+(shared.weight != decoder.embed_tokens.weight) that produces degenerate output (BLEU 0).
+Additionally, 3B float16 parameters require ~6 GB weights + KV cache, exceeding the 8 GB
+VRAM budget and forcing CPU offload (~30 s/sentence). This model is EXCLUDED from
+benchmarks. Re-download cleanly from HF Hub before using.
+"""
 
 from __future__ import annotations
 import importlib.util
+import warnings
 
 from bn_en_translate.config import ModelConfig
 from bn_en_translate.models.base import TranslatorBase
@@ -25,11 +33,12 @@ class MADLADTranslator(TranslatorBase):
 
     Architecture: T5-based encoder-decoder
     HF ID: google/madlad400-3b-mt
-    VRAM (float16): ~3 GB
-    FLORES-200 bn->en BLEU: ~36 (zero-shot)
+    VRAM (float16): 8.1 GB measured — exceeds 8 GB budget, triggers CPU offload
+    FLORES-200 bn→en: EXCLUDED (checkpoint weight mismatch → degenerate output)
 
     Source text is prefixed with the target language tag, e.g. '<2en> <bengali text>'.
-    No source language tag is required.
+    No source language tag is required. Always use max_new_tokens in generate(), not
+    max_length — T5's max_length caps input+output tokens combined.
 
     Setup:
         python scripts/download_models.py --model madlad-3b
@@ -58,6 +67,15 @@ class MADLADTranslator(TranslatorBase):
 
         from bn_en_translate.utils.cuda_check import get_best_device
 
+        warnings.warn(
+            "MADLADTranslator: the local checkpoint at models/madlad-3b-hf/ has a known "
+            "shared.weight != decoder.embed_tokens.weight mismatch that produces garbage output. "
+            "3B float16 also exceeds the 8 GB VRAM budget, forcing slow CPU offload. "
+            "Re-download cleanly from HF Hub before benchmarking.",
+            UserWarning,
+            stacklevel=2,
+        )
+
         # Prefer local download; fall back to HF Hub (auto-downloads on first use)
         model_id = self._LOCAL_PATH if Path(self._LOCAL_PATH).exists() else self.HF_MODEL_ID
 
@@ -70,7 +88,8 @@ class MADLADTranslator(TranslatorBase):
         device = (
             get_best_device() if self.config.device == "auto" else self.config.device
         )
-        # Use device_map="auto" to stream weights directly to GPU — avoids double-copy OOM
+        # device_map="auto" is necessary because 3B float16 weights (~6 GB) + KV cache
+        # exceed 8 GB VRAM. This forces CPU offload and reduces throughput to ~2 ch/s.
         device_map = "auto" if device == "cuda" and torch.cuda.is_available() else None
 
         self._tokenizer = T5Tokenizer.from_pretrained(model_id)
