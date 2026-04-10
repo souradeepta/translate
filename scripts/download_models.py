@@ -84,29 +84,24 @@ def download_and_convert(model_name: str, force: bool = False) -> None:
     print(f"Converting {hf_id} → {output_dir} ({cfg['quantization']})...")
     print("This downloads the model from HuggingFace Hub first (1–3 GB).")
 
+    # ct2-transformers-converter is the stable CLI entry point across CT2 versions.
+    # The old python -m ctranslate2.tools.transformers module was removed in CT2 4.x.
     cmd = [
-        sys.executable, "-m", "ctranslate2.tools.transformers",
+        "ct2-transformers-converter",
         "--model", hf_id,
         "--output_dir", str(output_dir),
         "--quantization", cfg["quantization"],
         "--force",
     ]
-
-    # Try the module-based approach first (most reliable cross-version)
     result = subprocess.run(cmd, check=False)
     if result.returncode != 0:
-        # Fall back to the CLI entry point
-        cmd2 = [
-            "ct2-transformers-converter",
-            "--model", hf_id,
-            "--output_dir", str(output_dir),
-            "--quantization", cfg["quantization"],
-            "--force",
-        ]
-        result2 = subprocess.run(cmd2, check=False)
-        if result2.returncode != 0:
-            print("ERROR: conversion failed. Check that ctranslate2 is installed and the model ID is correct.")
-            sys.exit(1)
+        print(
+            "ERROR: conversion failed.\n"
+            "  - Check that ctranslate2 is installed: pip show ctranslate2\n"
+            "  - For gated models, log in first: huggingface-cli login\n"
+            "  - Verify the model ID is correct and you have access on huggingface.co"
+        )
+        sys.exit(1)
 
     # Copy the SentencePiece tokenizer into the CT2 model dir if not already there
     spm_dest = output_dir / "sentencepiece.bpe.model"
