@@ -47,6 +47,25 @@ def get_free_vram_mib() -> int:
         return 0
 
 
+def reset_cuda_state() -> None:
+    """Release cached CUDA allocations and reset peak-memory statistics.
+
+    Call between models in multi-model runs so each model's VRAM peak reading
+    starts from a clean slate (residual allocations from a previous model
+    otherwise inflate the next model's reported peak — see
+    monitor/observations.md 2026-04-10).
+    Safe no-op when torch or CUDA is unavailable.
+    """
+    try:
+        import torch  # type: ignore[import-untyped]
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.reset_peak_memory_stats()
+    except (ImportError, RuntimeError):
+        pass
+
+
 def get_total_vram_mib() -> int:
     """Return total VRAM in MiB for the default CUDA device. Returns 0 if unavailable."""
     try:

@@ -362,6 +362,25 @@ These are the built-in thresholds in `show_stats.py regressions`:
 
 Only WARNING and CRITICAL are defined. CRITICAL triggers a non-zero exit code for use in CI pipelines.
 
+### Inter-model CUDA residue (fixed 2026-07)
+
+Multi-model benchmark runs (`scripts/benchmark.py --models A B ...`) call
+`reset_cuda_state()` (`src/bn_en_translate/utils/cuda_check.py`) at the end of
+each iteration of the model loop — after a model's result is printed and
+before the next model loads. This calls `torch.cuda.empty_cache()` and
+`torch.cuda.reset_peak_memory_stats()` so each model's `vram_peak` reading
+starts from a clean slate.
+
+Before this fix, `torch.cuda.empty_cache()` was never called between models,
+so cached allocations from model N could still be resident when model N+1's
+`ResourceMonitor` sampling began, inflating N+1's reported `gpu_vram_peak_mib`
+and occasionally tripping the `gpu_vram_peak_mib` regression threshold above
+with a false WARNING. See `monitor/observations.md` (2026-04-10 observation)
+for the original report. **Any multi-model `vram_peak` reading recorded
+before 2026-07 should be treated as potentially inflated by inter-model
+residue** — re-run the affected models individually or with the fix in place
+before trusting a regression flagged against that baseline.
+
 ---
 
 ## Invoking the Monitor Claude Code Agent

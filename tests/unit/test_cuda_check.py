@@ -81,3 +81,26 @@ def test_get_total_vram_returns_correct_mib() -> None:
     with patch.dict("sys.modules", {"torch": mock_torch}):
         result = get_total_vram_mib()
         assert result == 8192
+
+
+def test_reset_cuda_state_no_cuda_is_noop() -> None:
+    """Must never raise, even without CUDA (CI, CPU-only envs)."""
+    from bn_en_translate.utils.cuda_check import reset_cuda_state
+
+    reset_cuda_state()  # should not raise
+
+
+def test_reset_cuda_state_calls_torch(monkeypatch) -> None:
+    import sys
+    from unittest.mock import MagicMock
+
+    from bn_en_translate.utils import cuda_check
+
+    fake_torch = MagicMock()
+    fake_torch.cuda.is_available.return_value = True
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+
+    cuda_check.reset_cuda_state()
+
+    fake_torch.cuda.empty_cache.assert_called_once()
+    fake_torch.cuda.reset_peak_memory_stats.assert_called_once()

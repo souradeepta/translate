@@ -141,6 +141,8 @@ def main() -> None:
                         help="Translate one sentence at a time (pre-2026-07 behavior)")
     args = parser.parse_args()
 
+    from bn_en_translate.utils.cuda_check import reset_cuda_state
+
     print("=" * 72)
     print("Bengali → English Translation Benchmark")
     print("=" * 72)
@@ -166,6 +168,8 @@ def main() -> None:
                 f"{r['chars_per_sec']:>6}"
             )
             print(f"  Preview: {r['output_preview']}")
+
+        reset_cuda_state()
 
     print("=" * 80)
     print("Run history: python scripts/show_stats.py list")
