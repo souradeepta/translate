@@ -41,16 +41,19 @@ def _flash_attn_available() -> bool:
     return importlib.util.find_spec("flash_attn") is not None
 
 
-def _resolve_attn_implementation(use_flash: bool) -> str:
-    """flash_attention_2 if installed and requested; else PyTorch SDPA.
+def _resolve_attn_implementation(use_flash: bool, fallback: str = "sdpa") -> str:
+    """flash_attention_2 if installed and requested; else the given fallback.
 
-    SDPA (scaled_dot_product_attention) is always available in torch>=2.0 and is
-    significantly faster than eager. flash-attn is not installable on sm_120/WSL2
-    as of 2026-07, so SDPA is the effective default on this machine.
+    flash-attn is not installable on sm_120/WSL2 as of 2026-07, so the fallback is
+    the effective default on this machine. Not every architecture supports every
+    fallback: PyTorch SDPA (scaled_dot_product_attention) is fast and broadly
+    supported (e.g. Gemma3/MiLMMT), but T5 (MADLAD) does NOT support sdpa in
+    transformers 5.4.0 (T5PreTrainedModel._supports_sdpa is False) and raises
+    ValueError — callers must pass fallback="eager" for T5-based models.
     """
     if use_flash and _flash_attn_available():
         return "flash_attention_2"
-    return "sdpa"
+    return fallback
 
 
 class MiLMMTTranslator(TranslatorBase):

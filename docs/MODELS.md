@@ -123,14 +123,18 @@ pip install flash-attn --no-build-isolation
 ```
 
 flash-attn is not installable on this machine (sm_120/WSL2) as of 2026-07. Without it,
-`MADLADTranslator` and `MiLMMTTranslator` fall back to PyTorch's built-in SDPA
-(`scaled_dot_product_attention`, `attn_implementation="sdpa"`) via
-`_resolve_attn_implementation()` — SDPA is always available in torch>=2.0 and is
-faster than the previous `"eager"` fallback with no quality difference (measured:
-MiLMMT-46-1B 90-sentence FLORES-200 BLEU 64.8 / chrF 79.4, translate throughput
-326 → 399 ch/s, +22%). `IndicTrans2Translator` (the HF fallback used when no CT2
-model dir exists) still uses the old eager fallback — its attention selection is
-scheduled for the shared-helper refactor (`hf_utils`).
+each model falls back per architecture via `_resolve_attn_implementation(use_flash, fallback)`:
+
+- `MiLMMTTranslator` (Gemma3) → `"sdpa"` (PyTorch `scaled_dot_product_attention`) —
+  faster than the previous `"eager"` fallback with no quality difference (measured:
+  MiLMMT-46-1B 90-sentence FLORES-200 BLEU 64.8 / chrF 79.4, translate throughput
+  326 → 399 ch/s, +22%).
+- `MADLADTranslator` (T5) → `"eager"` — T5 does **not** support
+  `attn_implementation="sdpa"` in transformers 5.4.0 (`T5PreTrainedModel._supports_sdpa`
+  is False; passing sdpa raises `ValueError` at load).
+- `IndicTrans2Translator` (the HF fallback used when no CT2 model dir exists) still
+  uses the old eager ternary — its attention selection is scheduled for the
+  shared-helper refactor (`hf_utils`).
 
 ---
 

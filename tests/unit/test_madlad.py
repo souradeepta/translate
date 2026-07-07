@@ -1,6 +1,6 @@
 """Unit tests for MADLAD-400-3B translator."""
 from __future__ import annotations
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 import pytest
 from bn_en_translate.config import ModelConfig
 
@@ -48,8 +48,12 @@ def test_madlad_empty_input_returns_empty() -> None:
     assert result == []
 
 
-def test_attn_fallback_is_sdpa(monkeypatch) -> None:
-    """Without flash-attn installed, the fallback must be sdpa, not eager."""
+def test_attn_default_fallback_is_sdpa(monkeypatch) -> None:
+    """Without flash-attn installed, the default fallback (no `fallback=` arg) is sdpa.
+
+    This default suits architectures like Gemma3/MiLMMT; T5 (MADLAD) must override
+    it via fallback="eager" — see test_attn_madlad_fallback_is_eager below.
+    """
     import bn_en_translate.models.madlad as madlad_mod
 
     monkeypatch.setattr(madlad_mod, "_flash_attn_available", lambda: False)
@@ -62,3 +66,62 @@ def test_attn_uses_flash_when_available(monkeypatch) -> None:
 
     monkeypatch.setattr(madlad_mod, "_flash_attn_available", lambda: True)
     assert madlad_mod._resolve_attn_implementation(use_flash=True) == "flash_attention_2"
+
+
+def test_attn_madlad_fallback_is_eager(monkeypatch) -> None:
+    """T5ForConditionalGeneration does NOT support sdpa (transformers 5.4.0) —
+    MADLADTranslator.load() must pass fallback="eager" explicitly.
+    """
+    import bn_en_translate.models.madlad as madlad_mod
+
+    monkeypatch.setattr(madlad_mod, "_flash_attn_available", lambda: False)
+    assert madlad_mod._resolve_attn_implementation(use_flash=True, fallback="eager") == "eager"
+    assert madlad_mod._resolve_attn_implementation(use_flash=False, fallback="eager") == "eager"
+
+
+def test_madlad_load_passes_resolved_attn_impl_to_from_pretrained(monkeypatch) -> None:
+    """load() must pass the resolver's output (not a hardcoded string) as attn_implementation.
+
+    Patches the T5* from_pretrained classmethods directly on the real `transformers`
+    module (load()'s local `from transformers import ...` resolves to the same class
+    objects), and forces device="cpu" so no CUDA/download occurs.
+    """
+    import bn_en_translate.models.madlad as madlad_mod
+
+    monkeypatch.setattr(madlad_mod, "_flash_attn_available", lambda: False)
+
+    from bn_en_translate.models.madlad import MADLADTranslator
+
+    cfg = ModelConfig(
+        model_name="madlad-3b",
+        model_path="models/madlad-3b-hf",
+        src_lang="ben_Beng",
+        tgt_lang="eng_Latn",
+        device="cpu",
+    )
+    t = MADLADTranslator(cfg)
+
+    mock_tokenizer = MagicMock()
+    mock_model = MagicMock()
+
+    with patch("transformers.T5Tokenizer.from_pretrained", return_value=mock_tokenizer), \
+         patch("transformers.T5ForConditionalGeneration.from_pretrained", return_value=mock_model) as mock_from_pretrained:
+        t.load()
+
+    _, kwargs = mock_from_pretrained.call_args
+    assert kwargs["attn_implementation"] == "eager"
+
+
+def test_t5_rejects_sdpa_but_accepts_eager() -> None:
+    """Empirical regression guard: T5PreTrainedModel._supports_sdpa is False in
+    transformers 5.4.0 — a tiny T5 config must accept attn_implementation="eager"
+    and reject "sdpa" with ValueError. No download, ~1s.
+    """
+    from transformers import T5Config, T5ForConditionalGeneration
+
+    cfg = T5Config(d_model=8, d_ff=16, num_layers=1, num_heads=2, d_kv=4, vocab_size=32)
+
+    T5ForConditionalGeneration._from_config(cfg, attn_implementation="eager")
+
+    with pytest.raises(ValueError):
+        T5ForConditionalGeneration._from_config(cfg, attn_implementation="sdpa")

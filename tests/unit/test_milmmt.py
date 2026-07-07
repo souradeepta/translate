@@ -143,3 +143,38 @@ def test_attn_uses_flash_when_available(monkeypatch) -> None:
 
     monkeypatch.setattr(milmmt_mod, "_flash_attn_available", lambda: True)
     assert milmmt_mod._resolve_attn_implementation(use_flash=True) == "flash_attention_2"
+
+
+def test_milmmt_load_passes_resolved_attn_impl_to_from_pretrained(monkeypatch) -> None:
+    """load() must pass the resolver's output (not a hardcoded string) as attn_implementation.
+
+    Patches the AutoModelForCausalLM/AutoTokenizer from_pretrained classmethods directly
+    on the real `transformers` module (load()'s local `from transformers import ...`
+    resolves to the same class objects), and forces device="cpu" so no CUDA/download occurs.
+    """
+    import bn_en_translate.models.milmmt as milmmt_mod
+
+    monkeypatch.setattr(milmmt_mod, "_flash_attn_available", lambda: False)
+
+    from bn_en_translate.models.milmmt import MiLMMTTranslator
+
+    cfg = ModelConfig(
+        model_name="milmmt-46-1b",
+        model_path="",
+        src_lang="ben_Beng",
+        tgt_lang="eng_Latn",
+        device="cpu",
+    )
+    t = MiLMMTTranslator(cfg)
+
+    mock_tokenizer = MagicMock()
+    mock_model = MagicMock()
+
+    with patch("transformers.AutoTokenizer.from_pretrained", return_value=mock_tokenizer), \
+         patch(
+             "transformers.AutoModelForCausalLM.from_pretrained", return_value=mock_model
+         ) as mock_from_pretrained:
+        t.load()
+
+    _, kwargs = mock_from_pretrained.call_args
+    assert kwargs["attn_implementation"] == "sdpa"

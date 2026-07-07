@@ -66,6 +66,7 @@ make papers        # regenerate figures + compile all 4 PDFs
 - ✅ VRAM for text-only inference: ~3.9 GB — fits in 8 GB without offload
 
 ### HuggingFace Transformers 5.x
+- ❌ `attn_implementation="sdpa"` on T5 models (MADLAD) → `ValueError` at load; `T5PreTrainedModel._supports_sdpa` is False in transformers 5.4.0. Use `eager` for T5; Gemma3 (MiLMMT) accepts `sdpa` fine (+22% measured). Any shared attention-resolver helper needs a per-architecture fallback parameter.
 - ❌ `evaluation_strategy` → renamed to `eval_strategy`
 - ❌ `no_cuda` → renamed to `use_cpu`
 - ❌ `torch_dtype=` in `from_pretrained` → renamed to `dtype=`

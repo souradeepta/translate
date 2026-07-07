@@ -61,10 +61,12 @@ attributable to the batching change in `translate_sentences()`.
 ## After Task 2 (SDPA attention fallback, replaces `eager`)
 
 flash-attn is never installed on this machine (sm_120/WSL2), so the fallback path
-always won. `attn_implementation` for MiLMMT and MADLAD now resolves to `"sdpa"`
+always won. `attn_implementation` for MiLMMT (Gemma3) now resolves to `"sdpa"`
 (PyTorch's built-in `scaled_dot_product_attention`) instead of `"eager"` when
-flash-attn is unavailable, via `_resolve_attn_implementation()` in both
-`milmmt.py` and `madlad.py`. MADLAD is excluded from benchmarks (corrupted
+flash-attn is unavailable, via `_resolve_attn_implementation(use_flash, fallback)`
+in both `milmmt.py` and `madlad.py`. MADLAD (T5) keeps `fallback="eager"` — T5
+rejects sdpa in transformers 5.4.0 (`_supports_sdpa=False`, ValueError at load;
+caught in code review). MADLAD is also excluded from benchmarks (corrupted
 checkpoint); seamless.py never set `attn_implementation` and is untouched.
 
 ```bash
