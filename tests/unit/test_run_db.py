@@ -228,3 +228,42 @@ def test_run_db_creates_parent_directory(tmp_path: Path) -> None:
     db.close()
     assert db_path.parent.exists()
     assert db_path.exists()
+
+
+# ---------------------------------------------------------------------------
+# load_seconds / batched (translate-only chars_per_sec migration)
+# ---------------------------------------------------------------------------
+
+def test_run_db_schema_has_load_seconds_and_batched_columns(db: RunDatabase) -> None:
+    cols = {row[1] for row in db._conn.execute("PRAGMA table_info(runs)")}
+    assert "load_seconds" in cols
+    assert "batched" in cols
+
+
+def test_run_db_save_run_roundtrips_load_seconds_and_batched(db: RunDatabase) -> None:
+    db.save_run(
+        run_id="run-load-1",
+        run_type="benchmark",
+        model_name="nllb-600M",
+        started_at=_ts(),
+        finished_at=_ts(30),
+        status="ok",
+        summary=_summary(),
+        bleu_score=65.0,
+        input_chars=5000,
+        chars_per_sec=100.0,
+        load_seconds=12.5,
+        batched=True,
+    )
+    row = db.get_run("run-load-1")
+    assert row is not None
+    assert row["load_seconds"] == pytest.approx(12.5)
+    assert row["batched"] == 1
+
+
+def test_run_db_save_run_without_load_seconds_leaves_columns_null(db: RunDatabase) -> None:
+    _save(db, run_id="run-old-style")
+    row = db.get_run("run-old-style")
+    assert row is not None
+    assert row["load_seconds"] is None
+    assert row["batched"] is None

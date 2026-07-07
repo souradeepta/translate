@@ -11,6 +11,9 @@ from pathlib import Path
 FIXTURES_DIR = Path(__file__).parent.parent / "tests" / "fixtures"
 CORPUS_DIR = Path(__file__).parent.parent / "corpus"
 
+# Width of the printed results table (header + data rows must match this).
+_TABLE_WIDTH = 84
+
 
 def benchmark_model(
     model_name: str,
@@ -79,6 +82,8 @@ def benchmark_model(
                         bleu_score=bleu.score,
                         chrf_score=chrf.score,
                         chars_per_sec=float(chars_per_sec),
+                        load_seconds=load_seconds,
+                        batched=batched,
                         sample_interval_s=monitor_cfg.sample_interval_s,
                     )
                 print(f"  Monitor: {format_summary(monitor.summary)}")
@@ -90,6 +95,7 @@ def benchmark_model(
             "model": model_name,
             "backend": "N/A",
             "bleu": None,
+            "chrf": None,
             "load_seconds": None,
             "seconds": None,
             "chars_per_sec": None,
@@ -153,7 +159,7 @@ def main() -> None:
 
     print(f"\n{'Model':<22} {'Backend':<24} {'BLEU':>6} {'chrF':>6} "
           f"{'Load':>7} {'Time':>7} {'ch/s':>6}")
-    print("-" * 80)
+    print("-" * _TABLE_WIDTH)
 
     for model_name in args.models:
         r = benchmark_model(model_name, bn_texts, en_refs, device=args.device,
@@ -171,7 +177,7 @@ def main() -> None:
 
         reset_cuda_state()
 
-    print("=" * 80)
+    print("=" * _TABLE_WIDTH)
     print("Run history: python scripts/show_stats.py list")
 
 

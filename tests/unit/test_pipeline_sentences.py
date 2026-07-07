@@ -58,3 +58,14 @@ def test_translate_sentences_empty_list() -> None:
     pipeline, translator = _make_pipeline()
     assert pipeline.translate_sentences([]) == []
     assert translator.batches == []
+
+
+def test_translate_sentences_blank_input_maps_to_blank_output() -> None:
+    pipeline, translator = _make_pipeline(batch_size=2)
+    out = pipeline.translate_sentences(["বাক্য এক।", "   ", "বাক্য দুই।"])
+    assert len(out) == 3
+    assert out[1] == ""
+    assert "বাক্য এক" in out[0] and "বাক্য দুই" in out[2]
+    # blank never reached the backend
+    for batch in translator.batches:
+        assert "" not in batch

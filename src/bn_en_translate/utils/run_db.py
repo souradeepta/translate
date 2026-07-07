@@ -101,6 +101,13 @@ class RunDatabase:
         }
         migrations = [
             ("chrf_score", "REAL"),
+            # 2026-07: commit 6d56b34 changed chars_per_sec to be translate-only
+            # (excludes model-load time); earlier rows include load time in the
+            # denominator. load_seconds/batched are NULL for all pre-existing
+            # rows, so `load_seconds IS NOT NULL` unambiguously identifies rows
+            # using the new, translate-only chars_per_sec semantics.
+            ("load_seconds", "REAL"),
+            ("batched", "INTEGER"),
         ]
         for col, col_type in migrations:
             if col not in existing:
@@ -125,15 +132,24 @@ class RunDatabase:
         bleu_score: float | None = None,
         chrf_score: float | None = None,
         chars_per_sec: float | None = None,
+        load_seconds: float | None = None,
+        batched: bool | None = None,
         sample_interval_s: float = 2.0,
     ) -> None:
-        """Upsert a run record.  ``run_id`` is the natural key."""
+        """Upsert a run record.  ``run_id`` is the natural key.
+
+        ``load_seconds`` and ``batched`` are optional and NULL by default so
+        that older callers keep working. A non-NULL ``load_seconds`` marks a
+        row as using the post-6d56b34 translate-only ``chars_per_sec``
+        semantics (see ``_apply_migrations`` for details).
+        """
         self._conn.execute(
             """
             INSERT OR REPLACE INTO runs (
                 run_id, run_type, model_name, started_at, finished_at,
                 duration_s, status, error_msg,
                 input_chars, bleu_score, chrf_score, chars_per_sec,
+                load_seconds, batched,
                 cpu_peak_pct, cpu_avg_pct,
                 ram_peak_mib, ram_avg_mib,
                 swap_peak_mib, swap_avg_mib,
@@ -145,6 +161,7 @@ class RunDatabase:
                 :run_id, :run_type, :model_name, :started_at, :finished_at,
                 :duration_s, :status, :error_msg,
                 :input_chars, :bleu_score, :chrf_score, :chars_per_sec,
+                :load_seconds, :batched,
                 :cpu_peak_pct, :cpu_avg_pct,
                 :ram_peak_mib, :ram_avg_mib,
                 :swap_peak_mib, :swap_avg_mib,
@@ -167,6 +184,8 @@ class RunDatabase:
                 "bleu_score": bleu_score,
                 "chrf_score": chrf_score,
                 "chars_per_sec": chars_per_sec,
+                "load_seconds": load_seconds,
+                "batched": None if batched is None else int(batched),
                 "cpu_peak_pct": summary.cpu_peak_pct,
                 "cpu_avg_pct": summary.cpu_avg_pct,
                 "ram_peak_mib": summary.ram_peak_mib,

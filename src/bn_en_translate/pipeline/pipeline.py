@@ -59,11 +59,22 @@ class TranslationPipeline:
         string maps to exactly one output string, in order. Intended for
         benchmark corpora where hypothesis/reference alignment must be exact.
         Inputs are normalized the same way translate() normalizes documents.
+
+        Empty or whitespace-only inputs are mapped to "" locally and never
+        sent to the backend, while still occupying their original position
+        in the returned list (1:1 ordering is preserved).
         """
         if not sentences:
             return []
         normalized = [normalize(s) for s in sentences]
-        return self._translate_in_batches(normalized)
+        non_blank_indices = [i for i, s in enumerate(normalized) if s]
+        non_blank_texts = [normalized[i] for i in non_blank_indices]
+        translated = self._translate_in_batches(non_blank_texts) if non_blank_texts else []
+
+        results = [""] * len(normalized)
+        for idx, text in zip(non_blank_indices, translated, strict=True):
+            results[idx] = text
+        return results
 
     def _translate_in_batches(self, texts: list[str]) -> list[str]:
         batch_size = self.config.chunk.batch_size
