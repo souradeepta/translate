@@ -76,6 +76,13 @@ make papers        # regenerate figures + compile all 4 PDFs
 - ❌ `dataloader_prefetch_factor=2` with `num_workers=0` → `ValueError`; set to `None` when workers=0
 - ❌ CT2 export missing SPM: copy `sentencepiece.bpe.model` from source CT2 dir to export dir
 
+### Benchmarking / Measurement (learned 2026-07-07)
+- ❌ Timing model load + translation together → cold-page-cache disk reads (up to 5 GB/model) masquerade as slow inference. benchmark.py now reports `Load` separately; `ch/s` is translate-only. Historical ch/s (pre-6d56b34) conflated the two — do not compare against them.
+- ❌ Comparing load times across runs → page-cache-warmth artifact (seamless: 96 s cold vs 51 s warm, same code). Only translate-time is attributable to code changes.
+- ❌ Benchmarking sentences one-per-call → batch_size=1 for HF models. `pipeline.translate_sentences()` batches properly: 4-5.5× faster at BLEU parity. `--no-batch` restores the old loop for A/B.
+- ⚠️ Batched left-padded generation on causal LMs (MiLMMT) can shift BLEU ±0.3 vs single-sentence — expected padding effect, not a regression.
+- ❌ Watcher loops with `pgrep -f "<pattern containing the watched command>"` → the pattern matches the watcher's own cmdline; the loop never exits. Use a narrower pattern or poll for a log sentinel.
+
 ### Miscellaneous
 - ❌ `pynvml` package → deprecated; use `nvidia-ml-py` (same `import pynvml` API, no code changes)
 - ❌ `python -m ctranslate2.tools.transformers` → module removed in CT2 4.x; use `ct2-transformers-converter` CLI
