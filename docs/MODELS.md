@@ -128,8 +128,9 @@ flash-attn is not installable on this machine (sm_120/WSL2) as of 2026-07. Witho
 `_resolve_attn_implementation()` — SDPA is always available in torch>=2.0 and is
 faster than the previous `"eager"` fallback with no quality difference (measured:
 MiLMMT-46-1B 90-sentence FLORES-200 BLEU 64.8 / chrF 79.4, translate throughput
-326 → 399 ch/s, +22%). `IndicTrans2Translator` is CT2-based and does not use
-`attn_implementation`.
+326 → 399 ch/s, +22%). `IndicTrans2Translator` (the HF fallback used when no CT2
+model dir exists) still uses the old eager fallback — its attention selection is
+scheduled for the shared-helper refactor (`hf_utils`).
 
 ---
 
