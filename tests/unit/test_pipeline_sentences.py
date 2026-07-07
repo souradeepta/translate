@@ -1,0 +1,60 @@
+"""Tests for TranslationPipeline.translate_sentences (batched, 1:1, order-preserving)."""
+
+from __future__ import annotations
+
+from bn_en_translate.config import ChunkConfig, PipelineConfig
+from bn_en_translate.models.base import TranslatorBase
+from bn_en_translate.pipeline.pipeline import TranslationPipeline
+
+
+class RecordingTranslator(TranslatorBase):
+    """Mock that records every batch it receives."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.batches: list[list[str]] = []
+
+    def load(self) -> None:
+        self._loaded = True
+
+    def unload(self) -> None:
+        self._loaded = False
+
+    def _translate_batch(self, texts: list[str], src_lang: str, tgt_lang: str) -> list[str]:
+        self.batches.append(list(texts))
+        return [f"[MOCK] {t}" for t in texts]
+
+
+def _make_pipeline(batch_size: int = 3) -> tuple[TranslationPipeline, RecordingTranslator]:
+    translator = RecordingTranslator()
+    translator.load()
+    config = PipelineConfig(chunk=ChunkConfig(batch_size=batch_size))
+    return TranslationPipeline(translator, config), translator
+
+
+def test_translate_sentences_one_to_one_and_ordered() -> None:
+    pipeline, _ = _make_pipeline()
+    sentences = [f"বাক্য {i}।" for i in range(7)]
+    out = pipeline.translate_sentences(sentences)
+    assert len(out) == 7
+    for i, o in enumerate(out):
+        assert f"বাক্য {i}" in o
+
+
+def test_translate_sentences_batches_by_batch_size() -> None:
+    pipeline, translator = _make_pipeline(batch_size=3)
+    pipeline.translate_sentences([f"বাক্য {i}।" for i in range(7)])
+    assert [len(b) for b in translator.batches] == [3, 3, 1]
+
+
+def test_translate_sentences_normalizes_input() -> None:
+    pipeline, translator = _make_pipeline()
+    pipeline.translate_sentences(["  বাক্য\t\tএক।  "])
+    # normalize() collapses runs of spaces/tabs and strips
+    assert translator.batches[0][0] == "বাক্য এক।"
+
+
+def test_translate_sentences_empty_list() -> None:
+    pipeline, translator = _make_pipeline()
+    assert pipeline.translate_sentences([]) == []
+    assert translator.batches == []

@@ -229,9 +229,29 @@ python scripts/benchmark.py --models nllb-600M nllb-1.3B indicTrans2-1B --senten
 
 # CPU only
 python scripts/benchmark.py --models nllb-600M --device cpu --sentences 10
+
+# Pre-2026-07 behavior: one sentence per translate() call (slower, for A/B comparison)
+python scripts/benchmark.py --models nllb-600M --sentences 90 --no-batch
 ```
 
-Output columns: Model, Backend class, BLEU, Time, chars/sec, VRAM used.
+Output columns: Model, Backend class, BLEU, chrF, Load, Time, chars/sec, VRAM used.
+`Load` is time spent in `translator.load()` (model weights from disk to GPU —
+dominated by OS page-cache state, not code); `Time`/`ch/s` are translate-only
+(computed around `pipeline.translate_sentences()` / `pipeline.translate()`,
+inside the `with translator:` block but after `load()` returns). Compare
+`ch/s` across runs, not `Load` — load time swings widely with disk-cache
+warmth and isn't a signal about the translation code path.
+
+By default the benchmark translates the whole corpus through
+`TranslationPipeline.translate_sentences()`, which batches sentences in
+`ChunkConfig.batch_size` groups instead of calling `translate()` once per
+sentence. `translate_sentences()` is chunking-free — each input sentence maps
+to exactly one output string, in order — so hypothesis/reference alignment
+stays exact for BLEU/chrF scoring. Pass `--no-batch` to fall back to the
+one-sentence-at-a-time loop (useful for isolating batching-related BLEU
+regressions on HF backends, or for A/B comparison — see
+`docs/perf_baseline_2026-07-07.md` for a warm A/B run showing 4-5.5x
+translate-only speedups from batching).
 
 Current baseline BLEU on 90-sentence built-in corpus: **56.2** (NLLB-600M CT2 float16).
 

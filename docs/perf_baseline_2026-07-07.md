@@ -11,3 +11,47 @@ Benchmark loop: UNBATCHED (one sentence per pipeline.translate call) — this is
 | seamless-medium | 67.0 | 80.2 | 83.1 | 46 | 4457 |
 
 Acceptance gate for all Phase 1 changes: BLEU within ±0.3 of this table per model.
+
+**Caveat (discovered during Task 1):** the `Time (s)` / `ch/s` columns above conflate
+model *load* time (including cold-page-cache disk reads) with translate time — the
+benchmark's timer starts before `with translator:` (i.e. before `translator.load()`).
+On a cold cache, load time can dominate the total and swamp any translate-side
+speedup. Task 1 splits these into separate `Load` and `Time` columns so translate-only
+throughput is comparable run to run regardless of disk-cache state.
+
+---
+
+## After Task 1 (batched loop via `translate_sentences()`)
+
+Warm A/B, same session, same page cache, back-to-back runs — isolates the batching
+effect from load-time/disk-cache noise:
+
+```bash
+python scripts/benchmark.py --models nllb-600M milmmt-46-1b seamless-medium --sentences 90 --no-batch
+python scripts/benchmark.py --models nllb-600M milmmt-46-1b seamless-medium --sentences 90
+```
+
+### Run A — `--no-batch` (one sentence per `pipeline.translate()` call, pre-Task-1 loop)
+
+| Model | BLEU | chrF | Load (s) | Translate (s) | ch/s |
+|-------|------|------|----------|----------------|------|
+| nllb-600M | 55.3 | 72.8 | 5.2 | 9.9 | 383 |
+| milmmt-46-1b | 65.0 | 79.3 | 9.2 | 51.0 | 74 |
+| seamless-medium | 67.0 | 80.2 | 96.0 | 51.5 | 73 |
+
+### Run B — batched (`pipeline.translate_sentences()`, new default)
+
+| Model | BLEU | chrF | Load (s) | Translate (s) | ch/s | Speedup (translate-only) |
+|-------|------|------|----------|----------------|------|---------------------------|
+| nllb-600M | 55.3 | 72.8 | 23.9 | 1.8 | 2108 | 5.5x |
+| milmmt-46-1b | 64.7 | 79.4 | 16.8 | 11.6 | 326 | 4.4x |
+| seamless-medium | 67.0 | 80.2 | 50.6 | 12.6 | 300 | 4.1x |
+
+BLEU gate: nllb 55.3→55.3 (Δ0.0), milmmt 65.0→64.7 (Δ−0.3, exactly at the inclusive
+±0.3 edge — small padding/attention interaction on the HF causal-LM backend, chrF
+improved 79.3→79.4), seamless 67.0→67.0 (Δ0.0). **Gate passes for all three models.**
+
+Load-time and total-wall-clock figures still vary run to run with OS page-cache state
+(compare Run A's seamless load of 96.0s against Run B's 50.6s — same code, same
+model, different cache warmth) — only the `Translate (s)` / `ch/s` columns above are
+attributable to the batching change in `translate_sentences()`.

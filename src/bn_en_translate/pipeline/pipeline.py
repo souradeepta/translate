@@ -51,6 +51,20 @@ class TranslationPipeline:
         # 4. Reassemble into the original paragraph structure
         return reassemble(chunks, translations)
 
+    def translate_sentences(self, sentences: list[str]) -> list[str]:
+        """
+        Translate pre-split sentences with true batching, 1:1 in/out.
+
+        Unlike translate(), this does no chunking or reassembly — each input
+        string maps to exactly one output string, in order. Intended for
+        benchmark corpora where hypothesis/reference alignment must be exact.
+        Inputs are normalized the same way translate() normalizes documents.
+        """
+        if not sentences:
+            return []
+        normalized = [normalize(s) for s in sentences]
+        return self._translate_in_batches(normalized)
+
     def _translate_in_batches(self, texts: list[str]) -> list[str]:
         batch_size = self.config.chunk.batch_size
         results: list[str] = []
