@@ -55,3 +55,26 @@ Load-time and total-wall-clock figures still vary run to run with OS page-cache 
 (compare Run A's seamless load of 96.0s against Run B's 50.6s — same code, same
 model, different cache warmth) — only the `Translate (s)` / `ch/s` columns above are
 attributable to the batching change in `translate_sentences()`.
+
+---
+
+## After Task 2 (SDPA attention fallback, replaces `eager`)
+
+flash-attn is never installed on this machine (sm_120/WSL2), so the fallback path
+always won. `attn_implementation` for MiLMMT and MADLAD now resolves to `"sdpa"`
+(PyTorch's built-in `scaled_dot_product_attention`) instead of `"eager"` when
+flash-attn is unavailable, via `_resolve_attn_implementation()` in both
+`milmmt.py` and `madlad.py`. MADLAD is excluded from benchmarks (corrupted
+checkpoint); seamless.py never set `attn_implementation` and is untouched.
+
+```bash
+python scripts/benchmark.py --models milmmt-46-1b --sentences 90
+```
+
+| Model | BLEU | chrF | Load (s) | Translate (s) | ch/s | vs. Task 1 (eager) ch/s |
+|-------|------|------|----------|----------------|------|--------------------------|
+| milmmt-46-1b | 64.8 | 79.4 | 7.3 | 9.5 | 399 | 326 → 399 (+22%) |
+
+BLEU gate: 65.0 (original) → 64.8 (Δ−0.2, within the ±0.3 gate, ≥64.7 floor).
+chrF unchanged at 79.4. SDPA is faster than eager as expected — no regression,
+no `DONE_WITH_CONCERNS` needed.

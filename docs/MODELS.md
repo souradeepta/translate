@@ -116,13 +116,20 @@ This downloads ~3 GB from HuggingFace and converts to CT2 float16 (~3 GB on disk
 
 ### Flash Attention 2
 
-`IndicTrans2Translator` and `MADLADTranslator` will use Flash Attention 2 if the `flash-attn` package is installed and `ModelConfig.use_flash_attention=True` (default). This reduces memory bandwidth and improves throughput on Ampere and later GPUs.
+`IndicTrans2Translator`, `MADLADTranslator`, and `MiLMMTTranslator` will use Flash Attention 2 if the `flash-attn` package is installed and `ModelConfig.use_flash_attention=True` (default). This reduces memory bandwidth and improves throughput on Ampere and later GPUs.
 
 ```bash
 pip install flash-attn --no-build-isolation
 ```
 
-Without `flash-attn` installed, both translators fall back to the standard `"eager"` attention implementation with no quality difference.
+flash-attn is not installable on this machine (sm_120/WSL2) as of 2026-07. Without it,
+`MADLADTranslator` and `MiLMMTTranslator` fall back to PyTorch's built-in SDPA
+(`scaled_dot_product_attention`, `attn_implementation="sdpa"`) via
+`_resolve_attn_implementation()` — SDPA is always available in torch>=2.0 and is
+faster than the previous `"eager"` fallback with no quality difference (measured:
+MiLMMT-46-1B 90-sentence FLORES-200 BLEU 64.8 / chrF 79.4, translate throughput
+326 → 399 ch/s, +22%). `IndicTrans2Translator` is CT2-based and does not use
+`attn_implementation`.
 
 ---
 

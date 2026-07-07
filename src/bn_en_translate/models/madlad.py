@@ -19,6 +19,18 @@ def _flash_attn_available() -> bool:
     return importlib.util.find_spec("flash_attn") is not None
 
 
+def _resolve_attn_implementation(use_flash: bool) -> str:
+    """flash_attention_2 if installed and requested; else PyTorch SDPA.
+
+    SDPA (scaled_dot_product_attention) is always available in torch>=2.0 and is
+    significantly faster than eager. flash-attn is not installable on sm_120/WSL2
+    as of 2026-07, so SDPA is the effective default on this machine.
+    """
+    if use_flash and _flash_attn_available():
+        return "flash_attention_2"
+    return "sdpa"
+
+
 # Map FLORES-200 language codes to MADLAD-400 target tags
 _MADLAD_LANG_TAG: dict[str, str] = {
     "eng_Latn": "<2en>",
@@ -79,11 +91,7 @@ class MADLADTranslator(TranslatorBase):
         # Prefer local download; fall back to HF Hub (auto-downloads on first use)
         model_id = self._LOCAL_PATH if Path(self._LOCAL_PATH).exists() else self.HF_MODEL_ID
 
-        attn_impl = (
-            "flash_attention_2"
-            if self.config.use_flash_attention and _flash_attn_available()
-            else "eager"
-        )
+        attn_impl = _resolve_attn_implementation(self.config.use_flash_attention)
 
         device = (
             get_best_device() if self.config.device == "auto" else self.config.device

@@ -46,3 +46,19 @@ def test_madlad_empty_input_returns_empty() -> None:
     t._tokenizer = MagicMock()
     result = t.translate([], "ben_Beng", "eng_Latn")
     assert result == []
+
+
+def test_attn_fallback_is_sdpa(monkeypatch) -> None:
+    """Without flash-attn installed, the fallback must be sdpa, not eager."""
+    import bn_en_translate.models.madlad as madlad_mod
+
+    monkeypatch.setattr(madlad_mod, "_flash_attn_available", lambda: False)
+    assert madlad_mod._resolve_attn_implementation(use_flash=True) == "sdpa"
+    assert madlad_mod._resolve_attn_implementation(use_flash=False) == "sdpa"
+
+
+def test_attn_uses_flash_when_available(monkeypatch) -> None:
+    import bn_en_translate.models.madlad as madlad_mod
+
+    monkeypatch.setattr(madlad_mod, "_flash_attn_available", lambda: True)
+    assert madlad_mod._resolve_attn_implementation(use_flash=True) == "flash_attention_2"

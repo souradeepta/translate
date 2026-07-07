@@ -127,3 +127,19 @@ def test_milmmt_translate_batch_slices_prompt_tokens() -> None:
     # Verify do_sample=False was passed
     generate_kwargs = mock_model.generate.call_args[1]
     assert generate_kwargs.get("do_sample") is False
+
+
+def test_attn_fallback_is_sdpa(monkeypatch) -> None:
+    """Without flash-attn installed, the fallback must be sdpa, not eager."""
+    import bn_en_translate.models.milmmt as milmmt_mod
+
+    monkeypatch.setattr(milmmt_mod, "_flash_attn_available", lambda: False)
+    assert milmmt_mod._resolve_attn_implementation(use_flash=True) == "sdpa"
+    assert milmmt_mod._resolve_attn_implementation(use_flash=False) == "sdpa"
+
+
+def test_attn_uses_flash_when_available(monkeypatch) -> None:
+    import bn_en_translate.models.milmmt as milmmt_mod
+
+    monkeypatch.setattr(milmmt_mod, "_flash_attn_available", lambda: True)
+    assert milmmt_mod._resolve_attn_implementation(use_flash=True) == "flash_attention_2"
