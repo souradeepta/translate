@@ -40,7 +40,7 @@ flowchart TD
 
     subgraph Analysis["Analysis Tools"]
         M["show_stats.py\nlist / show / trend\ncompare / regressions"]
-        N["plot_stats.py\nBLEU · resources\nradar · scatter"]
+        N["plot_stats.py\nBLEU / resources\nradar / scatter"]
         O[".claude/agents/monitor.md\nregression detection\nobservations.md"]
     end
 
@@ -367,9 +367,14 @@ Only WARNING and CRITICAL are defined. CRITICAL triggers a non-zero exit code fo
 Multi-model benchmark runs (`scripts/benchmark.py --models A B ...`) call
 `reset_cuda_state()` (`src/bn_en_translate/utils/cuda_check.py`) at the end of
 each iteration of the model loop — after a model's result is printed and
-before the next model loads. This calls `torch.cuda.empty_cache()` and
-`torch.cuda.reset_peak_memory_stats()` so each model's `vram_peak` reading
-starts from a clean slate.
+before the next model loads. The fix for the `vram_peak` reading is
+`torch.cuda.empty_cache()`: it returns cached allocator blocks to the driver,
+which the pynvml-based `ResourceMonitor` sampling then sees as freed.
+`torch.cuda.reset_peak_memory_stats()` is torch-side hygiene only — pynvml
+sampling never reads torch's allocator counters — and is kept for any future
+torch-based instrumentation. Note the residue mechanism applies to HF-backed
+models (seamless, milmmt); CT2-backed models (nllb, indicTrans2) allocate
+through CTranslate2's own allocator and free on `unload()` regardless.
 
 Before this fix, `torch.cuda.empty_cache()` was never called between models,
 so cached allocations from model N could still be resident when model N+1's

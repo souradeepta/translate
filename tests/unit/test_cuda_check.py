@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import sys
 from unittest.mock import MagicMock, patch
 
+from bn_en_translate.utils import cuda_check
 from bn_en_translate.utils.cuda_check import (
     get_best_device,
     get_free_vram_mib,
@@ -83,19 +85,31 @@ def test_get_total_vram_returns_correct_mib() -> None:
         assert result == 8192
 
 
-def test_reset_cuda_state_no_cuda_is_noop() -> None:
-    """Must never raise, even without CUDA (CI, CPU-only envs)."""
-    from bn_en_translate.utils.cuda_check import reset_cuda_state
+def test_reset_cuda_state_no_torch_is_noop() -> None:
+    """Must never raise when torch is not installed (CI, CPU-only envs)."""
+    with patch.dict("sys.modules", {"torch": None}):
+        import importlib
 
-    reset_cuda_state()  # should not raise
+        import bn_en_translate.utils.cuda_check as m
+
+        importlib.reload(m)
+        m.reset_cuda_state()  # should not raise
+        importlib.reload(m)  # restore
+
+
+def test_reset_cuda_state_no_cuda_is_noop(monkeypatch) -> None:
+    """No-op (no calls, no raise) when CUDA is unavailable."""
+    fake_torch = MagicMock()
+    fake_torch.cuda.is_available.return_value = False
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+
+    cuda_check.reset_cuda_state()
+
+    fake_torch.cuda.empty_cache.assert_not_called()
+    fake_torch.cuda.reset_peak_memory_stats.assert_not_called()
 
 
 def test_reset_cuda_state_calls_torch(monkeypatch) -> None:
-    import sys
-    from unittest.mock import MagicMock
-
-    from bn_en_translate.utils import cuda_check
-
     fake_torch = MagicMock()
     fake_torch.cuda.is_available.return_value = True
     monkeypatch.setitem(sys.modules, "torch", fake_torch)
