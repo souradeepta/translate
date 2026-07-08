@@ -18,6 +18,23 @@ CT2_MODEL_PATHS: dict[str, str] = {
     "indictrans2":    str(REPO_ROOT / "models/indicTrans2-1B-ct2"),
 }
 
+# Measured VRAM peaks (MiB) on RTX 5050 8 GB — source: monitor/observations.md
+# (2026-04-10 run + 2026-07 optimization pass). Used for pre-flight checks
+# before loading a second model (e.g. the Ollama polish pass). Keys are
+# lower-case model names.
+#
+# milmmt-46-1b: 4100, not the 3,379 MiB reported on 2026-04-10 — the 2026-07
+# Task 3 note (post-batching) measured 4,009 MiB standalone / 4,024 MiB
+# sequential-after-nllb, rounded up to the nearest 100 like the other entries.
+MODEL_VRAM_MIB: dict[str, int] = {
+    "nllb-600m":         2400,
+    "milmmt-46-1b":      4100,
+    "seamless-medium":   4100,
+    "indictrans2-1b":    3100,
+    "ollama-qwen2.5:7b": 4800,
+    "ollama-gemma3:12b": 4700,
+}
+
 
 @dataclass
 class ChunkConfig:

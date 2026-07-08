@@ -5,6 +5,8 @@ from __future__ import annotations
 import sys
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from bn_en_translate.utils import cuda_check
 from bn_en_translate.utils.cuda_check import (
     get_best_device,
@@ -119,3 +121,14 @@ def test_reset_cuda_state_calls_torch(monkeypatch) -> None:
 
     fake_torch.cuda.empty_cache.assert_called_once()
     fake_torch.cuda.reset_peak_memory_stats.assert_called_once()
+
+
+def test_ensure_vram_available_raises_when_insufficient(monkeypatch) -> None:
+    monkeypatch.setattr(cuda_check, "get_free_vram_mib", lambda: 1000)
+    with pytest.raises(RuntimeError, match="polish pass"):
+        cuda_check.ensure_vram_available(4800, context="Ollama polish pass")
+
+
+def test_ensure_vram_available_passes_when_sufficient(monkeypatch) -> None:
+    monkeypatch.setattr(cuda_check, "get_free_vram_mib", lambda: 6000)
+    cuda_check.ensure_vram_available(4800, context="Ollama polish pass")  # no raise

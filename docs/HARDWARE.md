@@ -124,15 +124,31 @@ Never use `pip install torch` (pulls latest nightly on some platforms) or `--pre
 
 ## VRAM Budget (8 GB RTX 5050)
 
-| Configuration | Load | Inference | Headroom |
-|---|---|---|---|
-| NLLB-600M CT2 float16 | ~2.0 GB | ~2.1 GB | ~5.9 GB |
-| NLLB-1.3B CT2 float16 | ~2.6 GB | ~2.7 GB | ~5.3 GB |
-| IndicTrans2-1B CT2 float16 | ~3.0 GB | ~3.1 GB | ~4.9 GB |
-| Ollama qwen2.5:7b | ~4.7 GB | ~4.7 GB | ~3.3 GB |
-| IndicTrans2 + Ollama | ~7.7 GB | OOM risk | ⚠️ unload first |
+The measured VRAM budget below is encoded in code as
+`bn_en_translate.config.MODEL_VRAM_MIB` and enforced at runtime by
+`bn_en_translate.utils.cuda_check.ensure_vram_available()`, which raises a
+clear `RuntimeError` before a second model would OOM mid-run (e.g. loading
+Ollama for the polish pass while a translator is still resident). Keep the
+numbers below byte-identical to `MODEL_VRAM_MIB` — update both together.
 
-The pipeline automatically unloads the translator before running the Ollama pass.
+| Model | VRAM peak (MiB) | Source |
+|---|---|---|
+| `nllb-600m` | 2400 | monitor/observations.md 2026-04-10 (2,355 MiB measured) |
+| `milmmt-46-1b` | 4100 | monitor/observations.md 2026-07 Task 3 (4,009 MiB standalone / 4,024 MiB sequential-after-nllb, post-batching) |
+| `seamless-medium` | 4100 | monitor/observations.md 2026-04-10 (4,096 MiB measured) |
+| `indictrans2-1b` | 3100 | estimated — model not yet downloaded (gated HF repo) |
+| `ollama-qwen2.5:7b` | 4800 | monitor/observations.md 2026-04-10 (~4.7 GB) |
+| `ollama-gemma3:12b` | 4700 | CLAUDE.md model reference table (~4.7 GB) |
+
+Note: the `milmmt-46-1b` figure was revised upward from an earlier (stale)
+3,379 MiB reading taken before batch_size=8 batching was enabled — the
+2026-07 optimization pass measured a genuine increase to ~4.0 GB.
+
+**Safe combination on 8 GB:** only `nllb-600m` + Ollama fits concurrently
+(2400 + 4800 = 7200 MiB, within the ~7.5 GB usable ceiling). Every other
+translator (`milmmt-46-1b`, `seamless-medium`, `indictrans2-1b`) must be
+unloaded before starting the Ollama polish pass — the pipeline does this
+automatically.
 
 ---
 

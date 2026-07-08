@@ -66,6 +66,22 @@ def reset_cuda_state() -> None:
         pass
 
 
+def ensure_vram_available(required_mib: int, context: str) -> None:
+    """Raise RuntimeError if free VRAM is below required_mib.
+
+    Pre-flight for loading a second model (e.g. Ollama polish after
+    translation). Failing here with a clear message beats a CUDA OOM
+    mid-run. GPU-only rule: we never fall back to CPU.
+    """
+    free = get_free_vram_mib()
+    if free < required_mib:
+        raise RuntimeError(
+            f"{context}: needs ~{required_mib} MiB VRAM but only {free} MiB free. "
+            "Unload the translation model first, or use a smaller polish model. "
+            "Safe combination on 8 GB: nllb-600M + Ollama."
+        )
+
+
 def get_total_vram_mib() -> int:
     """Return total VRAM in MiB for the default CUDA device. Returns 0 if unavailable."""
     try:

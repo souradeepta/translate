@@ -97,3 +97,15 @@ def test_pipeline_config_defaults() -> None:
     assert isinstance(config.model, ModelConfig)
     assert isinstance(config.chunk, ChunkConfig)
     assert config.ollama_polish is False
+
+
+# ---------------------------------------------------------------------------
+# MODEL_VRAM_MIB
+# ---------------------------------------------------------------------------
+
+
+def test_model_vram_table_has_known_models() -> None:
+    from bn_en_translate.config import MODEL_VRAM_MIB
+
+    for key in ("nllb-600m", "milmmt-46-1b", "seamless-medium", "ollama-qwen2.5:7b"):
+        assert MODEL_VRAM_MIB[key] > 0
