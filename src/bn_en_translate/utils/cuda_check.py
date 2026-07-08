@@ -6,7 +6,7 @@ from __future__ import annotations
 def is_cuda_available() -> bool:
     """Return True if PyTorch can use a CUDA device."""
     try:
-        import torch  # type: ignore[import-untyped]
+        import torch
 
         return torch.cuda.is_available()
     except ImportError:
@@ -37,7 +37,7 @@ def get_free_vram_mib() -> int:
     Returns 0 if CUDA is unavailable.
     """
     try:
-        import torch  # type: ignore[import-untyped]
+        import torch
 
         if not torch.cuda.is_available():
             return 0
@@ -57,7 +57,7 @@ def reset_cuda_state() -> None:
     Safe no-op when torch or CUDA is unavailable.
     """
     try:
-        import torch  # type: ignore[import-untyped]
+        import torch
 
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
@@ -69,7 +69,7 @@ def reset_cuda_state() -> None:
 def get_total_vram_mib() -> int:
     """Return total VRAM in MiB for the default CUDA device. Returns 0 if unavailable."""
     try:
-        import torch  # type: ignore[import-untyped]
+        import torch
 
         if not torch.cuda.is_available():
             return 0

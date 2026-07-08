@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 from bn_en_translate.pipeline.chunker import ChunkResult
-from bn_en_translate.pipeline.postprocessor import reassemble, _clean_english
-
+from bn_en_translate.pipeline.postprocessor import _clean_english, reassemble
 
 # ---------------------------------------------------------------------------
 # reassemble()

@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from bn_en_translate.config import PipelineConfig
 from bn_en_translate.pipeline.pipeline import TranslationPipeline
 from tests.conftest import MockTranslator

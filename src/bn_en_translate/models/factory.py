@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from bn_en_translate.config import CT2_MODEL_PATHS, ModelConfig, PipelineConfig
 from bn_en_translate.models.base import TranslatorBase
@@ -15,12 +15,14 @@ from bn_en_translate.models.base import TranslatorBase
 # PipelineConfig and returns a TranslatorBase.  Adding a new model is a
 # one-line registration — no if/elif chain to touch.
 
-_REGISTRY: dict[str, Callable[[PipelineConfig], TranslatorBase]] = {}
+_Factory = Callable[[PipelineConfig], TranslatorBase]
+
+_REGISTRY: dict[str, _Factory] = {}
 
 
-def register_model(name: str) -> Callable:
+def register_model(name: str) -> Callable[[_Factory], _Factory]:
     """Decorator that registers a factory function under the given model name."""
-    def _decorator(fn: Callable[[PipelineConfig], TranslatorBase]) -> Callable:
+    def _decorator(fn: _Factory) -> _Factory:
         _REGISTRY[name.lower()] = fn
         return fn
     return _decorator

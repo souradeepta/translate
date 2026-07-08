@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 import unicodedata
 
-
 # Bengali sentence-ending punctuation
 BENGALI_DANDA = "\u0964"       # ।
 BENGALI_DOUBLE_DANDA = "\u0965"  # ॥

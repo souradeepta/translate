@@ -10,6 +10,7 @@ benchmarks. Re-download cleanly from HF Hub before using.
 from __future__ import annotations
 
 import warnings
+from typing import Any
 
 from bn_en_translate.config import REPO_ROOT, ModelConfig
 from bn_en_translate.models.base import TranslatorBase
@@ -67,16 +68,16 @@ class MADLADTranslator(TranslatorBase):
             src_lang="ben_Beng",
             tgt_lang="eng_Latn",
         )
-        self._model: object | None = None
-        self._tokenizer: object | None = None
+        self._model: Any = None
+        self._tokenizer: Any = None
 
     _LOCAL_PATH: str = str(REPO_ROOT / "models/madlad-3b-hf")
 
     def load(self) -> None:
         from pathlib import Path
 
-        import torch  # type: ignore[import-untyped]
-        from transformers import (  # type: ignore[import-untyped]
+        import torch
+        from transformers import (
             T5ForConditionalGeneration,
             T5Tokenizer,
         )
@@ -124,7 +125,7 @@ class MADLADTranslator(TranslatorBase):
         corruption randomises the whole matrix. Corruption confined to rows
         >= 64 would pass this check; that mode has never been observed.
         """
-        import torch  # type: ignore[import-untyped]
+        import torch
 
         shared = model.shared.weight  # type: ignore[attr-defined]
         decoder = model.decoder.embed_tokens.weight  # type: ignore[attr-defined]
@@ -153,14 +154,14 @@ class MADLADTranslator(TranslatorBase):
         return [f"{tag} {t}" for t in texts]
 
     def _translate_batch(self, texts: list[str], src_lang: str, tgt_lang: str) -> list[str]:
-        import torch  # type: ignore[import-untyped]
+        import torch
 
         # When using device_map="auto", the model manages its own device placement.
         # Move inputs to the same device as the model's first parameter.
-        model_device = next(self._model.parameters()).device  # type: ignore[union-attr]
+        model_device = next(self._model.parameters()).device
 
         input_texts = self._build_input_texts(texts, tgt_lang)
-        inputs = self._tokenizer(  # type: ignore[operator]
+        inputs = self._tokenizer(
             input_texts,
             return_tensors="pt",
             padding=True,
@@ -169,12 +170,12 @@ class MADLADTranslator(TranslatorBase):
         ).to(model_device)
 
         with torch.no_grad():
-            generated = self._model.generate(  # type: ignore[union-attr]
+            generated = self._model.generate(
                 **inputs,
                 num_beams=self._effective_beam_size(),
                 max_new_tokens=256,
             )
 
-        return self._tokenizer.batch_decode(  # type: ignore[union-attr]
+        return list(self._tokenizer.batch_decode(
             generated, skip_special_tokens=True
-        )
+        ))

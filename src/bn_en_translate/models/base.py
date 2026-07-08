@@ -38,7 +38,7 @@ class TranslatorBase(ABC):
         """Return beam_size from config if explicitly set, else this model's DEFAULT_BEAM_SIZE."""
         config = getattr(self, "config", None)
         if config is not None and getattr(config, "beam_size", None) is not None:
-            return config.beam_size  # type: ignore[union-attr]
+            return int(config.beam_size)
         return self.DEFAULT_BEAM_SIZE
 
     def translate(self, texts: list[str], src_lang: str, tgt_lang: str) -> list[str]:
@@ -56,7 +56,7 @@ class TranslatorBase(ABC):
             return []
         return self._translate_batch(texts, src_lang, tgt_lang)
 
-    def __enter__(self) -> "TranslatorBase":
+    def __enter__(self) -> TranslatorBase:
         self.load()
         return self
 

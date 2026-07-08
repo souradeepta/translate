@@ -10,7 +10,6 @@ from bn_en_translate.config import ModelConfig, PipelineConfig
 from bn_en_translate.models.indicTrans2 import IndicTrans2Translator
 from bn_en_translate.pipeline.pipeline import TranslationPipeline
 
-
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
 MIN_BLEU_SCORE = 25.0  # Conservative floor — IndicTrans2 typically scores 30+
 

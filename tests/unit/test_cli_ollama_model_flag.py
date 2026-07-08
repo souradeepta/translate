@@ -1,7 +1,10 @@
 """Tests for --ollama-model CLI flag and updated --beam-size default."""
 from __future__ import annotations
-from click.testing import CliRunner
+
 from unittest.mock import MagicMock, patch
+
+from click.testing import CliRunner
+
 from bn_en_translate.cli import main
 
 

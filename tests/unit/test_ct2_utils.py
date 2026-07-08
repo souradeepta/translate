@@ -1,8 +1,7 @@
 """Unit tests for shared CTranslate2 utilities."""
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch, call
-import pytest
+from unittest.mock import MagicMock, patch
 
 
 def test_probe_compute_type_cpu_returns_int8() -> None:

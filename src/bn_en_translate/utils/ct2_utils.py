@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Callable
+from collections.abc import Callable
+from typing import Any
 
 
 def probe_compute_type(
     model_path: str,
     device: str,
-    probe_fn: Callable[[object], None],
+    probe_fn: Callable[[Any], None],
 ) -> str:
     """Select the best working CTranslate2 compute type for the given device.
 
@@ -26,7 +26,7 @@ def probe_compute_type(
     Returns:
         The first compute type that works, or "float32" as an ultimate fallback.
     """
-    import ctranslate2  # type: ignore[import-untyped]
+    import ctranslate2
 
     if device == "cpu":
         return "int8"

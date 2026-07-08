@@ -1,5 +1,6 @@
 """Tests for per-model beam size defaults."""
 from __future__ import annotations
+
 from bn_en_translate.config import ModelConfig
 from bn_en_translate.models.base import TranslatorBase
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from bn_en_translate.config import ModelConfig
 from bn_en_translate.models.base import TranslatorBase
 
@@ -22,17 +24,18 @@ class NLLBTranslator(TranslatorBase):
     def __init__(self, config: ModelConfig | None = None) -> None:
         super().__init__()
         self.config = config or ModelConfig(model_name="nllb-600M")
-        self._pipeline: object | None = None
+        self._pipeline: Any = None
 
     def load(self) -> None:
-        from transformers import pipeline  # type: ignore[import-untyped]
+        from transformers import pipeline
 
         model_id = self._resolve_model_id()
         device = 0 if self.config.device == "cuda" else -1  # HF pipeline convention
 
         # Do not pass max_length here: for encoder-decoder models it caps total tokens
         # (input + output), not just new tokens. Pass max_new_tokens per-call instead.
-        self._pipeline = pipeline(
+        # HF stubs' pipeline() overloads don't cover translation kwargs
+        self._pipeline = pipeline(  # type: ignore[call-overload]
             "translation",
             model=model_id,
             device=device,
@@ -47,7 +50,7 @@ class NLLBTranslator(TranslatorBase):
         self._loaded = False
         # Release GPU memory if torch is available
         try:
-            import torch  # type: ignore[import-untyped]
+            import torch
 
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
@@ -56,14 +59,14 @@ class NLLBTranslator(TranslatorBase):
 
     def _translate_batch(self, texts: list[str], src_lang: str, tgt_lang: str) -> list[str]:
         assert self._pipeline is not None
-        results = self._pipeline(  # type: ignore[operator]
+        results = self._pipeline(
             texts,
             src_lang=src_lang,
             tgt_lang=tgt_lang,
             batch_size=self.config.inference_batch_size,
             max_new_tokens=self.config.max_decoding_length,
         )
-        return [r["translation_text"] for r in results]  # type: ignore[index]
+        return [r["translation_text"] for r in results]
 
     def _resolve_model_id(self) -> str:
         """Map short model names to HuggingFace model IDs."""

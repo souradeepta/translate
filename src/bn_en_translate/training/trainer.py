@@ -180,7 +180,7 @@ class Seq2SeqFineTuner:
             )
 
         import os
-        import torch
+
         import transformers
 
         # NLLB uses a Rust-backed fast tokenizer. On Linux, DataLoader workers
@@ -236,8 +236,10 @@ class Seq2SeqFineTuner:
             metric_for_best_model="eval_loss",
             greater_is_better=False,
             report_to="none",
-            dataloader_num_workers=0 if self._use_cuda else 4,  # parallel loading safe on CPU; 0 avoids CUDA fork issues
-            dataloader_prefetch_factor=2 if not self._use_cuda else None,  # prefetch 2 batches per worker on CPU
+            # parallel loading safe on CPU; 0 avoids CUDA fork issues
+            dataloader_num_workers=0 if self._use_cuda else 4,
+            # prefetch 2 batches per worker on CPU
+            dataloader_prefetch_factor=2 if not self._use_cuda else None,
             use_cpu=not self._use_cuda,  # force CPU when sm_120 not supported by this PyTorch build
         )
 
@@ -259,7 +261,10 @@ class Seq2SeqFineTuner:
             # Save whatever adapter weights exist so a partial run is recoverable
             try:
                 self._peft_model.save_pretrained(str(output_path / "adapter_partial"))
-                logger.warning("Training failed — partial adapter saved to %s/adapter_partial/", ft.output_dir)
+                logger.warning(
+                    "Training failed — partial adapter saved to %s/adapter_partial/",
+                    ft.output_dir,
+                )
             except Exception:
                 pass
             raise
@@ -326,7 +331,6 @@ class Seq2SeqFineTuner:
 
         import tempfile
 
-        import peft
 
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)

@@ -1,7 +1,10 @@
 """Unit tests for MADLAD-400-3B translator."""
 from __future__ import annotations
+
 from unittest.mock import MagicMock, patch
+
 import pytest
+
 from bn_en_translate.config import ModelConfig
 
 
@@ -110,7 +113,10 @@ def test_madlad_load_passes_resolved_attn_impl_to_from_pretrained(monkeypatch) -
     mock_model.decoder.embed_tokens.weight = tied_weight
 
     with patch("transformers.T5Tokenizer.from_pretrained", return_value=mock_tokenizer), \
-         patch("transformers.T5ForConditionalGeneration.from_pretrained", return_value=mock_model) as mock_from_pretrained:
+         patch(
+             "transformers.T5ForConditionalGeneration.from_pretrained",
+             return_value=mock_model,
+         ) as mock_from_pretrained:
         t.load()
 
     _, kwargs = mock_from_pretrained.call_args

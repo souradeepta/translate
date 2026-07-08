@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import threading
 import time
 from dataclasses import FrozenInstanceError
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -19,8 +17,9 @@ def _make_config(
     interval: float = 0.1,
     backend: str = "none",
 ) -> object:
-    from bn_en_translate.config import MonitorConfig
     from pathlib import Path
+
+    from bn_en_translate.config import MonitorConfig
     return MonitorConfig(
         sample_interval_s=interval,
         enabled=enabled,
@@ -299,11 +298,14 @@ def test_get_gpu_stats_pynvml_unavailable_falls_back_to_nvidia_smi(mocker: objec
 
 
 def test_get_gpu_stats_nvidia_smi_parse_error_returns_zeros(mocker: object) -> None:
-    from bn_en_translate.utils.monitor import ResourceMonitor
     import subprocess
 
+    from bn_en_translate.utils.monitor import ResourceMonitor
+
     m = ResourceMonitor(config=_make_config(backend="nvidia-smi"))
-    with patch("subprocess.check_output", side_effect=subprocess.CalledProcessError(1, "nvidia-smi")):
+    with patch(
+        "subprocess.check_output", side_effect=subprocess.CalledProcessError(1, "nvidia-smi")
+    ):
         vram, util = m._get_gpu_stats_nvidia_smi()
 
     assert vram == 0.0

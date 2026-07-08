@@ -1,8 +1,9 @@
 """Unit tests for SeamlessM4T-v2 translator."""
 from __future__ import annotations
+
 from unittest.mock import MagicMock
+
 import pytest
-from bn_en_translate.config import ModelConfig
 
 
 def test_seamless_import() -> None:

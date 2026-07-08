@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import httpx
 
-from bn_en_translate.config import ModelConfig, PipelineConfig
+from bn_en_translate.config import PipelineConfig
 from bn_en_translate.models.base import TranslatorBase
 
 TRANSLATION_PROMPT = """\
@@ -84,4 +84,4 @@ class OllamaTranslator(TranslatorBase):
             },
         )
         response.raise_for_status()
-        return response.json()["response"].strip()
+        return str(response.json()["response"].strip())

@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # Helpers to build minimal mock tokenizer (no GPU / no model download)
@@ -24,7 +23,8 @@ def _make_mock_tokenizer(vocab_size: int = 256200) -> MagicMock:
             texts = [texts]
         n = len(texts)
         max_len = int(kwargs.get("max_length", 64))
-        ids = [[10, 20, 30, tok.eos_token_id, tok.pad_token_id] + [tok.pad_token_id] * (max_len - 5)] * n
+        row = [10, 20, 30, tok.eos_token_id, tok.pad_token_id]
+        ids = [row + [tok.pad_token_id] * (max_len - 5)] * n
         mask = [[1, 1, 1, 1, 1] + [0] * (max_len - 5)] * n
         return {"input_ids": ids, "attention_mask": mask}
 

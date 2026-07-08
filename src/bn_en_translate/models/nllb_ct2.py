@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from bn_en_translate.config import ModelConfig
 from bn_en_translate.models.base import TranslatorBase
@@ -29,12 +30,12 @@ class NLLBCt2Translator(TranslatorBase):
     def __init__(self, config: ModelConfig | None = None) -> None:
         super().__init__()
         self.config = config or ModelConfig(model_name="nllb-600M")
-        self._translator: object | None = None
-        self._sp: object | None = None
+        self._translator: Any = None
+        self._sp: Any = None
 
     def load(self) -> None:
-        import ctranslate2  # type: ignore[import-untyped]
-        import sentencepiece as spm  # type: ignore[import-untyped]
+        import ctranslate2
+        import sentencepiece as spm
 
         model_path = Path(self.config.model_path)
         if not model_path.exists():
@@ -49,12 +50,12 @@ class NLLBCt2Translator(TranslatorBase):
 
         sp_path = model_path / "sentencepiece.bpe.model"
         self._sp = spm.SentencePieceProcessor()
-        self._sp.load(str(sp_path))  # type: ignore[union-attr]
+        self._sp.load(str(sp_path))
 
         # Probe to find the best working compute type.
         # INT8 fails on Blackwell sm_120 + CUDA 12.x; probe catches it at load time.
         probe_src = (
-            self._sp.encode(  # type: ignore[union-attr]
+            self._sp.encode(
                 "Rabindranath Tagore is an unforgettable poet of Bengali literature.",
                 out_type=str,
             )
@@ -88,12 +89,12 @@ class NLLBCt2Translator(TranslatorBase):
 
         # NLLB source format: [tokens..., </s>, src_lang]; target prefix: [tgt_lang]
         tokenized = [
-            self._sp.encode(t, out_type=str) + ["</s>", src_lang]  # type: ignore[union-attr]
+            self._sp.encode(t, out_type=str) + ["</s>", src_lang]
             for t in texts
         ]
         target_prefix = [[tgt_lang]] * len(tokenized)
 
-        results = self._translator.translate_batch(  # type: ignore[union-attr]
+        results = self._translator.translate_batch(
             tokenized,
             target_prefix=target_prefix,
             beam_size=self._effective_beam_size(),
@@ -106,5 +107,5 @@ class NLLBCt2Translator(TranslatorBase):
             tokens = result.hypotheses[0]
             if tokens and tokens[0] == tgt_lang:
                 tokens = tokens[1:]
-            output_texts.append(self._sp.decode(tokens))  # type: ignore[union-attr]
+            output_texts.append(self._sp.decode(tokens))
         return output_texts

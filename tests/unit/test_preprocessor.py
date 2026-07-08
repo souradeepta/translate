@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unicodedata
 
-from bn_en_translate.pipeline.preprocessor import normalize, _collapse_whitespace
+from bn_en_translate.pipeline.preprocessor import normalize
 
 
 def test_nfc_normalization_applied() -> None:

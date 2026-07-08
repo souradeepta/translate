@@ -18,6 +18,7 @@ def test_returns_false_when_torch_not_installed() -> None:
     with patch.dict("sys.modules", {"torch": None}):
         # Re-import to pick up the patched modules
         import importlib
+
         import bn_en_translate.utils.cuda_check as m
 
         importlib.reload(m)

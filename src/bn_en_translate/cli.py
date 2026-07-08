@@ -11,7 +11,9 @@ from bn_en_translate.utils.cuda_check import get_best_device
 
 
 @click.command()
-@click.option("--input", "-i", "input_path", required=True, help="Path to Bengali story file (.txt)")
+@click.option(
+    "--input", "-i", "input_path", required=True, help="Path to Bengali story file (.txt)"
+)
 @click.option("--output", "-o", "output_path", required=True, help="Path for English output file")
 @click.option(
     "--model",
@@ -36,12 +38,20 @@ from bn_en_translate.utils.cuda_check import get_best_device
     type=int,
     help="Beam search width (default: model-specific; NLLB=4, IndicTrans2/SeamlessM4T=5)",
 )
-@click.option("--ollama-polish", is_flag=True, default=False, help="Run Ollama polishing pass after translation")
+@click.option(
+    "--ollama-polish",
+    is_flag=True,
+    default=False,
+    help="Run Ollama polishing pass after translation",
+)
 @click.option(
     "--ollama-model",
     default="gemma3:12b",
     show_default=True,
-    help="Ollama model tag for the polish pass (e.g. gemma3:4b, gemma3:12b, qwen2.5:7b-instruct-q4_K_M)",
+    help=(
+        "Ollama model tag for the polish pass "
+        "(e.g. gemma3:4b, gemma3:12b, qwen2.5:7b-instruct-q4_K_M)"
+    ),
 )
 def main(
     input_path: str,

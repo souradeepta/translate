@@ -20,6 +20,8 @@ Setup:
 
 from __future__ import annotations
 
+from typing import Any
+
 from bn_en_translate.config import REPO_ROOT, ModelConfig
 from bn_en_translate.models.base import TranslatorBase
 from bn_en_translate.models.hf_utils import (
@@ -82,8 +84,8 @@ class MiLMMTTranslator(TranslatorBase):
             src_lang="ben_Beng",
             tgt_lang="eng_Latn",
         )
-        self._model: object | None = None
-        self._tokenizer: object | None = None
+        self._model: Any = None
+        self._tokenizer: Any = None
 
     def _build_prompts(self, texts: list[str], src_lang: str, tgt_lang: str) -> list[str]:
         """Format each text using the MiLMMT prompt template.
@@ -101,8 +103,8 @@ class MiLMMTTranslator(TranslatorBase):
     def load(self) -> None:
         from pathlib import Path
 
-        import torch  # type: ignore[import-untyped]
-        from transformers import AutoModelForCausalLM, AutoTokenizer  # type: ignore[import-untyped]
+        import torch
+        from transformers import AutoModelForCausalLM, AutoTokenizer
 
         from bn_en_translate.utils.cuda_check import require_cuda
 
@@ -115,7 +117,7 @@ class MiLMMTTranslator(TranslatorBase):
         self._tokenizer = AutoTokenizer.from_pretrained(model_id)
         # Left-padding is required for causal LM batch generation.
         # Causal attention is left-to-right; right-padded batches produce misaligned KV cache.
-        self._tokenizer.padding_side = "left"  # type: ignore[union-attr]
+        self._tokenizer.padding_side = "left"
 
         self._model = AutoModelForCausalLM.from_pretrained(
             model_id,
@@ -124,7 +126,7 @@ class MiLMMTTranslator(TranslatorBase):
         )
         if device == "cuda":
             require_cuda(type(self).__name__)
-            self._model = self._model.to("cuda")  # type: ignore[union-attr]
+            self._model = self._model.to("cuda")
 
         self._loaded = True
 
@@ -135,12 +137,12 @@ class MiLMMTTranslator(TranslatorBase):
         free_cuda_memory()
 
     def _translate_batch(self, texts: list[str], src_lang: str, tgt_lang: str) -> list[str]:
-        import torch  # type: ignore[import-untyped]
+        import torch
 
-        model_device = next(self._model.parameters()).device  # type: ignore[union-attr]
+        model_device = next(self._model.parameters()).device
 
         prompts = self._build_prompts(texts, src_lang, tgt_lang)
-        inputs = self._tokenizer(  # type: ignore[operator]
+        inputs = self._tokenizer(
             prompts,
             return_tensors="pt",
             padding=True,
@@ -154,7 +156,7 @@ class MiLMMTTranslator(TranslatorBase):
         input_len = inputs["input_ids"].shape[1]
 
         with torch.no_grad():
-            output_ids = self._model.generate(  # type: ignore[union-attr]
+            output_ids = self._model.generate(
                 **inputs,
                 max_new_tokens=self.config.max_decoding_length,
                 num_beams=self._effective_beam_size(),
@@ -163,6 +165,6 @@ class MiLMMTTranslator(TranslatorBase):
 
         # Strip the echoed prompt tokens — only decode what was generated after the prompt.
         new_tokens = output_ids[:, input_len:]
-        return self._tokenizer.batch_decode(  # type: ignore[union-attr]
+        return list(self._tokenizer.batch_decode(
             new_tokens, skip_special_tokens=True
-        )
+        ))

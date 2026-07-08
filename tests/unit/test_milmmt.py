@@ -1,8 +1,9 @@
 """Unit tests for MiLMMT-46-1B translator."""
 from __future__ import annotations
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 import torch
 
 from bn_en_translate.config import ModelConfig
@@ -72,7 +73,9 @@ def test_milmmt_empty_input_returns_empty() -> None:
 
 def test_milmmt_custom_config() -> None:
     from bn_en_translate.models.milmmt import MiLMMTTranslator
-    cfg = ModelConfig(model_name="milmmt-46-1b", model_path="", src_lang="ben_Beng", tgt_lang="eng_Latn")
+    cfg = ModelConfig(
+        model_name="milmmt-46-1b", model_path="", src_lang="ben_Beng", tgt_lang="eng_Latn"
+    )
     t = MiLMMTTranslator(cfg)
     assert t.config.src_lang == "ben_Beng"
 

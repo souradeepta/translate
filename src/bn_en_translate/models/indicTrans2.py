@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from bn_en_translate.config import ModelConfig
 from bn_en_translate.models.base import TranslatorBase
 from bn_en_translate.models.hf_utils import free_cuda_memory, resolve_attn_implementation
@@ -35,9 +37,9 @@ class IndicTrans2Translator(TranslatorBase):
             src_lang="ben_Beng",
             tgt_lang="eng_Latn",
         )
-        self._model: object | None = None
-        self._tokenizer: object | None = None
-        self._processor: object | None = None
+        self._model: Any = None
+        self._tokenizer: Any = None
+        self._processor: Any = None
 
     def load(self) -> None:
         """
@@ -52,9 +54,9 @@ class IndicTrans2Translator(TranslatorBase):
         self._loaded = True
 
     def _load_via_indictrans2_interface(self) -> None:
-        import torch  # type: ignore[import-untyped]
-        from IndicTransToolkit import IndicProcessor  # type: ignore[import-untyped]
-        from transformers import (  # type: ignore[import-untyped]
+        import torch
+        from IndicTransToolkit import IndicProcessor
+        from transformers import (
             AutoModelForSeq2SeqLM,
             AutoTokenizer,
         )
@@ -77,12 +79,12 @@ class IndicTrans2Translator(TranslatorBase):
 
         if self.config.device == "cuda":
             require_cuda(type(self).__name__)
-            self._model.to("cuda")  # type: ignore[union-attr]
+            self._model.to("cuda")
 
     def _load_via_transformers_fallback(self) -> None:
         """Fallback: load as a standard seq2seq model (lower quality tokenization)."""
-        import torch  # type: ignore[import-untyped]
-        from transformers import (  # type: ignore[import-untyped]
+        import torch
+        from transformers import (
             AutoModelForSeq2SeqLM,
             AutoTokenizer,
         )
@@ -99,7 +101,7 @@ class IndicTrans2Translator(TranslatorBase):
 
         if self.config.device == "cuda":
             require_cuda(type(self).__name__)
-            self._model.to("cuda")  # type: ignore[union-attr]
+            self._model.to("cuda")
 
     def unload(self) -> None:
         self._model = None
@@ -108,14 +110,14 @@ class IndicTrans2Translator(TranslatorBase):
         free_cuda_memory()
 
     def _translate_batch(self, texts: list[str], src_lang: str, tgt_lang: str) -> list[str]:
-        import torch  # type: ignore[import-untyped]
+        import torch
 
-        model_device = next(self._model.parameters()).device  # type: ignore[union-attr]
+        model_device = next(self._model.parameters()).device
 
         if self._processor is not None:
             # Use IndicTransToolkit preprocessing
             batch = self._processor.preprocess_batch(texts, src_lang=src_lang, tgt_lang=tgt_lang)
-            inputs = self._tokenizer(  # type: ignore[operator]
+            inputs = self._tokenizer(
                 batch,
                 truncation=True,
                 padding="longest",
@@ -123,7 +125,7 @@ class IndicTrans2Translator(TranslatorBase):
                 return_attention_mask=True,
             ).to(model_device)
         else:
-            inputs = self._tokenizer(  # type: ignore[operator]
+            inputs = self._tokenizer(
                 texts,
                 return_tensors="pt",
                 padding=True,
@@ -132,17 +134,17 @@ class IndicTrans2Translator(TranslatorBase):
             ).to(model_device)
 
         with torch.no_grad():
-            generated = self._model.generate(  # type: ignore[union-attr]
+            generated = self._model.generate(
                 **inputs,
                 num_beams=self._effective_beam_size(),
                 max_new_tokens=self.config.max_decoding_length,
             )
 
-        decoded = self._tokenizer.batch_decode(  # type: ignore[union-attr]
+        decoded = self._tokenizer.batch_decode(
             generated, skip_special_tokens=True, clean_up_tokenization_spaces=True
         )
 
         if self._processor is not None:
             decoded = self._processor.postprocess_batch(decoded, lang=tgt_lang)
 
-        return decoded
+        return list(decoded)

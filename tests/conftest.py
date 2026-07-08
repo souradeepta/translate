@@ -6,9 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from bn_en_translate.models.base import TranslatorBase
 from bn_en_translate.config import PipelineConfig
-
+from bn_en_translate.models.base import TranslatorBase
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 

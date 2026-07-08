@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -10,14 +10,13 @@ import pytest
 from bn_en_translate.utils.monitor import ResourceSummary
 from bn_en_translate.utils.run_db import RunDatabase
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 def _ts(offset_s: int = 0) -> datetime:
     """Return a fixed UTC datetime, optionally offset by seconds."""
-    base = datetime(2026, 4, 1, 12, 0, 0, tzinfo=timezone.utc)
+    base = datetime(2026, 4, 1, 12, 0, 0, tzinfo=UTC)
     from datetime import timedelta
     return base + timedelta(seconds=offset_s)
 

@@ -17,10 +17,13 @@ import logging
 import subprocess
 import threading
 import time
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from pathlib import Path
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from types import TracebackType
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from bn_en_translate.config import MonitorConfig
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
@@ -143,7 +146,7 @@ class ResourceMonitor:
 
     def __init__(
         self,
-        config: object | None = None,
+        config: MonitorConfig | None = None,
         run_id: str | None = None,
     ) -> None:
         # Import here to allow config=None convenience
@@ -194,10 +197,10 @@ class ResourceMonitor:
     # ------------------------------------------------------------------
 
     def __enter__(self) -> ResourceMonitor:
-        if not self._config.enabled:  # type: ignore[union-attr]
+        if not self._config.enabled:
             return self
 
-        self._started_at = datetime.now(tz=timezone.utc)
+        self._started_at = datetime.now(tz=UTC)
         self._start_time = time.monotonic()
 
         # Capture disk I/O baseline
@@ -237,7 +240,7 @@ class ResourceMonitor:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        if not self._config.enabled:  # type: ignore[union-attr]
+        if not self._config.enabled:
             return
 
         # Signal and join sampling thread
@@ -277,7 +280,7 @@ class ResourceMonitor:
     # ------------------------------------------------------------------
 
     def _sampling_loop(self) -> None:
-        interval = self._config.sample_interval_s  # type: ignore[union-attr]
+        interval = self._config.sample_interval_s
         while not self._stop_event.wait(timeout=interval):
             try:
                 sample = self._take_sample()
@@ -312,7 +315,7 @@ class ResourceMonitor:
 
     def _init_nvml(self) -> bool:
         """Initialise pynvml. Returns True on success."""
-        backend = self._config.gpu_backend  # type: ignore[union-attr]
+        backend = self._config.gpu_backend
         if backend != "pynvml":
             return False
         try:
@@ -336,7 +339,7 @@ class ResourceMonitor:
 
     def _get_gpu_stats(self) -> tuple[float, float]:
         """Return (vram_used_mib, util_pct). Returns (0.0, -1.0) if unavailable."""
-        backend = self._config.gpu_backend  # type: ignore[union-attr]
+        backend = self._config.gpu_backend
 
         if backend == "none":
             return 0.0, -1.0

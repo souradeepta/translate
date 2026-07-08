@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 import unicodedata
 
-
 # Zero-width joiner / non-joiner
 ZWJ = "\u200d"
 ZWNJ = "\u200c"

@@ -38,7 +38,7 @@ def resolve_device(config_device: str) -> str:
 def free_cuda_memory() -> None:
     """Release cached CUDA allocations. Safe no-op without torch/CUDA."""
     try:
-        import torch  # type: ignore[import-untyped]
+        import torch
 
         if torch.cuda.is_available():
             torch.cuda.empty_cache()

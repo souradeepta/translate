@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from bn_en_translate.config import ModelConfig
 from bn_en_translate.models.base import TranslatorBase
@@ -38,13 +39,13 @@ class IndicTrans2Ct2Translator(TranslatorBase):
             src_lang="ben_Beng",
             tgt_lang="eng_Latn",
         )
-        self._translator: object | None = None
-        self._sp: object | None = None
-        self._processor: object | None = None
+        self._translator: Any = None
+        self._sp: Any = None
+        self._processor: Any = None
 
     def load(self) -> None:
-        import ctranslate2  # type: ignore[import-untyped]
-        import sentencepiece as spm  # type: ignore[import-untyped]
+        import ctranslate2
+        import sentencepiece as spm
 
         model_path = Path(self.config.model_path)
         if not model_path.exists():
@@ -64,10 +65,10 @@ class IndicTrans2Ct2Translator(TranslatorBase):
             if not alt.exists():
                 raise FileNotFoundError(f"SentencePiece model not found at {sp_path}")
         self._sp = spm.SentencePieceProcessor()
-        self._sp.load(str(sp_path))  # type: ignore[union-attr]
+        self._sp.load(str(sp_path))
 
         probe_src = (
-            self._sp.encode(  # type: ignore[union-attr]
+            self._sp.encode(
                 "Rabindranath Tagore is an unforgettable poet of Bengali literature.",
                 out_type=str,
             )
@@ -91,7 +92,7 @@ class IndicTrans2Ct2Translator(TranslatorBase):
 
         # IndicTransToolkit handles script normalization + language tagging
         try:
-            from IndicTransToolkit import IndicProcessor  # type: ignore[import-untyped]
+            from IndicTransToolkit import IndicProcessor
             self._processor = IndicProcessor(inference=True)
         except ImportError:
             self._processor = None
@@ -119,12 +120,12 @@ class IndicTrans2Ct2Translator(TranslatorBase):
         # IndicTrans2 source format: [text_tokens..., </s>, src_lang]
         # (same NLLB-style format since IndicTrans2 also uses M2M-100 architecture)
         tokenized = [
-            self._sp.encode(t, out_type=str) + ["</s>", src_lang]  # type: ignore[union-attr]
+            self._sp.encode(t, out_type=str) + ["</s>", src_lang]
             for t in preprocessed
         ]
         target_prefix = [[tgt_lang]] * len(tokenized)
 
-        results = self._translator.translate_batch(  # type: ignore[union-attr]
+        results = self._translator.translate_batch(
             tokenized,
             target_prefix=target_prefix,
             beam_size=self._effective_beam_size(),
@@ -137,7 +138,7 @@ class IndicTrans2Ct2Translator(TranslatorBase):
             tokens = result.hypotheses[0]
             if tokens and tokens[0] == tgt_lang:
                 tokens = tokens[1:]
-            decoded.append(self._sp.decode(tokens))  # type: ignore[union-attr]
+            decoded.append(self._sp.decode(tokens))
 
         if self._processor is not None:
             decoded = self._processor.postprocess_batch(decoded, lang=tgt_lang)

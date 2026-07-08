@@ -1,6 +1,8 @@
 """Tests for new ModelConfig fields added in model-expansion update."""
 from __future__ import annotations
+
 import pytest
+
 from bn_en_translate.config import ModelConfig
 
 
