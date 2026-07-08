@@ -33,6 +33,16 @@ The LoRA fine-tuned export `models/nllb-600M-finetuned-ct2/` (BLEU 0.17
 open-domain, failed experiment) was also deleted; training metrics survive in
 `monitor/runs.db` and the papers.
 
+### Deferred: MiLMMT-46-4B in 4-bit (probe passed 2026-07-08)
+
+bitsandbytes 0.49.2 4-bit inference **works on sm_120** — verified by loading the
+existing MiLMMT-46-1B checkpoint with
+`BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_compute_dtype=torch.bfloat16)`
+and generating a correct translation. The 4B attempt (~8.6 GB download, ~3 GB
+VRAM quantized) was deferred by user decision (disk space). To resume: extend
+`milmmt.py` with a `load_in_4bit` config path, register `milmmt-46-4b`,
+download, benchmark against Seamless 67.0.
+
 > **FLORES BLEU / chrF** numbers marked ✅ are directly measured on FLORES-200 devtest (90 sentences) on this hardware.  
 > Literature figures (no ✅) are from published papers and may not reflect in-domain Bengali performance.  
 > "Default Beams" is each model's `DEFAULT_BEAM_SIZE`; override with `ModelConfig(beam_size=N)`.
