@@ -20,7 +20,6 @@ from bn_en_translate.models.hf_utils import (
     resolve_device,
 )
 
-
 # Map FLORES-200 language codes to MADLAD-400 target tags
 _MADLAD_LANG_TAG: dict[str, str] = {
     "eng_Latn": "<2en>",
