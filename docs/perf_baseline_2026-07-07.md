@@ -131,7 +131,7 @@ above, once OS page cache was warm — see caveat).
 |-------|----------------------|--------------------|----------|
 | nllb-600M | 383 ch/s | ~2072 ch/s | 5.4x |
 | milmmt-46-1b | 74 ch/s | ~366 ch/s (avg of 357/375) | 4.9x |
-| seamless-medium | 73 ch/s | ~302 ch/s (avg of 288/315) | 4.1x |
+| seamless-medium | 73 ch/s | ~317 ch/s (avg of 288/346, the two highest disclosed runs — same methodology as the milmmt row) | 4.3x |
 
 All three models pass the BLEU acceptance gate (±0.3 of the original baseline)
 after every Phase 1 task. Phase 1 (batching + SDPA + length-sorting) delivers a
