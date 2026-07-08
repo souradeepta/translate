@@ -42,9 +42,9 @@ _LANG_NAMES: dict[str, str] = {
 def _resolve_attn_implementation(use_flash: bool, fallback: str = "sdpa") -> str:
     """flash_attention_2 if installed and requested; else the given fallback.
 
-    Thin wrapper around hf_utils.resolve_attn_implementation that calls the
-    module-level `_flash_attn_available` name (not hf_utils directly) so tests
-    can monkeypatch it by module attribute.
+    Re-implements hf_utils.resolve_attn_implementation's logic inline (rather
+    than delegating to it) so it reads the module-level `_flash_attn_available`
+    name — this preserves the existing monkeypatch seam tests rely on.
     """
     if use_flash and _flash_attn_available():
         return "flash_attention_2"
