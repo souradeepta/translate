@@ -460,6 +460,84 @@ def fig_finetune_runs(runs: list[dict], out_dir: Path) -> Path:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Figure 7 — July 2026 optimization pass: before/after throughput +
+# model-selection-under-VRAM-budget scatter. Numbers are hardcoded from the
+# measured 2026-07-07/08 optimization-pass runs (see monitor/observations.md
+# and paper/efficiency_paper.tex); this figure intentionally does NOT read
+# monitor/runs.db because the close-out run may not be persisted there.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Translate-only chars/s, warm cache, FLORES-200 90-sentence devtest.
+OPT_BEFORE_AFTER = {
+    "NLLB-600M":    {"before": 383, "after": 2072, "speedup": "5.4x"},
+    "MiLMMT-46-1B": {"before": 74,  "after": 366,  "speedup": "4.9x"},
+    "Seamless-med.": {"before": 73, "after": 317,  "speedup": "4.3x"},
+}
+
+# Model-selection-under-budget: (BLEU, VRAM GB, deployed?) on FLORES-200 90-sent.
+MODEL_SELECTION = {
+    "NLLB-600M":        {"bleu": 55.3, "vram": 1.9, "deployed": True},
+    "MiLMMT-46-1B":     {"bleu": 65.2, "vram": 3.4, "deployed": True},
+    "Seamless-med.":    {"bleu": 67.0, "vram": 3.9, "deployed": True},
+    "LMT-60-1.7B":      {"bleu": 63.8, "vram": 6.6, "deployed": False},
+    "Hunyuan-MT-7B Q4": {"bleu": 54.7, "vram": 6.6, "deployed": False},
+}
+
+
+def fig_optimization_speedup(out_dir: Path) -> Path:
+    fig, axes = plt.subplots(1, 2, figsize=(_COL2, 3.4))
+    fig.suptitle("July 2026 Inference Optimization and Model Selection "
+                  "(RTX 5050, FLORES-200 90-sentence)", fontweight="bold")
+
+    # (a) Before/after translate-only throughput, log scale (grouped bars)
+    ax = axes[0]
+    models = list(OPT_BEFORE_AFTER.keys())
+    before = [OPT_BEFORE_AFTER[m]["before"] for m in models]
+    after = [OPT_BEFORE_AFTER[m]["after"] for m in models]
+    x = np.arange(len(models))
+    w = 0.35
+    b1 = ax.bar(x - w / 2, before, w, label="Before", color=_C["grey"],
+                alpha=0.85, zorder=3)
+    b2 = ax.bar(x + w / 2, after, w, label="After", color=_C["blue"],
+                alpha=0.85, zorder=3)
+    ax.set_yscale("log")
+    ax.set_ylabel("Translate-only throughput (chars/s, log scale)")
+    ax.set_xticks(x)
+    ax.set_xticklabels(models, fontsize=6.5)
+    ax.set_title("(a) Batching + SDPA + Length-Sorted Batching")
+    ax.legend(loc="upper left")
+    for xi, m in zip(x, models):
+        ax.text(xi, OPT_BEFORE_AFTER[m]["after"] * 1.15,
+                OPT_BEFORE_AFTER[m]["speedup"], ha="center", fontsize=7,
+                fontweight="bold", color=_C["blue"])
+
+    # (b) Model selection under fixed 8 GB VRAM budget: BLEU vs VRAM
+    ax = axes[1]
+    for name, d in MODEL_SELECTION.items():
+        color = _C["green"] if d["deployed"] else _C["red"]
+        marker = "*" if d["deployed"] else "x"
+        size = 140 if d["deployed"] else 90
+        ax.scatter(d["vram"], d["bleu"], color=color, marker=marker,
+                   s=size, zorder=3,
+                   edgecolors="black" if d["deployed"] else None, linewidths=0.6)
+        ax.annotate(name, (d["vram"], d["bleu"]), fontsize=6.5,
+                    xytext=(4, 4), textcoords="offset points")
+    ax.axvline(8.0, color=_C["orange"], linestyle="--", linewidth=1.0, zorder=1)
+    ax.text(8.05, 52, "8 GB budget",
+            fontsize=6.5, color=_C["orange"], rotation=90, va="bottom")
+    ax.set_xlabel("Peak VRAM (GB)")
+    ax.set_ylabel("BLEU (FLORES-200 90-sent.)")
+    ax.set_title("(b) Deployed vs. Rejected Under VRAM Budget")
+
+    fig.tight_layout()
+    out = out_dir / "optimization_speedup.png"
+    fig.savefig(out)
+    plt.close(fig)
+    print(f"  [ok] {out}")
+    return out
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Figure 6 — Multi-model radar chart (all benchmarked models)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -603,6 +681,7 @@ def main() -> None:
     fig_resource_usage(chron, FIGURES_DIR)
     fig_finetune_runs(chron, FIGURES_DIR)
     fig_radar_latest(runs, FIGURES_DIR)
+    fig_optimization_speedup(FIGURES_DIR)
 
     n = len(list(FIGURES_DIR.glob("*.png")))
     print(f"\nDone. {n} figures in {FIGURES_DIR}/")

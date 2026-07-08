@@ -1,6 +1,6 @@
 .PHONY: install test test-fast test-slow test-e2e lint typecheck clean setup-cuda \
         papers slides figures \
-        paper-ieee paper-survey paper-ieee-tr paper-acm \
+        paper-ieee paper-survey paper-ieee-tr paper-acm paper-efficiency \
         slides-ieee slides-survey slides-ieee-tr slides-acm
 
 # ── Dev setup ──────────────────────────────────────────────────────────────────
@@ -63,7 +63,8 @@ PDF_OUT      := paper/pdf
 PAPER_SRCS   := paper/ieee_conference/ieee_conference.tex \
                 paper/survey/survey.tex \
                 paper/ieee_transactions/ieee_transactions.tex \
-                paper/acm_tallip/acm_tallip.tex
+                paper/acm_tallip/acm_tallip.tex \
+                paper/efficiency/efficiency.tex
 SLIDES_SRCS  := paper/ieee_conference/ieee_conference_slides.tex \
                 paper/survey/survey_slides.tex \
                 paper/ieee_transactions/ieee_transactions_slides.tex \
@@ -85,6 +86,10 @@ paper-acm:
 	mkdir -p $(PDF_OUT)
 	$(TECTONIC) paper/acm_tallip/acm_tallip.tex -o $(PDF_OUT)/
 
+paper-efficiency:
+	mkdir -p $(PDF_OUT)
+	$(TECTONIC) paper/efficiency/efficiency.tex -o $(PDF_OUT)/
+
 slides-ieee:
 	mkdir -p $(PDF_OUT)
 	$(TECTONIC) paper/ieee_conference/ieee_conference_slides.tex -o $(PDF_OUT)/
@@ -102,7 +107,7 @@ slides-acm:
 	$(TECTONIC) paper/acm_tallip/acm_tallip_slides.tex -o $(PDF_OUT)/
 
 # ── Batch targets ──────────────────────────────────────────────────────────────
-# Compile all 4 papers to PDF
+# Compile all 5 papers to PDF
 papers: figures
 	mkdir -p $(PDF_OUT)
 	@for f in $(PAPER_SRCS); do \
