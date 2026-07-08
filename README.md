@@ -58,12 +58,19 @@ bn-translate --input my_story.bn.txt --output translated.en.txt --model nllb-600
 
 ## Model Comparison
 
-| Model | VRAM (float16) | BLEU bn→en | Speed | Notes |
-|-------|---------------|------------|-------|-------|
-| `nllb-600M` | ~2 GB | ~22 open-domain | Fast | ✅ Downloaded, working |
-| `nllb-1.3B` | ~2.6 GB | ~26 | Medium | Download with `--model nllb-1.3B` |
-| `indicTrans2-1B` | ~3 GB | ~30+ | Medium | Best for Bengali; download with `--model indicTrans2-1B` |
+| Model | VRAM | FLORES BLEU/chrF | Speed | Notes |
+|-------|------|------------------|-------|-------|
+| `nllb-600M` | ~2 GB | 55.3 / 72.8 | Fastest | ✅ On disk, working |
+| `seamless-medium` | ~4 GB | **67.0 / 80.2** | Medium | ✅ On disk — best quality |
+| `milmmt-46-1b` | ~3.3 GB | 65.0 / 79.3 | Medium | ✅ On disk — best quality-per-GB |
+| `nllb-1.3B` | ~2.6 GB | ~26 (published) | Medium | Download with `--model nllb-1.3B` |
+| `indicTrans2-1B` | ~3 GB | ~44 (published) | Medium | Gated HF repo — accept terms + login first |
 | `ollama` | ~4.7 GB | subjective | Slow | Optional literary polish; requires Ollama daemon |
+
+> Evaluated and rejected (2026-07-08): NiuTrans LMT-60-1.7B (BLEU 63.8 — below
+> MiLMMT at higher VRAM) and Tencent Hunyuan-MT-7B Q4 via Ollama (BLEU 54.7 —
+> quantization loss). MADLAD-3B is permanently excluded (corrupt checkpoint at
+> source). Details in `docs/MODELS.md`.
 
 > BLEU scores are approximate for open-domain text. On in-domain literary Bengali the working NLLB-600M model achieves BLEU ~64 on the bundled corpus.
 

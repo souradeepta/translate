@@ -6,10 +6,32 @@
 |-----|---------------|---------|---------------|-------------|-------------|------------|---------------|--------|
 | `nllb-600M` | `facebook/nllb-200-distilled-600M` | CT2 float16 | 2.0 GB | **55.3** ✅ | **72.8** ✅ | 197 ch/s | 4 | Working — `models/nllb-600M-ct2/` |
 | `seamless-medium` | `facebook/seamless-m4t-v2-large` | HF float16 | 3.9 GB | **67.0** ✅ | **80.2** ✅ | 32 ch/s | 5 | Working — `models/seamless-medium-hf/` |
+| `milmmt-46-1b` | `xiaomi-research/MiLMMT-46-1B-v0.1` | HF bfloat16 | 3.3 GB | **65.0** ✅ | **79.3** ✅ | 28 ch/s | 1 | Working — `models/milmmt-46-1B-hf/` |
 | `nllb-1.3B` | `facebook/nllb-200-distilled-1.3B` | CT2 float16 | ~2.6 GB | ~26 (lit.) | — | — | 4 | Needs download |
 | `indicTrans2-1B` | `ai4bharat/indictrans2-indic-en-1B` | CT2 float16 | ~3.0 GB | ~44 (lit.) | — | — | 5 | Needs download |
-| `madlad-3b` | `google/madlad400-3b-mt` | HF float16 | 8.1 GB actual | — | — | — | 4 | ❌ EXCLUDED — see MADLAD section |
+| `madlad-3b` | `google/madlad400-3b-mt` | HF float16 | 8.1 GB actual | — | — | — | 4 | ❌ EXCLUDED — corrupt at source, see MADLAD section |
 | `ollama` | N/A (local daemon) | Ollama HTTP | ~4.7 GB | subjective | — | — | N/A | Optional polish |
+
+### Evaluated and rejected (2026-07-08)
+
+Both models below were fully wired (factory entries + tests remain in the codebase),
+benchmarked on the same FLORES-200 90-sentence set, and rejected against the
+incumbents (Seamless 67.0 BLEU / 4.1 GB; MiLMMT 65.0 BLEU / 3.4 GB). Their
+checkpoints were deleted to free disk; re-download commands are in each row.
+
+| Key | BLEU | chrF | ch/s | VRAM peak | Rejection reason | Re-acquire |
+|-----|------|------|------|-----------|------------------|------------|
+| `lmt-60-1.7b` (NiuTrans, Qwen3-based) | 63.8 | 78.3 | 86 | 6635 MiB (num_beams=5) | Loses to MiLMMT on BLEU, VRAM, and speed | `python scripts/download_models.py --model lmt-60-1.7B` |
+| `hunyuan-mt-7b` (Tencent, Q4_K_M via Ollama) | 54.7 | 74.7 | 112 | 6614 MiB | Q4 quantization drops it below even NLLB-600M (55.3) | `ollama pull demonbyron/HY-MT1.5-7B:Q4_K_M` |
+
+> Note: the first Ollama request after a pull loads the model into VRAM and can
+> exceed the translator's 120 s HTTP timeout; if VRAM is occupied at load time
+> Ollama silently falls back to **100% CPU** (~5 tok/s vs ~58 tok/s on GPU).
+> Check `ollama ps` before trusting an Ollama benchmark number.
+
+The LoRA fine-tuned export `models/nllb-600M-finetuned-ct2/` (BLEU 0.17
+open-domain, failed experiment) was also deleted; training metrics survive in
+`monitor/runs.db` and the papers.
 
 > **FLORES BLEU / chrF** numbers marked ✅ are directly measured on FLORES-200 devtest (90 sentences) on this hardware.  
 > Literature figures (no ✅) are from published papers and may not reflect in-domain Bengali performance.  
@@ -27,6 +49,8 @@ Each translator class declares a `DEFAULT_BEAM_SIZE` class variable. When `Model
 | `IndicTrans2Translator` | 5 |
 | `MADLADTranslator` | 4 |
 | `SeamlessTranslator` | 5 |
+| `MiLMMTTranslator` | 1 |
+| `LMT60Translator` | 5 |
 
 ---
 
@@ -163,6 +187,13 @@ each model falls back per architecture via `_resolve_attn_implementation(use_fla
 > instead of silently producing BLEU-0 garbage. The `UserWarning` emitted
 > earlier in `load()` is left in place until a clean checkpoint passes the
 > guard.
+>
+> **Re-download verdict (2026-07-08):** a clean `snapshot_download` of
+> `google/madlad400-3b-mt` was performed and the guard **still raised** —
+> the untied-embedding corruption is present at source (or in every copy this
+> mirror serves), not a local disk artifact. MADLAD-3B is permanently excluded
+> and the 11 GB checkpoint was deleted. Do not re-attempt without evidence the
+> upstream repo was fixed.
 
 **Architecture:** T5-based encoder-decoder  
 **Source:** Google Research  

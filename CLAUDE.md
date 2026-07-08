@@ -12,14 +12,15 @@ make papers        # regenerate figures + compile all 4 PDFs
 **State as of 2026-04-10:**
 - `models/nllb-600M-ct2/` ✅ CT2 float16 — **BLEU 55.3 / chrF 72.8** on FLORES-200 90-sentence
 - `models/seamless-medium-hf/` ✅ HF float16, `.to("cuda")` — **BLEU 67.0 / chrF 80.2** on FLORES-200
-- `models/madlad-3b-hf/` ✅ downloaded but **EXCLUDED** — local checkpoint weight mismatch causes garbage output; 8 GB VRAM insufficient for 3B float16 (CPU offload → degenerate sequences)
+- `madlad-3b` ❌ **PERMANENTLY EXCLUDED, checkpoint deleted** — clean re-download (2026-07-08) still failed the tied-embedding guard: corruption is at source, not a local artifact
+- New-model evaluation (2026-07-08, both **rejected**, checkpoints deleted): LMT-60-1.7B BLEU 63.8 (loses to MiLMMT on BLEU/VRAM/speed); Hunyuan-MT-7B Q4 via Ollama BLEU 54.7 (Q4 drops below NLLB-600M). Code + tests remain (`lmt-60-1.7b`, `hunyuan-mt-7b` factory keys)
 - `models/indicTrans2-1B-ct2/` — **gated repo**: accept terms at huggingface.co/ai4bharat/indictrans2-indic-en-1B then `! huggingface-cli login` and `python scripts/download_models.py --model indicTrans2-1B`
 - `models/milmmt-46-1B-hf/` ✅ HF bfloat16 — **BLEU 65.0 / chrF 79.3** on FLORES-200 (2nd best, 3.3 GB VRAM, 28 ch/s)
 - `corpus/` ✅ 90-sentence built-in + 9,829 Samanantar pairs (train/val/test splits)
 - `paper/pdf/` — run `make papers` to rebuild all 4 PDFs (tectonic, no sudo needed)
 - All 217 unit/integration tests passing
 - **PyTorch 2.7.0+cu128** — GPU training FULLY UNLOCKED (6/6 sm_120 probes pass)
-- LoRA fine-tune done: 2.46h, 3 epochs, eval_loss 1.992, post-FT BLEU 0.17 (open-domain)
+- LoRA fine-tune done: 2.46h, 3 epochs, eval_loss 1.992, post-FT BLEU 0.17 (open-domain) — export `models/nllb-600M-finetuned-ct2/` deleted 2026-07-08 (failed experiment; metrics live in runs.db)
 - Papers: `paper/ieee_paper.tex`, `paper/survey_paper.tex`, `paper/ieee_transactions_paper.tex`, `paper/acm_paper.tex`
 - Figures: `python scripts/gen_paper_figures.py` or `make figures` → `paper/figures/`
 
@@ -102,7 +103,9 @@ make papers        # regenerate figures + compile all 4 PDFs
 | NLLB-600M CT2 float16 | **55.3** | **72.8** | 2.3 GB | 191 ch/s | Fastest |
 | MiLMMT-46-1B bfloat16 | **65.0** | **79.3** | 3.3 GB | 28 ch/s | 2nd best, efficient |
 | Seamless-medium float16 | **67.0** | **80.2** | 4.0 GB | 31 ch/s | Best quality |
-| MADLAD-3B float16 | ~~0.0~~ | — | 8.1 GB | ~2 ch/s | Excluded — checkpoint corrupted |
+| MADLAD-3B float16 | ~~0.0~~ | — | 8.1 GB | ~2 ch/s | Excluded permanently — corrupt at source (re-verified 2026-07-08), deleted |
+| LMT-60-1.7B bf16 (2026-07-08) | 63.8 | 78.3 | 6.6 GB peak | 86 ch/s | Rejected — loses to MiLMMT on all axes; deleted |
+| Hunyuan-MT-7B Q4 Ollama (2026-07-08) | 54.7 | 74.7 | 6.6 GB | 112 ch/s | Rejected — Q4 below NLLB-600M; deleted |
 
 ---
 
