@@ -106,18 +106,18 @@ BLEU gate: nllb 55.3→55.27 (Δ−0.03), milmmt 65.0→65.24 (Δ+0.24), seamles
 ±0.3, no `DONE_WITH_CONCERNS` needed).
 
 **Speed: neutral-to-positive within noise, no clean incremental read possible.**
-Five back-to-back milmmt runs in this session spanned 146–375 ch/s and three
-seamless runs spanned 268–346 ch/s — all on identical (fixed) code, GPU idle at
-~50°C between runs. The two slowest milmmt runs (146, 197) were the first two
-model loads of the session (cold OS page cache for the ~2 GB safetensors, load
-avg >2 on the host at the time); the three subsequent runs (261, 357, 375) after
-the page cache warmed were markedly faster and consistent with the "further
-improvement" this task hypothesized. nllb is unaffected as expected (CT2 sorts
-internally) — its 1827–2072 ch/s range matches the pre-Task-4 Task-1 baseline of
-2108 within normal run-to-run variance. Given the overlap between the noise band
-and the hypothesized effect size, this task is reported as **BLEU-neutral,
-speed neutral-to-positive within measurement noise** rather than claiming a
-specific percentage gain over Task 2.
+Five back-to-back milmmt runs in this session (chronologically: 261, 197, 146,
+357, 375 ch/s) and three seamless runs (268, 288, 346 ch/s) — all on identical
+(fixed) code, GPU idle at ~50°C between runs — show a 2.5x spread with no
+monotonic trend (the slowest run, 146, falls in the *middle* of the sequence,
+not at the start), so this is **not** a cold-cache-warming story; it is session
+noise (host load average >2 at the time, contending with the CPU-bound
+tokenize/detokenize steps around each GPU batch). nllb is unaffected as expected
+(CT2 sorts internally) — its 1827–2072 ch/s range matches the pre-Task-4 Task-1
+baseline of 2108 within normal run-to-run variance. Given the noise band overlaps
+the hypothesized effect size, this task is reported as **BLEU-neutral, speed
+neutral-to-positive within measurement noise** rather than claiming a specific
+percentage gain over Task 2.
 
 ---
 
