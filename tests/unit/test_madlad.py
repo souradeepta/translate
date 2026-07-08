@@ -138,8 +138,44 @@ def test_verify_tied_embeddings_raises_on_mismatch() -> None:
     w = torch.randn(8, 4)
     MADLADTranslator._verify_tied_embeddings(FakeModel(w, w))  # tied: no raise
 
+    # w + 1.0 is deterministically different from w (provably untied)
     with pytest.raises(RuntimeError, match="tied-embedding mismatch"):
-        MADLADTranslator._verify_tied_embeddings(FakeModel(w, torch.randn(8, 4)))
+        MADLADTranslator._verify_tied_embeddings(FakeModel(w, w + 1.0))
+
+
+def test_madlad_load_raises_on_untied_checkpoint(monkeypatch) -> None:
+    """Negative wiring test: load() must actually invoke the integrity guard.
+
+    Without this, deleting the guard call in load() leaves every other test
+    green. Also proves _loaded stays False when the guard fires.
+    """
+    import bn_en_translate.models.madlad as madlad_mod
+
+    monkeypatch.setattr(madlad_mod, "_flash_attn_available", lambda: False)
+
+    from bn_en_translate.models.madlad import MADLADTranslator
+
+    cfg = ModelConfig(
+        model_name="madlad-3b",
+        model_path="models/madlad-3b-hf",
+        src_lang="ben_Beng",
+        tgt_lang="eng_Latn",
+        device="cpu",
+    )
+    t = MADLADTranslator(cfg)
+
+    import torch
+
+    mock_model = MagicMock()
+    mock_model.shared.weight = torch.randn(4, 2)
+    mock_model.decoder.embed_tokens.weight = torch.randn(4, 2)  # untied
+
+    with patch("transformers.T5Tokenizer.from_pretrained", return_value=MagicMock()), \
+         patch("transformers.T5ForConditionalGeneration.from_pretrained", return_value=mock_model):
+        with pytest.raises(RuntimeError, match="tied-embedding mismatch"):
+            t.load()
+
+    assert t._loaded is False
 
 
 def test_t5_rejects_sdpa_but_accepts_eager() -> None:

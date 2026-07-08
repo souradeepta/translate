@@ -122,13 +122,20 @@ class MADLADTranslator(TranslatorBase):
         A healthy T5 MT checkpoint has shared.weight tied to
         decoder.embed_tokens.weight. The local madlad-3b-hf checkpoint was
         observed with untied (randomised) weights, which produces degenerate
-        output (BLEU 0) with no error. Compare a slice — full 3B comparison
-        would be slow and the corruption randomises the whole matrix.
+        output (BLEU 0) with no error. Compare a slice — the embedding matrix
+        is ~512M params, too large to compare in full, and the documented
+        corruption randomises the whole matrix. Corruption confined to rows
+        >= 64 would pass this check; that mode has never been observed.
         """
         import torch  # type: ignore[import-untyped]
 
         shared = model.shared.weight  # type: ignore[attr-defined]
         decoder = model.decoder.embed_tokens.weight  # type: ignore[attr-defined]
+        if getattr(shared, "is_meta", False) or getattr(decoder, "is_meta", False):
+            raise RuntimeError(
+                "MADLAD embeddings are disk-offloaded (meta tensors); cannot verify "
+                "checkpoint integrity — insufficient RAM for device_map='auto'."
+            )
         if not torch.equal(shared[:64].float().cpu(), decoder[:64].float().cpu()):
             raise RuntimeError(
                 "MADLAD checkpoint tied-embedding mismatch: shared.weight != "
