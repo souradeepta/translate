@@ -154,6 +154,15 @@ each model falls back per architecture via `_resolve_attn_implementation(use_fla
 > 2. **VRAM constraint**: 3B parameters at float16 = ~6 GB weights + activations + KV cache > 8 GB. `device_map="auto"` offloads layers to CPU, reducing throughput to ~2 sentences/minute — unacceptable for 90+ sentence benchmarks.
 >
 > Use `seamless-medium` (BLEU 67.0, 3.9 GB) instead.
+>
+> **Integrity guard (2026-07-07):** `MADLADTranslator.load()` now calls
+> `_verify_tied_embeddings()` immediately after `from_pretrained()` and before
+> marking the model loaded. It compares a 64-row slice of `shared.weight`
+> against `decoder.embed_tokens.weight` and raises `RuntimeError` on any
+> mismatch — the corrupted local checkpoint now fails loudly at load time
+> instead of silently producing BLEU-0 garbage. The `UserWarning` emitted
+> earlier in `load()` is left in place until a clean checkpoint passes the
+> guard.
 
 **Architecture:** T5-based encoder-decoder  
 **Source:** Google Research  

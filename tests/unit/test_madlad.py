@@ -101,8 +101,13 @@ def test_madlad_load_passes_resolved_attn_impl_to_from_pretrained(monkeypatch) -
     )
     t = MADLADTranslator(cfg)
 
+    import torch
+
     mock_tokenizer = MagicMock()
     mock_model = MagicMock()
+    tied_weight = torch.randn(4, 2)
+    mock_model.shared.weight = tied_weight
+    mock_model.decoder.embed_tokens.weight = tied_weight
 
     with patch("transformers.T5Tokenizer.from_pretrained", return_value=mock_tokenizer), \
          patch("transformers.T5ForConditionalGeneration.from_pretrained", return_value=mock_model) as mock_from_pretrained:
@@ -110,6 +115,31 @@ def test_madlad_load_passes_resolved_attn_impl_to_from_pretrained(monkeypatch) -
 
     _, kwargs = mock_from_pretrained.call_args
     assert kwargs["attn_implementation"] == "eager"
+
+
+def test_verify_tied_embeddings_raises_on_mismatch() -> None:
+    import torch
+
+    from bn_en_translate.models.madlad import MADLADTranslator
+
+    class FakeEmbed:
+        def __init__(self, w: torch.Tensor) -> None:
+            self.weight = w
+
+    class FakeDecoder:
+        def __init__(self, w: torch.Tensor) -> None:
+            self.embed_tokens = FakeEmbed(w)
+
+    class FakeModel:
+        def __init__(self, w1: torch.Tensor, w2: torch.Tensor) -> None:
+            self.shared = FakeEmbed(w1)
+            self.decoder = FakeDecoder(w2)
+
+    w = torch.randn(8, 4)
+    MADLADTranslator._verify_tied_embeddings(FakeModel(w, w))  # tied: no raise
+
+    with pytest.raises(RuntimeError, match="tied-embedding mismatch"):
+        MADLADTranslator._verify_tied_embeddings(FakeModel(w, torch.randn(8, 4)))
 
 
 def test_t5_rejects_sdpa_but_accepts_eager() -> None:

@@ -111,7 +111,31 @@ class MADLADTranslator(TranslatorBase):
             device_map=device_map,
         )
 
+        self._verify_tied_embeddings(self._model)
+
         self._loaded = True
+
+    @staticmethod
+    def _verify_tied_embeddings(model: object) -> None:
+        """Detect the known corrupt-checkpoint failure mode at load time.
+
+        A healthy T5 MT checkpoint has shared.weight tied to
+        decoder.embed_tokens.weight. The local madlad-3b-hf checkpoint was
+        observed with untied (randomised) weights, which produces degenerate
+        output (BLEU 0) with no error. Compare a slice — full 3B comparison
+        would be slow and the corruption randomises the whole matrix.
+        """
+        import torch  # type: ignore[import-untyped]
+
+        shared = model.shared.weight  # type: ignore[attr-defined]
+        decoder = model.decoder.embed_tokens.weight  # type: ignore[attr-defined]
+        if not torch.equal(shared[:64].float().cpu(), decoder[:64].float().cpu()):
+            raise RuntimeError(
+                "MADLAD checkpoint tied-embedding mismatch: shared.weight != "
+                "decoder.embed_tokens.weight. This checkpoint produces garbage "
+                "output. Re-download cleanly: rm -rf models/madlad-3b-hf && "
+                "python scripts/download_models.py --model madlad-3b"
+            )
 
     def unload(self) -> None:
         self._model = None
