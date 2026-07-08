@@ -96,7 +96,7 @@ class TranslationPipeline:
                 src_lang=self.config.model.src_lang,
                 tgt_lang=self.config.model.tgt_lang,
             )
-            for idx, out in zip(index_batch, translated):
+            for idx, out in zip(index_batch, translated, strict=True):
                 results[idx] = out
 
         return results

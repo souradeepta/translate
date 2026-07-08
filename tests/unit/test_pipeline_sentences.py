@@ -100,3 +100,34 @@ def test_document_translate_still_preserves_paragraphs(mock_translator) -> None:
     text = "প্রথম অনুচ্ছেদ।\n\nদ্বিতীয় অনুচ্ছেদ যা একটু লম্বা।\n\nতৃতীয়।"
     result = pipeline.translate(text)
     assert result.count("\n\n") == 2
+    # Content placement, not just count: a scatter bug that permuted
+    # translations across paragraphs would preserve the paragraph count.
+    paras = result.split("\n\n")
+    assert "প্রথম" in paras[0]
+    assert "দ্বিতীয়" in paras[1]
+    assert "তৃতীয়" in paras[2]
+
+
+def test_blanks_and_mixed_lengths_compose() -> None:
+    """The blank-filter scatter (translate_sentences) and the length-sort
+    scatter (_translate_in_batches) are two independent index layers —
+    this pins their composition: blanks stay put while non-blanks are
+    sorted for batching and restored to their original slots."""
+    pipeline, translator = _make_pipeline(batch_size=2)
+    sentences = [
+        "এটি একটি অনেক অনেক লম্বা বাংলা বাক্য যা চলতেই থাকে।",
+        "",
+        "ছোট।",
+        "   ",
+        "মাঝারি বাক্য।",
+    ]
+    out = pipeline.translate_sentences(sentences)
+    assert len(out) == 5
+    assert out[1] == "" and out[3] == ""
+    assert "লম্বা" in out[0]
+    assert "ছোট" in out[2]
+    assert "মাঝারি" in out[4]
+    # Batches see only non-blanks, internally length-ascending
+    for batch in translator.batches:
+        assert "" not in batch
+        assert [len(t) for t in batch] == sorted(len(t) for t in batch)
