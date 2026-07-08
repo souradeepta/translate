@@ -47,6 +47,12 @@ MODELS: dict[str, dict[str, str]] = {
         "quantization": "bfloat16",
         "type": "hf_only",
     },
+    "lmt-60-1.7B": {
+        "hf_id": "NiuTrans/LMT-60-1.7B",
+        "output_dir": "models/lmt-60-1.7B-hf",
+        "quantization": "bfloat16",
+        "type": "hf_only",
+    },
 }
 
 
