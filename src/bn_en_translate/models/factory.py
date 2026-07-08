@@ -60,6 +60,20 @@ def _make_ollama(config: PipelineConfig) -> TranslatorBase:
     return OllamaTranslator(config)
 
 
+@register_model("hunyuan-mt-7b")
+@register_model("hunyuan")
+def _make_hunyuan(config: PipelineConfig) -> TranslatorBase:
+    from bn_en_translate.models.ollama_translator import (
+        HUNYUAN_MT_PROMPT,
+        OllamaTranslator,
+    )
+    return OllamaTranslator(
+        config,
+        prompt_template=HUNYUAN_MT_PROMPT,
+        model_tag="demonbyron/HY-MT1.5-7B:Q4_K_M",
+    )
+
+
 @register_model("madlad-3b")
 @register_model("madlad")
 def _make_madlad(config: PipelineConfig) -> TranslatorBase:
@@ -79,6 +93,13 @@ def _make_seamless(config: PipelineConfig) -> TranslatorBase:
 def _make_milmmt(config: PipelineConfig) -> TranslatorBase:
     from bn_en_translate.models.milmmt import MiLMMTTranslator
     return MiLMMTTranslator(config.model)
+
+
+@register_model("lmt-60-1.7b")
+@register_model("lmt-60")
+def _make_lmt60(config: PipelineConfig) -> TranslatorBase:
+    from bn_en_translate.models.lmt60 import LMT60Translator
+    return LMT60Translator(config.model)
 
 
 # ---------------------------------------------------------------------------

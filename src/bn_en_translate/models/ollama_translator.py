@@ -18,6 +18,14 @@ Bengali text:
 
 English translation:"""
 
+# Hunyuan-MT prompt format for non-Chinese pairs, verbatim from the model card
+# (https://huggingface.co/tencent/Hunyuan-MT-7B) — the model is prompt-brittle,
+# do not reword.
+HUNYUAN_MT_PROMPT = """\
+Translate the following segment into English, without additional explanation.
+
+{text}"""
+
 
 class OllamaTranslator(TranslatorBase):
     """
@@ -40,9 +48,16 @@ class OllamaTranslator(TranslatorBase):
       - Model pulled: `ollama pull qwen2.5:7b-instruct-q4_K_M`
     """
 
-    def __init__(self, config: PipelineConfig | None = None) -> None:
+    def __init__(
+        self,
+        config: PipelineConfig | None = None,
+        prompt_template: str | None = None,
+        model_tag: str | None = None,
+    ) -> None:
         super().__init__()
         self.config = config or PipelineConfig()
+        self.prompt_template = prompt_template or TRANSLATION_PROMPT
+        self.model_tag = model_tag or self.config.ollama_model
         self._client: httpx.Client | None = None
 
     def load(self) -> None:
@@ -73,11 +88,11 @@ class OllamaTranslator(TranslatorBase):
 
     def _translate_one(self, text: str) -> str:
         assert self._client is not None
-        prompt = TRANSLATION_PROMPT.format(text=text)
+        prompt = self.prompt_template.format(text=text)
         response = self._client.post(
             "/api/generate",
             json={
-                "model": self.config.ollama_model,
+                "model": self.model_tag,
                 "prompt": prompt,
                 "stream": False,
                 "options": {"temperature": 0.2, "num_predict": 1024},
