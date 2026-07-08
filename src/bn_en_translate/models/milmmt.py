@@ -20,10 +20,12 @@ Setup:
 
 from __future__ import annotations
 
-import importlib.util
-
 from bn_en_translate.config import REPO_ROOT, ModelConfig
 from bn_en_translate.models.base import TranslatorBase
+from bn_en_translate.models.hf_utils import (
+    flash_attn_available as _flash_attn_available,  # noqa: F401
+)
+from bn_en_translate.models.hf_utils import free_cuda_memory, resolve_device
 
 # Human-readable language names used in the MiLMMT prompt template.
 # Keys are FLORES-200 codes; values are what the model card uses.
@@ -37,19 +39,12 @@ _LANG_NAMES: dict[str, str] = {
 }
 
 
-def _flash_attn_available() -> bool:
-    return importlib.util.find_spec("flash_attn") is not None
-
-
 def _resolve_attn_implementation(use_flash: bool, fallback: str = "sdpa") -> str:
     """flash_attention_2 if installed and requested; else the given fallback.
 
-    flash-attn is not installable on sm_120/WSL2 as of 2026-07, so the fallback is
-    the effective default on this machine. Not every architecture supports every
-    fallback: PyTorch SDPA (scaled_dot_product_attention) is fast and broadly
-    supported (e.g. Gemma3/MiLMMT), but T5 (MADLAD) does NOT support sdpa in
-    transformers 5.4.0 (T5PreTrainedModel._supports_sdpa is False) and raises
-    ValueError — callers must pass fallback="eager" for T5-based models.
+    Thin wrapper around hf_utils.resolve_attn_implementation that calls the
+    module-level `_flash_attn_available` name (not hf_utils directly) so tests
+    can monkeypatch it by module attribute.
     """
     if use_flash and _flash_attn_available():
         return "flash_attention_2"
@@ -104,17 +99,18 @@ class MiLMMTTranslator(TranslatorBase):
         ]
 
     def load(self) -> None:
-        import torch  # type: ignore[import-untyped]
         from pathlib import Path
+
+        import torch  # type: ignore[import-untyped]
         from transformers import AutoModelForCausalLM, AutoTokenizer  # type: ignore[import-untyped]
 
-        from bn_en_translate.utils.cuda_check import get_best_device, require_cuda
+        from bn_en_translate.utils.cuda_check import require_cuda
 
         model_id = self._LOCAL_PATH if Path(self._LOCAL_PATH).exists() else self.HF_MODEL_ID
 
         attn_impl = _resolve_attn_implementation(self.config.use_flash_attention)
 
-        device = get_best_device() if self.config.device == "auto" else self.config.device
+        device = resolve_device(self.config.device)
 
         self._tokenizer = AutoTokenizer.from_pretrained(model_id)
         # Left-padding is required for causal LM batch generation.
@@ -136,12 +132,7 @@ class MiLMMTTranslator(TranslatorBase):
         self._model = None
         self._tokenizer = None
         self._loaded = False
-        try:
-            import torch  # type: ignore[import-untyped]
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-        except ImportError:
-            pass
+        free_cuda_memory()
 
     def _translate_batch(self, texts: list[str], src_lang: str, tgt_lang: str) -> list[str]:
         import torch  # type: ignore[import-untyped]

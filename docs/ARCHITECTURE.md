@@ -275,6 +275,10 @@ get_translator(config)
 
 `MADLADTranslator` and `SeamlessTranslator` always use HuggingFace native inference — there is no CT2 path for these models.
 
+**Shared HF helpers** (`hf_utils.py`):
+
+`milmmt.py`, `madlad.py`, `seamless.py`, and `indicTrans2.py` are all HF-native translators that previously duplicated the same boilerplate: flash-attn detection, attention-implementation resolution, `"auto"` → best-device resolution, and CUDA cache-freeing on `unload()`. `hf_utils.py` centralizes these as `flash_attn_available()`, `resolve_attn_implementation(use_flash, fallback="sdpa")`, `resolve_device(config_device)`, and `free_cuda_memory()`. The `fallback` parameter on `resolve_attn_implementation` is load-bearing: T5 (MADLAD) rejects `attn_implementation="sdpa"` in transformers 5.4.0 and must pass `fallback="eager"`, while Gemma3 (MiLMMT) and IndicTrans2 use other fallbacks explicitly. `milmmt.py` and `madlad.py` keep a thin module-level `_flash_attn_available` / `_resolve_attn_implementation` re-export so existing tests can still monkeypatch by module attribute.
+
 **CTranslate2 source tokenisation format (M2M-100 / NLLB):**
 
 ```

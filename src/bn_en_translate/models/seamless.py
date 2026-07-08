@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from bn_en_translate.config import REPO_ROOT, ModelConfig
 from bn_en_translate.models.base import TranslatorBase
+from bn_en_translate.models.hf_utils import free_cuda_memory, resolve_device
 
 # Map FLORES-200 codes to SeamlessM4T short codes
 _SEAMLESS_LANG_MAP: dict[str, str] = {
@@ -58,18 +59,20 @@ class SeamlessTranslator(TranslatorBase):
         self._processor: object | None = None
 
     def load(self) -> None:
-        import torch  # type: ignore[import-untyped]
         from pathlib import Path
-        from transformers import AutoProcessor, SeamlessM4Tv2ForTextToText  # type: ignore[import-untyped]
 
-        from bn_en_translate.utils.cuda_check import get_best_device, require_cuda
+        import torch  # type: ignore[import-untyped]
+        from transformers import (  # type: ignore[import-untyped]
+            AutoProcessor,
+            SeamlessM4Tv2ForTextToText,
+        )
+
+        from bn_en_translate.utils.cuda_check import require_cuda
 
         # Prefer local download; fall back to HF Hub
         model_id = self._LOCAL_PATH if Path(self._LOCAL_PATH).exists() else self.HF_MODEL_ID
 
-        device = (
-            get_best_device() if self.config.device == "auto" else self.config.device
-        )
+        device = resolve_device(self.config.device)
 
         # SeamlessM4Tv2ForTextToText does not support device_map="auto" — load in float16
         # then move to GPU explicitly. Text-only portion is ~3.5 GB, fits in 8 GB VRAM.
@@ -88,12 +91,7 @@ class SeamlessTranslator(TranslatorBase):
         self._model = None
         self._processor = None
         self._loaded = False
-        try:
-            import torch  # type: ignore[import-untyped]
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-        except ImportError:
-            pass
+        free_cuda_memory()
 
     def _translate_batch(self, texts: list[str], src_lang: str, tgt_lang: str) -> list[str]:
         import torch  # type: ignore[import-untyped]

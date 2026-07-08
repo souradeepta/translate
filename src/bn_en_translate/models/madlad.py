@@ -8,26 +8,23 @@ benchmarks. Re-download cleanly from HF Hub before using.
 """
 
 from __future__ import annotations
-import importlib.util
+
 import warnings
 
 from bn_en_translate.config import REPO_ROOT, ModelConfig
 from bn_en_translate.models.base import TranslatorBase
-
-
-def _flash_attn_available() -> bool:
-    return importlib.util.find_spec("flash_attn") is not None
+from bn_en_translate.models.hf_utils import (
+    flash_attn_available as _flash_attn_available,  # noqa: F401
+)
+from bn_en_translate.models.hf_utils import free_cuda_memory, resolve_device
 
 
 def _resolve_attn_implementation(use_flash: bool, fallback: str = "sdpa") -> str:
     """flash_attention_2 if installed and requested; else the given fallback.
 
-    flash-attn is not installable on sm_120/WSL2 as of 2026-07, so the fallback is
-    the effective default on this machine. Not every architecture supports every
-    fallback: PyTorch SDPA (scaled_dot_product_attention) is fast and broadly
-    supported (e.g. Gemma3/MiLMMT), but T5 (MADLAD) does NOT support sdpa in
-    transformers 5.4.0 (T5PreTrainedModel._supports_sdpa is False) and raises
-    ValueError — callers must pass fallback="eager" for T5-based models.
+    Thin wrapper around hf_utils.resolve_attn_implementation that calls the
+    module-level `_flash_attn_available` name (not hf_utils directly) so tests
+    can monkeypatch it by module attribute.
     """
     if use_flash and _flash_attn_available():
         return "flash_attention_2"
@@ -76,11 +73,13 @@ class MADLADTranslator(TranslatorBase):
     _LOCAL_PATH: str = str(REPO_ROOT / "models/madlad-3b-hf")
 
     def load(self) -> None:
-        import torch  # type: ignore[import-untyped]
         from pathlib import Path
-        from transformers import T5ForConditionalGeneration, T5Tokenizer  # type: ignore[import-untyped]
 
-        from bn_en_translate.utils.cuda_check import get_best_device
+        import torch  # type: ignore[import-untyped]
+        from transformers import (  # type: ignore[import-untyped]
+            T5ForConditionalGeneration,
+            T5Tokenizer,
+        )
 
         warnings.warn(
             "MADLADTranslator: the local checkpoint at models/madlad-3b-hf/ has a known "
@@ -96,9 +95,7 @@ class MADLADTranslator(TranslatorBase):
 
         attn_impl = _resolve_attn_implementation(self.config.use_flash_attention, fallback="eager")
 
-        device = (
-            get_best_device() if self.config.device == "auto" else self.config.device
-        )
+        device = resolve_device(self.config.device)
         # device_map="auto" is necessary because 3B float16 weights (~6 GB) + KV cache
         # exceed 8 GB VRAM. This forces CPU offload and reduces throughput to ~2 ch/s.
         device_map = "auto" if device == "cuda" and torch.cuda.is_available() else None
@@ -148,12 +145,7 @@ class MADLADTranslator(TranslatorBase):
         self._model = None
         self._tokenizer = None
         self._loaded = False
-        try:
-            import torch  # type: ignore[import-untyped]
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-        except ImportError:
-            pass
+        free_cuda_memory()
 
     def _build_input_texts(self, texts: list[str], tgt_lang: str) -> list[str]:
         """Prefix each text with the MADLAD-400 target language tag."""

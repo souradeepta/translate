@@ -2,14 +2,9 @@
 
 from __future__ import annotations
 
-import importlib.util
-
 from bn_en_translate.config import ModelConfig
 from bn_en_translate.models.base import TranslatorBase
-
-
-def _flash_attn_available() -> bool:
-    return importlib.util.find_spec("flash_attn") is not None
+from bn_en_translate.models.hf_utils import free_cuda_memory, resolve_attn_implementation
 
 
 class IndicTrans2Translator(TranslatorBase):
@@ -59,18 +54,19 @@ class IndicTrans2Translator(TranslatorBase):
     def _load_via_indictrans2_interface(self) -> None:
         import torch  # type: ignore[import-untyped]
         from IndicTransToolkit import IndicProcessor  # type: ignore[import-untyped]
-        from transformers import AutoModelForSeq2SeqLM, AutoTokenizer  # type: ignore[import-untyped]
+        from transformers import (  # type: ignore[import-untyped]
+            AutoModelForSeq2SeqLM,
+            AutoTokenizer,
+        )
 
         from bn_en_translate.utils.cuda_check import require_cuda
 
         self._tokenizer = AutoTokenizer.from_pretrained(
             self.HF_MODEL_ID, trust_remote_code=True
         )
-        attn_impl = (
-            "flash_attention_2"
-            if self.config.use_flash_attention and _flash_attn_available()
-            else "eager"
-        )
+        # IndicTrans2's sdpa support is unverified — keep eager as the fallback
+        # (behavior-preserving; do not switch to sdpa without dedicated testing).
+        attn_impl = resolve_attn_implementation(self.config.use_flash_attention, fallback="eager")
         self._model = AutoModelForSeq2SeqLM.from_pretrained(
             self.HF_MODEL_ID,
             trust_remote_code=True,
@@ -86,16 +82,15 @@ class IndicTrans2Translator(TranslatorBase):
     def _load_via_transformers_fallback(self) -> None:
         """Fallback: load as a standard seq2seq model (lower quality tokenization)."""
         import torch  # type: ignore[import-untyped]
-        from transformers import AutoModelForSeq2SeqLM, AutoTokenizer  # type: ignore[import-untyped]
+        from transformers import (  # type: ignore[import-untyped]
+            AutoModelForSeq2SeqLM,
+            AutoTokenizer,
+        )
 
         from bn_en_translate.utils.cuda_check import require_cuda
 
         self._tokenizer = AutoTokenizer.from_pretrained(self.HF_MODEL_ID)
-        attn_impl = (
-            "flash_attention_2"
-            if self.config.use_flash_attention and _flash_attn_available()
-            else "eager"
-        )
+        attn_impl = resolve_attn_implementation(self.config.use_flash_attention, fallback="eager")
         self._model = AutoModelForSeq2SeqLM.from_pretrained(
             self.HF_MODEL_ID,
             attn_implementation=attn_impl,
@@ -110,13 +105,7 @@ class IndicTrans2Translator(TranslatorBase):
         self._model = None
         self._tokenizer = None
         self._loaded = False
-        try:
-            import torch  # type: ignore[import-untyped]
-
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-        except ImportError:
-            pass
+        free_cuda_memory()
 
     def _translate_batch(self, texts: list[str], src_lang: str, tgt_lang: str) -> list[str]:
         import torch  # type: ignore[import-untyped]
