@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
-from bn_en_translate.config import ChunkConfig, ModelConfig, PipelineConfig
-
+from bn_en_translate.config import REPO_ROOT, ChunkConfig, ModelConfig, PipelineConfig
 
 # ---------------------------------------------------------------------------
 # ChunkConfig
@@ -45,6 +46,12 @@ def test_model_config_defaults_are_valid() -> None:
     assert config.device == "cuda"
     assert config.compute_type == "int8"
     assert config.beam_size is None
+
+
+def test_model_path_default_is_repo_root_anchored() -> None:
+    config = ModelConfig()
+    assert Path(config.model_path).is_absolute()
+    assert Path(config.model_path) == REPO_ROOT / "models/nllb-600M-ct2"
 
 
 def test_model_config_invalid_device_raises() -> None:

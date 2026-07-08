@@ -148,6 +148,28 @@ Rules:
 
 ---
 
+## Configuration
+
+`ModelConfig` (in `src/bn_en_translate/config.py`) is the single source of truth for
+per-model settings:
+
+- **`model_path`** defaults to `REPO_ROOT / "models/nllb-600M-ct2"` — an absolute,
+  `REPO_ROOT`-anchored path (`REPO_ROOT = Path(__file__).parents[2]`), matching the
+  convention already used by `CT2_MODEL_PATHS`. This makes the default cwd-independent:
+  it resolves correctly whether the process is started from the repo root, a subdirectory,
+  or a completely different working directory. Do not reintroduce a bare relative string
+  here — it would only resolve correctly when cwd happens to equal the repo root.
+- **`compute_type`** defaults to `"int8"`, but this is a *requested preference*, not a
+  guarantee. On this GPU (RTX 5050, sm_120/Blackwell), CUBLAS does not support INT8
+  kernels, so the CT2 load-time probe (`probe_compute_type()` in
+  `src/bn_en_translate/utils/ct2_utils.py`, invoked from `nllb_ct2.py` /
+  `indicTrans2_ct2.py`) silently overrides it to `float16` after a real ~20-token
+  translation attempt fails. See "Common Pitfalls" below
+  (`CUBLAS_STATUS_NOT_SUPPORTED`). Do not read `config.compute_type` as the value
+  actually used at inference time — check the translator's resolved compute type instead.
+
+---
+
 ## Adding a New Model Backend
 
 Follow the CT2-first pattern:
@@ -156,12 +178,14 @@ Follow the CT2-first pattern:
 # src/bn_en_translate/models/mymodel_ct2.py
 from __future__ import annotations
 from pathlib import Path
-from bn_en_translate.config import ModelConfig
+from bn_en_translate.config import REPO_ROOT, ModelConfig
 from bn_en_translate.models.base import TranslatorBase
 
 class MyModelCt2Translator(TranslatorBase):
     def __init__(self, config: ModelConfig | None = None) -> None:
-        self.config = config or ModelConfig(model_name="my-model", model_path="models/my-model-ct2")
+        self.config = config or ModelConfig(
+            model_name="my-model", model_path=str(REPO_ROOT / "models/my-model-ct2")
+        )
         self._translator: object | None = None
         self._sp: object | None = None
 

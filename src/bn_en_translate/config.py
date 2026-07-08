@@ -44,8 +44,11 @@ class ModelConfig:
     """Configuration for the translation model."""
 
     model_name: str = "nllb-600M"
-    model_path: str = "models/nllb-600M-ct2"
+    model_path: str = str(REPO_ROOT / "models/nllb-600M-ct2")
     device: str = "cuda"
+    # Requested compute type for CT2 backends. On sm_120 the load-time probe
+    # overrides int8 with float16 (CUBLAS does not support int8 there) — this
+    # value is a preference, not a guarantee. See utils/ct2_utils.probe_compute_type.
     compute_type: str = "int8"
     src_lang: str = "ben_Beng"
     tgt_lang: str = "eng_Latn"
