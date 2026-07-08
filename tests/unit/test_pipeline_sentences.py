@@ -69,3 +69,34 @@ def test_translate_sentences_blank_input_maps_to_blank_output() -> None:
     # blank never reached the backend
     for batch in translator.batches:
         assert "" not in batch
+
+
+def test_batches_are_length_sorted_but_output_order_restored() -> None:
+    pipeline, translator = _make_pipeline(batch_size=2)
+    # Mixed lengths, deliberately unsorted (long first) so that a naive
+    # in-input-order batching produces a non-ascending first batch — this
+    # is what makes the assertion below actually exercise the sort fix
+    # instead of passing by coincidence.
+    sentences = ["এটি একটি অনেক অনেক অনেক লম্বা বাংলা বাক্য যা চলতেই থাকে।", "ছোট।", "মাঝারি বাক্য।"]
+    out = pipeline.translate_sentences(sentences)
+    # Output order must match input order exactly
+    assert [o.replace("[MOCK] ", "") for o in out] == [
+        "এটি একটি অনেক অনেক অনেক লম্বা বাংলা বাক্য যা চলতেই থাকে।",
+        "ছোট।",
+        "মাঝারি বাক্য।",
+    ]
+    # Each batch must be internally ordered shortest-to-longest input
+    for batch in translator.batches:
+        lengths = [len(t) for t in batch]
+        assert lengths == sorted(lengths)
+
+
+def test_document_translate_still_preserves_paragraphs(mock_translator) -> None:
+    """Regression guard: sorting inside _translate_in_batches must not break reassembly."""
+    from bn_en_translate.pipeline.pipeline import TranslationPipeline
+
+    mock_translator.load()
+    pipeline = TranslationPipeline(mock_translator)
+    text = "প্রথম অনুচ্ছেদ।\n\nদ্বিতীয় অনুচ্ছেদ যা একটু লম্বা।\n\nতৃতীয়।"
+    result = pipeline.translate(text)
+    assert result.count("\n\n") == 2

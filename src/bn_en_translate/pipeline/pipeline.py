@@ -77,17 +77,27 @@ class TranslationPipeline:
         return results
 
     def _translate_in_batches(self, texts: list[str]) -> list[str]:
-        batch_size = self.config.chunk.batch_size
-        results: list[str] = []
+        """Translate texts in batches, length-sorted to minimize padding waste.
 
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i : i + batch_size]
+        HF models pad each batch to its longest member; grouping similar
+        lengths cuts wasted decode steps. Original order is restored before
+        returning, so callers (and reassemble()) see 1:1 positional mapping.
+        CT2 backends sort internally — this is harmless there.
+        """
+        batch_size = self.config.chunk.batch_size
+        order = sorted(range(len(texts)), key=lambda i: len(texts[i]))
+        results: list[str] = [""] * len(texts)
+
+        for start in range(0, len(order), batch_size):
+            index_batch = order[start : start + batch_size]
+            batch = [texts[i] for i in index_batch]
             translated = self.translator.translate(
                 batch,
                 src_lang=self.config.model.src_lang,
                 tgt_lang=self.config.model.tgt_lang,
             )
-            results.extend(translated)
+            for idx, out in zip(index_batch, translated):
+                results[idx] = out
 
         return results
 

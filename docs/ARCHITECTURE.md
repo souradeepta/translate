@@ -309,6 +309,8 @@ On CUDA, the method runs a real ~20-token translation with each compute type in 
 - Strips leading/trailing whitespace per paragraph
 - Collapses repeated articles (`the the` → `the`)
 
+**Length-sorted batching (`_translate_in_batches`):** HF-backed models (Seamless, MiLMMT-46) pad every batch to its longest member, so a batch mixing a 4-char and a 200-char sentence wastes decode steps padding the short one out. `_translate_in_batches()` sorts input indices by `len(text)` ascending before slicing into `batch_size`-sized groups, translates each group, then scatters results back into a `results` array indexed by the original position — so callers (`translate()`, `translate_sentences()`) always see a strict 1:1, input-order mapping. This is an **invariant**: no caller may observe batch-internal reordering. CT2 backends (NLLB) already sort internally for their own batching, so this is a no-op there — safe to apply universally rather than special-casing per backend.
+
 ### Training Layer (`training/`)
 
 `Seq2SeqFineTuner` (formerly `NLLBFineTuner` — the old name remains as an alias) wraps the HuggingFace base model with PEFT LoRA adapters and drives `Seq2SeqTrainer`. It always loads on CPU first to avoid CUDA device errors on sm_120, then moves to GPU after LoRA wrapping. After training, `export_ct2()` merges the adapters into the base weights via `merge_and_unload()` and converts the result to CTranslate2 float16. Supported fine-tunable models: `nllb-600M`, `nllb-1.3B`, `indicTrans2-1B`, `madlad-3b` (T5-compatible LoRA path).
