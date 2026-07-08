@@ -15,14 +15,14 @@ flowchart TB
     end
 
     subgraph Stages["Processing Stages"]
-        C["Preprocessor\nNFC · whitespace"]
-        D["Chunker\n≤400 tokens\ndanda split"]
+        C["Preprocessor\nNFC + whitespace"]
+        D["Chunker\n<=400 tokens\ndanda split"]
         E["Postprocessor\npara reassembly\nMT artifact cleanup"]
     end
 
     subgraph Models["Model Layer"]
         F["ModelFactory\nget_translator()"]
-        G["NLLBCt2Translator\nCT2 float16 GPU\n✅ primary"]
+        G["NLLBCt2Translator\nCT2 float16 GPU\nprimary"]
         H["NLLBTranslator\nHF pipeline\nfallback"]
         I["IndicTrans2\n~3GB VRAM\noptional"]
         J["OllamaTranslator\nqwen2.5:7b\npolish pass"]
@@ -70,29 +70,29 @@ Each translation request passes through four deterministic stages. The stages ar
 
 ```mermaid
 flowchart TD
-    A["📄 Bengali .txt (UTF-8)"] --> B
+    A["Bengali .txt (UTF-8)"] --> B
 
-    subgraph Stage1["Stage 1 — Preprocessor"]
+    subgraph Stage1["Stage 1 - Preprocessor"]
         B["unicodedata.normalize(NFC)\nCollapse whitespace\nStrip zero-width chars"]
     end
 
     Stage1 --> Stage2
 
-    subgraph Stage2["Stage 2 — Chunker"]
-        C["Split paragraphs\n↓\nSplit sentences at danda ।/॥\n↓\nPack into chunks ≤ 400 tokens\nTag each with para_id + chunk_id"]
+    subgraph Stage2["Stage 2 - Chunker"]
+        C["Split paragraphs\nSplit sentences at danda (U+0964/U+0965)\nPack into chunks <= 400 tokens\nTag each with para_id + chunk_id"]
     end
 
     Stage2 --> Stage3
 
-    subgraph Stage3["Stage 3 — Translator"]
+    subgraph Stage3["Stage 3 - Translator"]
         D{CT2 model\non disk?}
-        D -- Yes --> E["NLLBCt2Translator\nfloat16 · GPU batch\n~1000 chars/s"]
+        D -- Yes --> E["NLLBCt2Translator\nfloat16 GPU batch\n~1000 chars/s"]
         D -- No  --> F["NLLBTranslator\nHuggingFace pipeline\nCPU fallback"]
     end
 
     Stage3 --> Stage4
 
-    subgraph Stage4["Stage 4 — Postprocessor"]
+    subgraph Stage4["Stage 4 - Postprocessor"]
         G["Group by para_id\nJoin sentence chunks\nClean MT artifacts\n(doubled articles, leading spaces)"]
     end
 
@@ -100,7 +100,7 @@ flowchart TD
     H -- "--ollama-polish" --> I["OllamaTranslator\nqwen2.5:7b-instruct\nLiterary tone refinement\n~200 chars/s"]
     H -- default --> J
 
-    I --> J["📄 English .txt (UTF-8)"]
+    I --> J["English .txt (UTF-8)"]
 
     style Stage1 fill:#e3f2fd,stroke:#1565c0
     style Stage2 fill:#e8f5e9,stroke:#2e7d32
@@ -198,8 +198,8 @@ sequenceDiagram
     PP-->>CLI: clean_text
 
     CLI->>CK: chunk(clean_text)
-    Note over CK: Split paragraphs<br/>Split at danda ।/॥<br/>Pack ≤400 tokens<br/>Tag para_id + chunk_id
-    CK-->>CLI: [ChunkResult × N]
+    Note over CK: Split paragraphs<br/>Split at danda (U+0964/U+0965)<br/>Pack <=400 tokens<br/>Tag para_id + chunk_id
+    CK-->>CLI: [ChunkResult x N]
 
     CLI->>TR: load()
     Note over TR: ctranslate2.Translator<br/>device=cuda, compute_type=float16<br/>_best_compute_type() probe
@@ -207,7 +207,7 @@ sequenceDiagram
 
     CLI->>TR: translate(chunk_texts, ben_Beng, eng_Latn)
     Note over TR: Tokenise with SentencePiece<br/>Format: tokens + [</s>, src_lang]<br/>Target prefix: [tgt_lang]<br/>translate_batch(max_batch_size=32)
-    TR-->>CLI: [translated_texts × N]
+    TR-->>CLI: [translated_texts x N]
 
     CLI->>PO: reassemble(chunks, translated_texts)
     Note over PO: Group by para_id<br/>Join sentence chunks<br/>Clean MT artifacts
@@ -217,7 +217,7 @@ sequenceDiagram
     Note over TR: torch.cuda.empty_cache()
 
     CLI->>FS: write_translation(output_path, english_text)
-    CLI-->>User: Done ✓
+    CLI-->>User: Done
 ```
 
 ---
