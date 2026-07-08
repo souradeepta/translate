@@ -86,6 +86,24 @@ Options:
   --help                 Show this message and exit.
 ```
 
+### `--ollama-polish`
+
+> **Fixed 2026-07:** this flag was previously parsed but silently ignored — the
+> polish pass never ran. It now works as documented.
+
+The polish pass runs after translation completes: the translator is unloaded
+first (freeing its VRAM), then a pre-flight check confirms the Ollama model fits
+in the remaining VRAM before loading it — a clear `RuntimeError` instead of a
+mid-run CUDA OOM. Polishing is per-paragraph, so paragraph structure is preserved.
+
+Safe combinations on an 8 GB GPU (models loaded sequentially, never together):
+
+| Translator | Polish model | Peak VRAM | Verdict |
+|------------|-------------|-----------|---------|
+| `nllb-600M` (~2.4 GB) | gemma3:12b (~4.7 GB) | one at a time | ✅ Safe |
+| `seamless-medium` (~4.1 GB) | gemma3:12b (~4.7 GB) | one at a time | ✅ Safe (sequential swap) |
+| Any translator still loaded | any Ollama model | combined | ❌ Pre-flight raises |
+
 ---
 
 ## Project Structure

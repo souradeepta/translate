@@ -84,7 +84,16 @@ def main(
     click.echo(f"Loading model '{model}'...")
     with translator:
         click.echo(f"Translating '{input_path}'...")
-        pipeline.translate_file(input_path, output_path)
+        result = pipeline.translate_file(input_path, output_path)
+    # translator is now unloaded — VRAM is free for the polish model
+
+    if ollama_polish:
+        from bn_en_translate.pipeline.pipeline import polish_with_ollama
+        from bn_en_translate.utils.file_io import write_translation
+
+        click.echo(f"Polishing with Ollama ({ollama_model})...")
+        polished = polish_with_ollama(result, config)
+        write_translation(polished, output_path)
 
     click.echo(f"Done. Output written to: {output_path}")
 

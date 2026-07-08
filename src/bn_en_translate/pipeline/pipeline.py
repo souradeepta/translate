@@ -7,6 +7,7 @@ from bn_en_translate.models.base import TranslatorBase
 from bn_en_translate.pipeline.chunker import Chunker
 from bn_en_translate.pipeline.postprocessor import reassemble
 from bn_en_translate.pipeline.preprocessor import normalize
+from bn_en_translate.utils.cuda_check import ensure_vram_available
 
 
 class TranslationPipeline:
@@ -109,3 +110,47 @@ class TranslationPipeline:
         result = self.translate(text)
         write_translation(result, output_path)
         return result
+
+
+def _make_ollama(config: PipelineConfig) -> TranslatorBase:
+    """Seam for tests — constructs the real OllamaTranslator."""
+    from bn_en_translate.models.ollama_translator import OllamaTranslator
+
+    return OllamaTranslator(config)
+
+
+def _ollama_vram_requirement_mib(ollama_model: str) -> int:
+    """Look up the polish model's VRAM need; unknown tags assume the largest."""
+    from bn_en_translate.config import MODEL_VRAM_MIB
+
+    exact = MODEL_VRAM_MIB.get(f"ollama-{ollama_model}")
+    if exact is not None:
+        return exact
+    # Tags often carry quant suffixes (qwen2.5:7b-instruct-q4_K_M) — prefix match
+    for key, mib in MODEL_VRAM_MIB.items():
+        if key.startswith("ollama-") and ollama_model.startswith(key.removeprefix("ollama-")):
+            return mib
+    return max(v for k, v in MODEL_VRAM_MIB.items() if k.startswith("ollama-"))
+
+
+def polish_with_ollama(english_text: str, config: PipelineConfig) -> str:
+    """Run the Ollama literary polish pass over translated English text.
+
+    Per-paragraph so paragraph structure survives (key invariant #3).
+    Caller must have unloaded the translation model first — this checks the
+    Ollama model's VRAM requirement and raises rather than OOM-ing.
+    """
+    from bn_en_translate.utils.text_utils import split_paragraphs
+
+    ensure_vram_available(
+        _ollama_vram_requirement_mib(config.ollama_model), context="Ollama polish pass"
+    )
+
+    paragraphs = split_paragraphs(english_text)
+    ollama = _make_ollama(config)
+    ollama.load()
+    try:
+        polished = ollama.translate(paragraphs, src_lang="eng_Latn", tgt_lang="eng_Latn")
+    finally:
+        ollama.unload()
+    return "\n\n".join(polished)

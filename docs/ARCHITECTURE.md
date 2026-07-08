@@ -384,7 +384,20 @@ Samanantar pairs (bn.txt / en.txt)
 | Ollama gemma3:12b | ~4.7 GB | ~4.7 GB | ~3.3 GB |
 | IndicTrans2 + Ollama | ~7.7 GB | OOM risk | unload before switching |
 
-The pipeline unloads the translator before running the Ollama polish pass when `--ollama-polish` is set.
+### Polish-pass sequence (`--ollama-polish`)
+
+When `--ollama-polish` is set, the CLI runs a strict swap sequence so both models
+never occupy VRAM at once:
+
+1. **Translate** — `pipeline.translate_file()` writes the raw translation.
+2. **Unload** — the `with translator:` block exits, freeing the translator's VRAM.
+3. **Pre-flight** — `polish_with_ollama()` looks up the polish model's measured
+   footprint in `config.MODEL_VRAM_MIB` (unknown Ollama tags assume the largest
+   measured, 4800 MiB) and calls `ensure_vram_available()`, raising `RuntimeError`
+   instead of OOM-ing mid-run.
+4. **Polish** — the Ollama model rewrites the text one paragraph at a time, so the
+   paragraph-count invariant survives; the model is unloaded even if a request fails.
+5. **Write** — the polished text overwrites the output file.
 
 ---
 
