@@ -1,3 +1,48 @@
+## 2026-07-08 — new-model evaluation (lmt-60-1.7b, hunyuan-mt-7b) + close-out benchmark + MADLAD re-download verdict (branch: perf/optimization-pass)
+
+**New-model evaluations — both REJECTED:**
+
+- **lmt-60-1.7b** (90-sentence FLORES, run `a63da1133a8c`): BLEU 63.84 / chrF 78.3, 86 ch/s, duration 139.2 s, VRAM peak 6,634.9 MiB, GPU util peak 100% / avg 14%, RAM peak 5,430 MiB, CPU avg 31.9%, `num_beams=5`. Below seamless-medium (67.0) and milmmt-46-1b (65.2) on BLEU while costing ~2 GB more VRAM than either — rejected on quality-per-VRAM.
+- lmt-60-1.7b **5-sentence smoke** (run `432433753d67`): BLEU **73.18** vs the 90-sentence figure of **63.84** — a 9.3-point gap from sample size alone. **Never gate a model accept/reject decision on a 5-sentence BLEU number**; the smoke test exists to catch load/crash failures, not to rank quality. This is the same small-sample-inflation pattern documented for nllb-600M and milmmt-46-1b below.
+- **hunyuan-mt-7b** (Q4 via Ollama, 90-sentence FLORES, run `80a3c494ddcd`): BLEU 54.7 / chrF 74.7, 112 ch/s, duration 34.0 s, VRAM peak 6,614.4 MiB, GPU util peak 89% / avg 59%. Below all three production models on BLEU (nllb 55.3, milmmt 65.2, seamless 67.0) while using the most VRAM of any accepted or candidate model — rejected. A companion 5-sentence run (`526fd3c565da`) scored BLEU 61.3 — same inflation pattern, disregarded per the rule above.
+- Both rejected models sit at ~6.6 GB VRAM standalone — each alone consumes essentially the full 7.5 GB usable budget, leaving no headroom for Ollama polish or any second model. This is a second, independent reason neither is viable even ignoring BLEU.
+
+**Ollama CPU-fallback gotcha (operational, not captured as a runs.db row):**
+
+- If VRAM is already occupied (e.g., by a prior model that wasn't unloaded) when Ollama loads a model, Ollama silently falls back to 100% CPU inference instead of erroring — observed at ~5.4 tok/s CPU vs ~58.5 tok/s GPU for the same model, a >10× slowdown. One benchmark attempt today timed out this way; because the pipeline's Ollama HTTP client has a 120 s timeout and the CPU-bound cold load exceeded it, the run never completed and consequently never wrote a row to `runs.db` — this incident is invisible to `show_stats.py` and must be logged here instead.
+- **Mitigation:** run `ollama ps` before trusting any Ollama-backed benchmark number, to confirm the model is actually resident on GPU (`PROCESSOR` column shows `100% GPU`, not `100% CPU`). Also be aware the first request after a fresh `ollama pull` can exceed the translator's 120 s HTTP timeout purely from cold load — retry once before concluding the model is broken.
+
+**Close-out three-model run at BLEU parity (all at 90-sentence FLORES, translate-only ch/s per the Task-1 Load/translate split):**
+
+- nllb-600M (`2713ab956b97`): BLEU 55.27 @ 2,346 ch/s, VRAM peak 2,552 MiB — matches the 55.3 April baseline.
+- milmmt-46-1b (`43d3473c7721`): BLEU 65.24 @ 401 ch/s, VRAM peak 3,557 MiB — +0.2 vs the April baseline of 65.0; this is the known left-padded-batch-generation effect documented in the 2026-07-07 entry above, well within the BLEU gate.
+- seamless-medium (`de028b8d7954`): BLEU 67.00 @ 372 ch/s, VRAM peak 4,630 MiB — exact match to the 67.0 April baseline.
+- All three confirm Phase 1's batching + SDPA + length-sorting changes are BLEU-neutral-to-positive at 90-sentence scale; this run is the new post-optimization baseline for `runs.db` comparisons going forward.
+
+**MADLAD-3B re-download verdict:**
+
+- Re-downloaded `models/madlad-3b-hf/` clean from source and re-ran the tied-embedding guard (`shared.weight == decoder.embed_tokens.weight` check immediately after `from_pretrained()`, before the model is marked loaded). The guard still fails on the fresh download — the corruption is **at the source checkpoint**, not a local artifact of a prior bad download/interrupted transfer. MADLAD-3B is now **permanently excluded**; the local checkpoint has been deleted to reclaim disk. No `runs.db` row exists for this attempt (the guard raises before a benchmark run is instantiated, so nothing reaches `RunDatabase`) — the only DB evidence of MADLAD's failure remains the three April rows (`c715cc7b7daf`, `d0417e625e3d`, `315a147013a3`, all BLEU 0.0), which should continue to be read as "excluded," not as a live regression target.
+
+**Regressions — none genuine; two false-alarm mechanisms found in the tooling itself:**
+
+1. `python scripts/show_stats.py regressions --lookback 5` (no `--model` filter) flagged WARNING on `duration_s` (52.96 vs prior_avg 40.12), `ram_peak_mib` (5,674 vs 2,738), and `chars_per_sec` (372 vs 607) against the latest row. That latest row is the seamless-medium close-out run, and the "prior 5" it's compared against are a mix of hunyuan-mt-7b, lmt-60-1.7b, milmmt-46-1b, and nllb-600M rows — completely different models with different resource profiles. Comparing seamless (heavier, slower) against a rolling average dominated by lighter/faster models is not a regression signal; it's a model-identity mismatch. **Always pass `--model <name>` when checking regressions**, or the rolling average is meaningless.
+2. Filtered per-model (`--model nllb-600M`), regressions still reported WARNING+CRITICAL on `bleu_score` (55.27 vs prior_avg 63.93), and `--model milmmt-46-1b` reported WARNING (65.24 vs prior_avg 66.54). Root cause: the "prior 5" window contains 5-sentence smoke-test rows (`af333ae2e76c` and `37e068100f82`, both nllb-600M BLEU 76.91 on 5 sentences; `7b4a41c2d10d`, milmmt-46-1b BLEU 71.70 on 5 sentences) interleaved with genuine 90-sentence FLORES rows. Small-sample BLEU inflation (same mechanism as lmt-60-1.7b's 73.2-vs-63.8 gap above) drags the rolling average up, making the next real 90-sentence run look like a regression when it is in fact flat (nllb 55.27 vs April 55.3; milmmt 65.24 vs April 65.0, +0.2 known effect). **No genuine BLEU, VRAM, or throughput regression exists in today's data** once smoke-test rows and cross-model comparisons are excluded.
+- **Tooling suggestion:** `RunDatabase` / `show_stats.py regressions` has no concept of sample size (`num_sentences` is not stored or filtered on). Recommend adding a `num_sentences` (or `is_smoke`) column and excluding smoke runs from the rolling-average window by default — this is the second independent false-alarm mechanism found in this tool in two days (see also the pre-6d56b34 load+translate conflation and pre-July inter-model VRAM residue caveats already on record) and will keep recurring until fixed at the schema level.
+- Minor, sub-threshold observation: both nllb 5-sentence smoke rows (`af333ae2e76c` swap_peak 126 MiB, `37e068100f82` swap_peak 108 MiB) show nonzero swap despite RAM peak only ~2 GB of 11 GB total (~18% utilization) — almost certainly WSL2/OS-level swap noise rather than code-driven RAM pressure, since no other run today (including the heavier lmt-60/hunyuan runs at 5.4-6.6 GB VRAM and matching RAM growth) shows swap activity. Not actioned; flagged for pattern-tracking only.
+
+**Optimization suggestions:**
+- `/home/sbisw/github/translate/scripts/show_stats.py` (`regressions` command, around line 274-310): add a `num_sentences`/`is_smoke` filter so smoke-test rows never enter the rolling-average baseline, and consider defaulting `--model` to required (or emitting a loud caveat) when comparing across heterogeneous model rows.
+- No source-code (`nllb_ct2.py`, `chunker.py`, `config.py`) changes indicated by today's data — `inter_threads=1, intra_threads=4` (nllb_ct2.py:76-77) and `ChunkConfig.batch_size=8` (config.py:45) remain correct for current CPU/GPU utilization profiles; none of today's `cpu_avg_pct` readings exceed 40% and no `gpu_util_peak_pct < 50` pattern persists across repeated same-model runs.
+
+**Resource snapshot (close-out run, new post-Phase-1 baseline):**
+- BLEU: nllb 55.27 (April baseline 55.3), milmmt 65.24 (April baseline 65.0, +0.2 known effect), seamless 67.00 (April baseline 67.0)
+- Duration: nllb 6.9 s, milmmt 16.0 s, seamless 53.0 s (translate-only-adjacent per Task-1 Load/translate split)
+- VRAM peak: nllb 2,552 MiB, milmmt 3,557 MiB, seamless 4,630 MiB; GPU util peak 50% / 40% / 73% respectively
+- RAM peak: nllb 2,117 MiB, milmmt 3,007 MiB, seamless 5,674 MiB; Swap: ≤5 MiB across all three (negligible)
+- CPU avg: nllb 9.2%, milmmt 19.1%, seamless 38.4%
+
+---
+
 ## 2026-07-07 — optimization pass Phase 1 / benchmark measurement learnings (branch: perf/optimization-pass)
 
 **Measurement flaw found and fixed (benchmark.py):**
