@@ -1,0 +1,67 @@
+--- paper/archive/ieee_transactions_2026-07-08_v4_pre.tex	2026-07-08 09:14:09.290045376 -0700
++++ paper/ieee_transactions/ieee_transactions.tex	2026-07-08 09:20:35.641102982 -0700
+@@ -73,8 +73,12 @@
+ NLLB-200-distilled-600M~\cite{nllb2022} that addresses all three.
+ On an NVIDIA RTX~5050 Laptop GPU (Blackwell sm\_120, 8\,GB GDDR7)~\cite{nvidia_blackwell},
+ the system reaches \textbf{65.2 BLEU} on a 90-sentence in-domain corpus across
+-10 domains (4.7 News to 80.6 Health) at 97--100\,chars/s with 82--84\% GPU
+-utilisation using CTranslate2~\cite{ctranslate2_klein} float16 inference.
++10 domains (4.7 News to 80.6 Health) with 82--84\% GPU
++utilisation using CTranslate2~\cite{ctranslate2_klein} float16 inference;
++a July~2026 optimization pass (batching, SDPA attention, length-sorted
++batching) raised translate-only throughput to 2,346\,chars/s at BLEU parity,
++after correcting an earlier benchmark that conflated model-load time with
++translation time (97--100\,chars/s).
+ LoRA fine-tuning~\cite{hu2021lora} via PEFT~\cite{peft2022} with bf16
+ precision trains 3 epochs over 7,863 Samanantar~\cite{samanantar2022} pairs
+ in \TRAINDURATION, yielding monotonically decreasing evaluation loss
+@@ -128,7 +132,10 @@
+ \begin{enumerate}
+   \item A four-stage translation pipeline (Preprocessor, Chunker, CTranslate2
+         Translator, Postprocessor) reaching 65.2 BLEU overall (up to 80.6 on Health)
+-        with 97--100\,chars/s throughput on a single consumer GPU.
++        on a single consumer GPU; a July~2026 optimization pass (batching, SDPA
++        attention, length-sorted batching) raised translate-only throughput to
++        2,346\,chars/s at BLEU parity after correcting a load/translate timing
++        conflation in the original 97--100\,chars/s figure.
+ 
+   \item Hardware-aware inference on RTX~5050 Blackwell sm\_120 with float16
+         CTranslate2, a runtime compute-type probe that bypasses the broken INT8
+@@ -515,13 +522,19 @@
+ \midrule
+ CT2 float16, batch=8 (Run 1) & 97  & 0.27 & 82 & 1{,}942 & RTX 5050 GPU \\
+ CT2 float16, batch=8 (Run 2) & 100 & 0.26 & 84 & 1{,}938 & RTX 5050 GPU \\
++CT2 float16, translate-only$^\ddagger$ (2026-07) & 2{,}346 & n/a & n/a & n/a & RTX 5050 GPU \\
+ \midrule
+ CPU only (estimated)$^\dagger$ & $\approx$5 & $\approx$5.4 & n/a & 0 & AMD Ryzen \\
+ \midrule
+-\multicolumn{6}{l}{\textbf{GPU speedup vs.\ CPU: $\approx$19--20$\times$}} \\
++\multicolumn{6}{l}{\textbf{GPU speedup vs.\ CPU: $\approx$19--20$\times$ (Run 1/2, load+translate)}} \\
+ \bottomrule
+ \multicolumn{6}{>{\footnotesize\raggedright\arraybackslash}p{0.9\columnwidth}}{%
+-  $^\dagger$ Estimate from CPU smoke-test eval duration relative to sentence count.}
++  $^\dagger$ Estimate from CPU smoke-test eval duration relative to sentence count.
++  $^\ddagger$ A July~2026 audit found that Run~1/2 timing started before model
++  load, conflating cold-page-cache disk reads with translation time; the corrected
++  figure reports translate-only throughput after a batching/SDPA/length-sorted-batching
++  optimization pass, measured separately from load time (5.0\,s). It is not
++  directly comparable to the Run~1/2 figures above.}
+ \end{tabular}%
+ }
+ \end{table}
+@@ -726,9 +739,12 @@
+ \label{sec:conclusion}
+ % ============================================================
+ 
+-Fully offline, privacy-preserving Bengali-to-English NMT at 65.2 BLEU and
+-97--100\,chars/s is achievable on a \$300 consumer laptop GPU (NVIDIA RTX~5050,
+-Blackwell sm\_120, 8\,GB GDDR7).
++Fully offline, privacy-preserving Bengali-to-English NMT at 65.2 BLEU is
++achievable on a \$300 consumer laptop GPU (NVIDIA RTX~5050,
++Blackwell sm\_120, 8\,GB GDDR7), reaching 2,346\,chars/s translate-only
++throughput after a July~2026 optimization pass (batching, SDPA attention,
++length-sorted batching) corrected a load/translate timing conflation in the
++original 97--100\,chars/s figure.
+ CTranslate2 float16 inference reaches 82--84\% average GPU utilisation with a
+ 1.9\,GB model footprint, leaving 6\,GB free for concurrent system use.
+ LoRA fine-tuning of the same 600M-parameter model completes in \TRAINDURATION{}

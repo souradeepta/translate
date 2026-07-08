@@ -1,0 +1,51 @@
+--- paper/archive/acm_tallip_2026-07-08_v4_pre.tex	2026-07-08 09:14:09.291221863 -0700
++++ paper/acm_tallip/acm_tallip.tex	2026-07-08 09:21:27.342439768 -0700
+@@ -83,8 +83,11 @@
+ NLLB-200-distilled-600M running via CTranslate2 float16 on an NVIDIA RTX~5050
+ Laptop GPU (Blackwell sm\_120, 8\,GB GDDR7).
+ The system achieves 65.2 BLEU on a 90-sentence in-domain corpus spanning 10
+-domains (4.7 News to 80.6 Health) at 97--100\,chars/s with 82--84\%
+-average GPU utilisation.
++domains (4.7 News to 80.6 Health) with 82--84\%
++average GPU utilisation. A July~2026 optimization pass (batching, SDPA attention,
++length-sorted batching) raised translate-only throughput to 2,346\,chars/s at
++BLEU parity, after correcting a benchmark timing bug that had conflated model-load
++time with translation time in the original 97--100\,chars/s figure.
+ LoRA fine-tuning via PEFT with bf16 precision trains 3 epochs over 7,863
+ Samanantar pairs in \TRAINDURATION, with evaluation loss decreasing monotonically
+ from 2.111 to 1.992.
+@@ -124,7 +127,8 @@
+ three barriers, targeting the NVIDIA RTX~5050 Laptop GPU (Blackwell sm\_120,
+ 8\,GB GDDR7).
+ This paper contributes: (i) a four-stage translation pipeline reaching 65.2 BLEU
+-on a curated in-domain corpus at 97--100\,chars/s; (ii) hardware-aware
++on a curated in-domain corpus, reaching 2,346\,chars/s translate-only after a
++July~2026 optimization pass; (ii) hardware-aware
+ inference and training on Blackwell sm\_120 with full constraint documentation;
+ (iii) LoRA fine-tuning completing in \TRAINDURATION{} on a \$300 consumer GPU;
+ (iv) a SQLite-backed resource monitoring subsystem with automated regression
+@@ -431,6 +435,12 @@
+ the introduction of parallel DataLoader pre-processing workers.
+ GPU speedup over the CPU-only path is approximately 19--20$\times$, derived from
+ the CPU smoke-test eval duration.
++A July~2026 audit found that this timer started before model load, conflating
++cold-page-cache disk reads with translation time; after separating load from
++translate time and applying a batching/SDPA/length-sorted-batching optimization
++pass, translate-only throughput reaches 2,346\,chars/s (load 5.0\,s) at BLEU
++parity --- not directly comparable to the Run~1/Run~2 figures above, which
++remain reported here for provenance.
+ 
+ \subsection{Per-Domain BLEU Analysis}
+ 
+@@ -560,7 +570,10 @@
+ \section{Conclusion}
+ 
+ bn-en-translate demonstrates that fully offline, privacy-preserving Bengali-to-English
+-NMT at 65.2 BLEU and 97--100\,chars/s is achievable on a \$300 consumer laptop GPU.
++NMT at 65.2 BLEU is achievable on a \$300 consumer laptop GPU, reaching
++2,346\,chars/s translate-only throughput after a July~2026 optimization pass
++corrected an earlier benchmark that conflated model-load and translation time
++(97--100\,chars/s).
+ CTranslate2 float16 inference on Blackwell sm\_120 reaches 82--84\% average GPU
+ utilisation with a 1.9\,GB model footprint, leaving 6\,GB free for concurrent use.
+ LoRA fine-tuning of the 600M-parameter backbone completes in \TRAINDURATION{}

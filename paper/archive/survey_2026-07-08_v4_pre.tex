@@ -619,25 +619,14 @@ with $\dagger$.
     \midrule
     \multicolumn{5}{l}{\textit{This Work}} \\
     NLLB-600M CT2 (FLORES-200)~\cite{biswas2025bnentr}  & \textbf{55.3} & \textbf{72.8} & FLORES-200 90-sent. & 2025 \\
-    MiLMMT-46-1B (FLORES-200)~\cite{biswas2025bnentr}   & \textbf{65.2} & \textbf{79.6} & FLORES-200 90-sent. & 2026 \\
     Seamless-v2 (FLORES-200)~\cite{biswas2025bnentr}    & \textbf{67.0} & \textbf{80.2} & FLORES-200 90-sent. & 2025 \\
     NLLB-600M CT2 (open-domain)~\cite{biswas2025bnentr} & 0.15$^\ddagger$ & --- & Samanantar 984 & 2025 \\
-    \midrule
-    \multicolumn{5}{l}{\textit{This Work --- 2026 Candidate Evaluation (measured, rejected)}} \\
-    LMT-60-1.7B$^\S$ (FLORES-200)~\cite{biswas2025bnentr}      & 63.8 & 78.3 & FLORES-200 90-sent. & 2026 \\
-    Hunyuan-MT-7B Q4\_K\_M$^\P$ (FLORES-200)~\cite{biswas2025bnentr} & 54.7 & 74.7 & FLORES-200 90-sent. & 2026 \\
     \bottomrule
     \multicolumn{5}{p{13cm}}{\scriptsize
       $^\dagger$ est.\ = estimated from published chrF/BLEU ratio for models of
       similar architecture; see text.
       $^\ddagger$ Raw sacreBLEU without SentencePiece normalization; see
-      Section~\ref{sec:ours} for discussion of this metric anomaly.
-      $^\S$ NiuTrans LMT-60-1.7B, our measurement, bf16; rejected in favor of
-      MiLMMT-46-1B on BLEU, VRAM, and speed (Section~\ref{sec:ours}).
-      $^\P$ Tencent Hunyuan-MT-7B, our measurement of a 4-bit GGUF quantization
-      (Q4\_K\_M) via Ollama, \emph{not} the model's published full-precision
-      (bf16, WMT25-winning) capability; quantization loss accounts for the
-      $>$12-point gap from its full-precision reputation.}
+      Section~\ref{sec:ours} for discussion of this metric anomaly.}
   \end{tabular}
 \end{table*}
 
@@ -671,14 +660,7 @@ where available; otherwise the figure is from the cited paper.
     Google Translate & N/A   & N/A    & API only        \\
     NLLB-600M CT2 f16& 600M  & 1.9 GB & Consumer laptop \\
     Seamless-v2-large f16 & 1.2B & 3.9 GB & Consumer laptop \\
-    MiLMMT-46-1B bf16$^\ddagger$ & 1B & 3.4 GB & Consumer laptop \\
-    LMT-60-1.7B bf16$^\S$ (rejected) & 1.7B & 6.6 GB & Consumer laptop \\
-    Hunyuan-MT-7B Q4\_K\_M$^\P$ (rejected) & 7B & 6.6 GB & Consumer laptop \\
     \bottomrule
-    \multicolumn{4}{p{8.4cm}}{\scriptsize $^\ddagger$ Gemma3-based causal LM, our
-      measurement. $^\S$/$^\P$ our 2026 candidate evaluation, rejected in favor
-      of MiLMMT-46-1B (Section~\ref{sec:ours}); Hunyuan-MT-7B VRAM is for the
-      4-bit GGUF quantization, not the published bf16 model.}
   \end{tabular}
 \end{table}
 
@@ -789,7 +771,7 @@ shared metrics.
     FLORES-200 chrF            & \textbf{72.8}  & \textbf{80.2}  & 63.2      & $\sim$60 \\
     VRAM (GB)                  & \textbf{1.9}   & 3.9            & 3.2       & N/A \\
     Params (millions)          & \textbf{600}   & 1,200          & 1,000     & N/A \\
-    Throughput (chars/s)$^\dagger$ & \textbf{2{,}346} & 372          & n/r       & n/r \\
+    Throughput (chars/s)       & \textbf{97}    & 32             & n/r       & n/r \\
     Offline capable            & \textbf{Yes}   & \textbf{Yes}   & Yes       & No  \\
     Consumer GPU viable        & \textbf{Yes}   & \textbf{Yes}   & Yes       & No  \\
     Privacy-preserving         & \textbf{Yes}   & \textbf{Yes}   & Yes       & No  \\
@@ -798,11 +780,7 @@ shared metrics.
     \multicolumn{5}{p{8.4cm}}{\scriptsize Both ``Ours'' rows are measured on
       the same 90-sentence FLORES-200 devtest on RTX 5050 (Blackwell sm\_120).
       IT2 = IndicTrans2; Google BLEU is informal estimate from~\cite{nllb2022}.
-      n/r = not reported on this test configuration.
-      $^\dagger$ Translate-only, post-July-2026-optimization (batching + SDPA +
-      length-sorted batching), measured separately from model load time; the
-      earlier 97/32\,chars/s conflated load and translate time and is not
-      comparable to this row (Section~\ref{sec:ours}).}
+      n/r = not reported on this test configuration.}
   \end{tabular}
 \end{table}
 
@@ -1022,7 +1000,7 @@ NLLB-200 and IndicTrans2 release model weights and code; NLLB-200-3.3B requires
 multi-GPU for fine-tuning (marked ``Partial'').
 Commercial systems (Google, Azure, Amazon) provide no reproducibility path.
 The \textit{bn-en-translate} system provides model weights, training scripts,
-282 tests, and documented hardware constraints, making it the only surveyed
+186 tests, and documented hardware constraints, making it the only surveyed
 system with full single-consumer-GPU reproducibility on Blackwell hardware.
 
 % ==================================================================
@@ -1178,33 +1156,6 @@ properly matched tokenization~\cite{nllb2022}; we expect a similar figure
 applies to the Samanantar test set under the correct evaluation protocol.
 We report 0.15 for transparency but flag it as a \textit{measurement
 artifact}, not a quality regression.
-
-\subsection{July 2026 Inference Optimization and Model Selection}
-
-A July~2026 optimization pass applied three changes --- batched sentence
-translation (replacing a one-sentence-per-call loop for HF-backed models),
-SDPA attention with a per-architecture eager/SDPA fallback (T5-based MADLAD
-rejects SDPA in transformers~5.4.0; Gemma3-based MiLMMT accepts it), and
-length-sorted batching with order restoration --- each validated against a
-$\pm$0.3 BLEU-parity gate. Translate-only throughput (measured separately from
-model load time, after a conflation bug in the original benchmark harness was
-found and fixed) rose 5.4$\times$ for NLLB-600M (383$\to$2{,}072\,chars/s),
-4.9$\times$ for MiLMMT-46-1B (74$\to$366\,chars/s), and 4.3$\times$ for
-Seamless-medium (73$\to$317\,chars/s).
-
-Two additional 2026 models were evaluated under the same 90-sentence
-FLORES-200 protocol and an 8\,GB VRAM budget, and rejected: NiuTrans
-LMT-60-1.7B (63.8 BLEU / 78.3 chrF, 6.6\,GB VRAM, 86\,chars/s) loses to the
-already-deployed MiLMMT-46-1B (65.2 BLEU, 3.4\,GB, 401\,chars/s) on every
-axis; a 5-sentence smoke test of LMT-60 had scored 73.2 BLEU, a reminder
-that small-sample BLEU is too noisy to drive a model-selection decision.
-Tencent Hunyuan-MT-7B, deployed as a 4-bit GGUF quantization (Q4\_K\_M) via
-Ollama, scored 54.7 BLEU --- below even NLLB-600M (55.3) and more than 12
-points under its published full-precision (bf16, WMT25-winning) reputation,
-indicating that on an 8\,GB budget, quantization loss can dominate a larger
-model's raw capacity. Table~\ref{tab:bleu} and Table~\ref{tab:compute}
-report both rejected candidates alongside the deployed models for
-transparency.
 
 \subsection{Limitations}
 

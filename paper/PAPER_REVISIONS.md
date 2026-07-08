@@ -107,3 +107,147 @@ Archived:
 - `paper/archive/slides/survey_slides_2026-04-07_v1.tex`
 - `paper/archive/slides/overview_2026-04-07_v1.md`
 - `paper/archive/slides/survey_reveal_2026-04-07_v1.html`
+
+---
+
+## v4 — 2026-07-08 (July 2026 optimization-pass results + new efficiency paper)
+
+Note: the paper tree was reorganized into per-venue subdirectories between v3
+and v4 (`paper/ieee_paper.tex` → `paper/ieee_conference/ieee_conference.tex`,
+`paper/survey_paper.tex` → `paper/survey/survey.tex`,
+`paper/ieee_transactions_paper.tex` → `paper/ieee_transactions/ieee_transactions.tex`,
+`paper/acm_paper.tex` → `paper/acm_tallip/acm_tallip.tex`). This entry uses the
+current paths. `paper/ieee_conference/ieee_conference.tex` and
+`paper/survey/survey.tex` did not previously mention MiLMMT-46-1B at all
+(only NLLB-600M and Seamless-v2 were present); MiLMMT is introduced as a
+baseline in both papers in this pass because the new-model rejections
+(LMT-60, Hunyuan-MT Q4) are defined relative to it.
+
+### ieee_conference/ieee_conference.tex
+- New `\newcommand` placeholders for MiLMMT FLORES BLEU/chrF (65.2/79.6) and
+  for July-2026 close-out throughput (load/translate split) and Phase-1
+  cumulative before/after throughput, all traced to the 2026-07-08 measured
+  run and `monitor/observations.md` — no invented numbers.
+- Abstract, Introduction contributions list, Conclusion: added MiLMMT as a
+  third evaluated model; added the three-optimization summary and BLEU-parity
+  gate methodology; added the two rejected 2026 candidates and the MADLAD
+  re-verification verdict.
+- New Table `tab:throughput` (translate-only + load, 2026-07-08 close-out) and
+  new Table `tab:optpass` (Phase-1 cumulative before/after); old `tab:benchmark`
+  (97--100 chars/s, load+translate conflated) retained for provenance with an
+  explicit non-comparability note.
+- New subsection "July 2026 Inference Optimization Pass" (`sec:optpass`):
+  the three optimizations (batching, SDPA + per-architecture fallback,
+  length-sorted batching) with per-step measured deltas, the load-vs-translate
+  measurement pitfall, and the single-run speed-noise caution.
+- New subsection "Model Selection Under a Fixed VRAM Budget" (`sec:modelselect`):
+  NiuTrans LMT-60-1.7B (rejected, incl. 73.2@5-sentence vs. 63.8@90-sentence
+  smoke-test noise caution), Tencent Hunyuan-MT-7B Q4\_K\_M (rejected,
+  quantization-loss finding), MADLAD-400 re-download verdict (still fails the
+  new tied-embedding integrity guard), and the Ollama silent-CPU-fallback gotcha.
+- New subsection "VRAM Budget Enforcement" under System Architecture
+  (`sec:vrambudget`): the measured per-model VRAM table and
+  `ensure_vram_available()` pre-flight pattern.
+- `tab:comparison` gained MiLMMT, LMT-60, and Hunyuan-MT-7B Q4 rows.
+- Discussion "GPU Utilisation and Batch Size" extended with the batching-vs-
+  occupancy-tuning finding.
+- No April BLEU/chrF numbers altered (NLLB 55.3/72.8 in-domain 65.2, Seamless
+  67.0/80.2 all unchanged); MiLMMT is a new row, not an edit to an existing one.
+- All `\cite`/`\bibitem` keys verified to match (no new bibliography entries
+  needed — reused `dao2022flashattention`, `nvidia_blackwell`, etc.).
+
+### survey/survey.tex
+- `tab:bleu` "This Work" block: added MiLMMT-46-1B row; new "2026 Candidate
+  Evaluation (measured, rejected)" block with LMT-60-1.7B and Hunyuan-MT-7B
+  Q4\_K\_M, each footnoted as our measurement (Hunyuan explicitly flagged as
+  a 4-bit quantization, not the model's full-precision capability).
+- `tab:compute`: added MiLMMT-46-1B, LMT-60-1.7B (rejected), Hunyuan-MT-7B
+  Q4\_K\_M (rejected) rows with VRAM figures.
+- `tab:headtohead`: throughput row corrected from the load+translate-conflated
+  97/32 chars/s to translate-only 2,346/372 chars/s, with an explicit
+  non-comparability footnote.
+- New subsection "July 2026 Inference Optimization and Model Selection" under
+  `sec:ours`: three-optimization summary with per-model speedups, and the
+  LMT-60 / Hunyuan-MT-7B Q4 rejection narrative including the small-sample
+  BLEU noise caution.
+- No new bibliography entries; all new content self-cites `biswas2025bnentr`
+  or makes no citation (descriptive-only optimization narrative).
+
+### ieee_transactions/ieee_transactions.tex (minimal edit, per scope)
+- `tab:throughput`: added a translate-only 2026-07 row (2,346 chars/s) with a
+  footnote explaining the load/translate conflation found in Run 1/2 timing;
+  `tab:benchmark` (Run 1/2, 97/100 chars/s) left untouched as provenance.
+- Abstract, Introduction contribution #1, Conclusion: "97--100 chars/s" now
+  paired with the corrected 2,346 chars/s figure and a one-sentence
+  methodology note. No new sections, no new-model content (out of scope per
+  brief — this paper never discussed MiLMMT/LMT-60/Hunyuan).
+
+### acm_tallip/acm_tallip.tex (minimal edit, per scope)
+- Abstract, Introduction contribution (i), Conclusion: same "97--100 chars/s
+  → 2,346 chars/s translate-only, methodology corrected" pattern as the
+  transactions paper.
+- Added one paragraph after `tab:benchmark` in "Baseline Inference
+  Performance" noting the July 2026 load/translate correction; the table
+  itself is unchanged (provenance).
+
+### New paper: efficiency/efficiency.tex
+- New IEEE-conference-format (IEEEtran) systems paper: "Batching, Kernels,
+  and Quantization Trade-offs: A Measured Study of Bengali-English NMT
+  Inference on an 8 GB Consumer GPU."
+- Sections: Introduction (three generalizable findings) → Background
+  (models/evaluation/inference engines) → Measurement Methodology (hardware,
+  corpus, BLEU-parity gate, multi-run variance) → Three Inference
+  Optimizations (batching, SDPA + per-architecture fallback, length-sorted
+  batching, each with measured before/after deltas) → The Load-vs-Translate
+  Measurement Pitfall → Model Selection Under a Fixed VRAM Budget (LMT-60,
+  Hunyuan-MT-7B Q4, MADLAD re-verification, Ollama CPU-fallback gotcha) →
+  VRAM Budget Enforcement as a Systems Pattern → Threats to Validity
+  (single GPU, single language pair, single-run speed noise, one-model/one-
+  quantization-level caveat) → Conclusion.
+- 13 bibliography entries, all real and independently verifiable: NLLB
+  (`nllb2022`), CTranslate2 (`ctranslate2_klein`), SeamlessM4T-v2
+  (`seamlessm4t2023`), MADLAD-400 (`kudugunta2023madlad`), BLEU
+  (`papineni2002bleu`), sacreBLEU (`post2018call`), chrF (`popovic2015chrf`),
+  FlashAttention (`dao2022flashattention`), QLoRA (`dettmers2023qlora`,
+  new — arXiv:2305.14314, cited only for the quantization threats-to-validity
+  discussion), NVIDIA Blackwell (`nvidia_blackwell`), Ethnologue
+  (`ethnologue2023`), Ollama (`ollama2024`, new — GitHub repo, no fabricated
+  paper), and a self-citation to the companion system paper
+  (`biswas2025bnentr`). No citation for NiuTrans LMT-60-1.7B: no
+  independently verifiable publication was identified, so it is described
+  only in prose (architecture, precision, prompt format — all facts from
+  the measured run) with no `\cite`, per the no-fabricated-citation
+  constraint.
+- New figure `optimization_speedup.png`: (a) before/after translate-only
+  throughput per model (log scale, grouped bars), (b) BLEU-vs-VRAM
+  model-selection scatter (deployed vs. rejected, 8 GB budget line). Added
+  as `fig_optimization_speedup()` in `scripts/gen_paper_figures.py`,
+  hardcoded to the brief's measured numbers (does not read `monitor/runs.db`,
+  since the 2026-07-08 close-out run may not be persisted there). Regenerated
+  via `make figures` / `python scripts/gen_paper_figures.py`.
+
+### Makefile
+- Added `paper/efficiency/efficiency.tex` to `PAPER_SRCS`, a `paper-efficiency`
+  target, and updated the `.PHONY` list and the `papers` comment (4 → 5 papers).
+
+### Slides
+- Not touched in this pass (brief scoped this revision to papers + Makefile
+  `papers` target only; no `efficiency_slides.tex` was requested or created).
+
+### Compile status (2026-07-08, `make papers`)
+All 5 papers compiled with `tectonic`, zero errors (only pre-existing
+underfull/overfull hbox warnings and Bengali-glyph-in-Latin-font warnings,
+unrelated to this pass). Page counts: ieee_conference 13, survey 13,
+ieee_transactions 6, acm_tallip 5, efficiency 6.
+
+Archived:
+- `paper/archive/ieee_conference_2026-07-08_v4_pre.tex`
+- `paper/archive/survey_2026-07-08_v4_pre.tex`
+- `paper/archive/ieee_transactions_2026-07-08_v4_pre.tex`
+- `paper/archive/acm_tallip_2026-07-08_v4_pre.tex`
+
+Diffs:
+- `paper/archive/ieee_conference_v3_to_v4.diff`
+- `paper/archive/survey_v3_to_v4.diff`
+- `paper/archive/ieee_transactions_v3_to_v4.diff`
+- `paper/archive/acm_tallip_v3_to_v4.diff`

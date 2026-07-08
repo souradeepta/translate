@@ -83,11 +83,8 @@ We describe \textbf{bn-en-translate}, a fully offline four-stage pipeline
 NLLB-200-distilled-600M running via CTranslate2 float16 on an NVIDIA RTX~5050
 Laptop GPU (Blackwell sm\_120, 8\,GB GDDR7).
 The system achieves 65.2 BLEU on a 90-sentence in-domain corpus spanning 10
-domains (4.7 News to 80.6 Health) with 82--84\%
-average GPU utilisation. A July~2026 optimization pass (batching, SDPA attention,
-length-sorted batching) raised translate-only throughput to 2,346\,chars/s at
-BLEU parity, after correcting a benchmark timing bug that had conflated model-load
-time with translation time in the original 97--100\,chars/s figure.
+domains (4.7 News to 80.6 Health) at 97--100\,chars/s with 82--84\%
+average GPU utilisation.
 LoRA fine-tuning via PEFT with bf16 precision trains 3 epochs over 7,863
 Samanantar pairs in \TRAINDURATION, with evaluation loss decreasing monotonically
 from 2.111 to 1.992.
@@ -95,7 +92,7 @@ A SQLite-backed resource monitor tracks per-run CPU, RAM, GPU, and disk metrics
 with automated regression detection.
 Six first-generation Blackwell deployment constraints are documented and resolved,
 each absent from published CTranslate2 or PyTorch guides.
-All 282 tests pass under strict TDD.
+All 186 tests pass under strict TDD.
 The system and all experiments are reproducible from the public GitHub repository.
 \end{abstract}
 
@@ -127,15 +124,14 @@ We present \textbf{bn-en-translate}, a production-ready system that addresses al
 three barriers, targeting the NVIDIA RTX~5050 Laptop GPU (Blackwell sm\_120,
 8\,GB GDDR7).
 This paper contributes: (i) a four-stage translation pipeline reaching 65.2 BLEU
-on a curated in-domain corpus, reaching 2,346\,chars/s translate-only after a
-July~2026 optimization pass; (ii) hardware-aware
+on a curated in-domain corpus at 97--100\,chars/s; (ii) hardware-aware
 inference and training on Blackwell sm\_120 with full constraint documentation;
 (iii) LoRA fine-tuning completing in \TRAINDURATION{} on a \$300 consumer GPU;
 (iv) a SQLite-backed resource monitoring subsystem with automated regression
 detection; and (v) a per-domain BLEU analysis across 10 domains revealing a
 75.9-point spread within a single model run.
 
-The full system---models, training scripts, 282 tests, and hardware constraint
+The full system---models, training scripts, 186 tests, and hardware constraint
 documentation---is available at \url{https://github.com/sbisw/translate}.
 
 % ============================================================
@@ -435,12 +431,6 @@ The 3\% throughput improvement (97 $\to$ 100\,chars/s) between runs reflects
 the introduction of parallel DataLoader pre-processing workers.
 GPU speedup over the CPU-only path is approximately 19--20$\times$, derived from
 the CPU smoke-test eval duration.
-A July~2026 audit found that this timer started before model load, conflating
-cold-page-cache disk reads with translation time; after separating load from
-translate time and applying a batching/SDPA/length-sorted-batching optimization
-pass, translate-only throughput reaches 2,346\,chars/s (load 5.0\,s) at BLEU
-parity --- not directly comparable to the Run~1/Run~2 figures above, which
-remain reported here for provenance.
 
 \subsection{Per-Domain BLEU Analysis}
 
@@ -570,10 +560,7 @@ VRAM allocation to safe levels.
 \section{Conclusion}
 
 bn-en-translate demonstrates that fully offline, privacy-preserving Bengali-to-English
-NMT at 65.2 BLEU is achievable on a \$300 consumer laptop GPU, reaching
-2,346\,chars/s translate-only throughput after a July~2026 optimization pass
-corrected an earlier benchmark that conflated model-load and translation time
-(97--100\,chars/s).
+NMT at 65.2 BLEU and 97--100\,chars/s is achievable on a \$300 consumer laptop GPU.
 CTranslate2 float16 inference on Blackwell sm\_120 reaches 82--84\% average GPU
 utilisation with a 1.9\,GB model footprint, leaving 6\,GB free for concurrent use.
 LoRA fine-tuning of the 600M-parameter backbone completes in \TRAINDURATION{}

@@ -57,34 +57,6 @@
 \newcommand{\NLLBFLORESCHRF}{72.8}
 \newcommand{\SEAMLESSPROJBLEU}{67.0}
 \newcommand{\SEAMLESSPROJCHRF}{80.2}
-% Our measured FLORES-200 results, MiLMMT-46-1B (2026-07-08 close-out run;
-% 65.0 BLEU on 2026-04-10 first measurement -> 65.2 after batched left-padded
-% generation, an expected padding effect within the +-0.3 BLEU parity gate)
-\newcommand{\MILMMTFLORESBLEU}{65.2}
-\newcommand{\MILMMTFLORESCHRF}{79.6}
-% July 2026 optimization pass: translate-only throughput (chars/s), measured
-% 2026-07-08 close-out run, RTX 5050, FLORES-200 90-sentence devtest, warm cache.
-% Single-run figures; session-to-session noise is +-30% (see Section~VI-B).
-\newcommand{\NLLBCHS}{2346}
-\newcommand{\NLLBLOAD}{5.0\,s}
-\newcommand{\NLLBTRANSLATE}{1.6\,s}
-\newcommand{\MILMMTCHS}{401}
-\newcommand{\MILMMTLOAD}{6.3\,s}
-\newcommand{\MILMMTTRANSLATE}{9.4\,s}
-\newcommand{\SEAMLESSCHS}{372}
-\newcommand{\SEAMLESSLOAD}{41.5\,s}
-\newcommand{\SEAMLESSTRANSLATE}{10.2\,s}
-% Phase-1 cumulative speedup (translate-only ch/s, before -> after batching +
-% SDPA + length-sorted batching, warm-cache A/B, BLEU-parity gated at +-0.3)
-\newcommand{\NLLBBEFORECHS}{383}
-\newcommand{\NLLBAFTERCHS}{2072}
-\newcommand{\NLLBSPEEDUP}{5.4$\times$}
-\newcommand{\MILMMTBEFORECHS}{74}
-\newcommand{\MILMMTAFTERCHS}{366}
-\newcommand{\MILMMTSPEEDUP}{4.9$\times$}
-\newcommand{\SEAMLESSBEFORECHS}{73}
-\newcommand{\SEAMLESSAFTERCHS}{317}
-\newcommand{\SEAMLESSSPEEDUP}{4.3$\times$}
 
 % ============================================================
 \begin{document}
@@ -110,41 +82,27 @@ and Hardware-Aware Deployment}
 % ============================================================
 \textbf{bn-en-translate} is a fully offline Bengali-to-English translation system
 targeting consumer-grade GPU hardware.
-Three open-source models are evaluated locally on an NVIDIA RTX~5050 (Blackwell sm\_120,
+Two open-source models are evaluated locally on an NVIDIA RTX~5050 (Blackwell sm\_120,
 8\,GB GDDR7)~\cite{nvidia_blackwell}: NLLB-200-distilled-600M~\cite{nllb2022} via
 CTranslate2~\cite{ctranslate2_klein} float16 achieves \NLLBFLORESBLEU{} BLEU
-(\NLLBFLORESCHRF{} chrF); MiLMMT-46-1B (Gemma3-based causal LM, bf16) achieves
-\MILMMTFLORESBLEU{} BLEU (\MILMMTFLORESCHRF{} chrF); SeamlessM4T-v2-large~\cite{seamlessm4t2023}
-achieves \SEAMLESSPROJBLEU{} BLEU (\SEAMLESSPROJCHRF{} chrF) --- all on the 90-sentence
-FLORES-200 devtest.
-A July~2026 optimization pass (batched translation, SDPA attention with a
-per-architecture fallback, and length-sorted batching with order restoration) raises
-translate-only throughput by \NLLBSPEEDUP{}--\MILMMTSPEEDUP{} at BLEU parity
-($\pm$0.3), reaching \NLLBCHS{}~chars/s (NLLB-600M), \MILMMTCHS{}~chars/s (MiLMMT-46-1B),
-and \SEAMLESSCHS{}~chars/s (Seamless-medium); load and translate time are now
-measured separately after discovering that combined timing conflated cold-page-cache
-disk reads with inference.
-Under the resulting 8\,GB VRAM budget we additionally evaluate two 2026 release
-candidates: NiuTrans LMT-60-1.7B (63.8 BLEU, rejected on quality/VRAM/speed vs.\
-MiLMMT-46-1B) and Tencent Hunyuan-MT-7B in 4-bit GGUF (54.7 BLEU, a $>$12-point drop
-from its full-precision reputation, rejected on quantization loss).
+(\NLLBFLORESCHRF{} chrF) on the 90-sentence FLORES-200 devtest at 97--100\,chars/s;
+SeamlessM4T-v2-large~\cite{seamlessm4t2023} achieves \SEAMLESSPROJBLEU{} BLEU
+(\SEAMLESSPROJCHRF{} chrF) at 32\,chars/s.
 LoRA fine-tuning~\cite{hu2021lora} via PEFT~\cite{peft2022} with bf16 precision
 runs 3~epochs on 7,863 Samanantar pairs in \TRAINDURATION, yielding \POSTFTBLEU{}
 BLEU on the 984-pair open-domain test set (sacreBLEU, no SentencePiece normalization).
 Per-run CPU, RAM, GPU, and disk metrics are recorded to SQLite with automated
-regression detection, and a measured-VRAM pre-flight check now converts CUDA OOM
-crashes into clean, actionable errors before model load.
+regression detection.
 Six Blackwell-specific deployment constraints are documented and resolved: cuBLAS
 INT8 incompatibility, concurrent-pip-install SIGBUS, fast-tokenizer fork-deadlock,
 \texttt{prefetch\_factor} conflict, fp16/bf16 GradScaler interaction, and CT2 batch OOM.
-All 282 tests pass (272 unit/integration, 10 slow/GPU-marked).
+All 212 tests pass.
 \end{abstract}
 
 \begin{IEEEkeywords}
 Bengali NMT, neural machine translation, CTranslate2, LoRA fine-tuning, NLLB-200,
-SeamlessM4T-v2, MiLMMT, consumer GPU, Blackwell sm\_120, BLEU evaluation, chrF evaluation,
-parameter-efficient fine-tuning, resource monitoring, Samanantar, batched inference,
-quantization
+SeamlessM4T-v2, consumer GPU, Blackwell sm\_120, BLEU evaluation, chrF evaluation,
+parameter-efficient fine-tuning, resource monitoring, Samanantar
 \end{IEEEkeywords}
 
 % ============================================================
@@ -173,22 +131,13 @@ three barriers. Our contributions are:
 \begin{enumerate}
   \item A four-stage translation pipeline (Preprocessor, Chunker, Translator,
         Postprocessor) supporting multiple backends; NLLB-600M achieves \NLLBFLORESBLEU{}
-        BLEU (\NLLBFLORESCHRF{} chrF), MiLMMT-46-1B achieves \MILMMTFLORESBLEU{} BLEU
-        (\MILMMTFLORESCHRF{} chrF), and SeamlessM4T-v2 achieves \SEAMLESSPROJBLEU{}
-        BLEU (\SEAMLESSPROJCHRF{} chrF) on FLORES-200, all running on a single consumer GPU.
+        BLEU (\NLLBFLORESCHRF{} chrF) and SeamlessM4T-v2 achieves \SEAMLESSPROJBLEU{}
+        BLEU (\SEAMLESSPROJCHRF{} chrF) on FLORES-200, both running on a single consumer GPU.
 
   \item Hardware-aware deployment on the NVIDIA RTX~5050 Blackwell sm\_120, with
         float16 CTranslate2 inference, a runtime compute-type probe that bypasses
         the broken INT8 cuBLAS path, and a \texttt{max\_batch\_size=32} guard against
         CUDA OOM on large inputs.
-
-  \item A July~2026 inference optimization pass --- batched sentence translation,
-        SDPA attention with a per-architecture eager/SDPA fallback, and length-sorted
-        batching with order restoration --- raising translate-only throughput
-        \NLLBSPEEDUP{} (NLLB-600M, \NLLBBEFORECHS{}$\to$\NLLBAFTERCHS{}~chars/s),
-        \MILMMTSPEEDUP{} (MiLMMT-46-1B), and \SEAMLESSSPEEDUP{} (Seamless-medium) at a
-        $\pm$0.3 BLEU-parity gate, together with the discovery and correction of a
-        load-vs-translate measurement conflation affecting all prior throughput figures.
 
   \item LoRA fine-tuning~\cite{hu2021lora} on Blackwell with bf16 precision~\cite{micikevicius2018mixed},
         training 3~epochs on 7,863 Samanantar pairs in \TRAINDURATION, achieving
@@ -196,18 +145,13 @@ three barriers. Our contributions are:
         decreasing evaluation loss (2.111 $\to$ 2.003 $\to$ 1.992).
 
   \item A comprehensive model comparison covering NLLB-200 (600M--54B), IndicTrans2,
-        MADLAD-400, SeamlessM4T-v2, MiLMMT-46-1B, and commercial APIs, with per-domain
-        BLEU breakdown across 10 corpus domains (75.9-point spread within a single
-        model) and a fixed-VRAM-budget model-selection study rejecting two 2026
-        release candidates (NiuTrans LMT-60-1.7B, Tencent Hunyuan-MT-7B Q4) on
-        measured quality, VRAM, and quantization-loss grounds.
+        MADLAD-400, SeamlessM4T-v2, and commercial APIs, with per-domain BLEU
+        breakdown across 10 corpus domains (75.9-point spread within a single model).
 
   \item Documentation and resolution of six previously undocumented deployment
         constraints on Blackwell sm\_120 hardware, including a corrected SIGBUS
         root cause (concurrent pip install, not AMD AMX), and five constraint fixes
-        absent from any CTranslate2 or PyTorch 2.6/2.7 release guide, plus a
-        measured-VRAM pre-flight budget check that converts CUDA OOM into a clean
-        \texttt{RuntimeError} before model load.
+        absent from any CTranslate2 or PyTorch 2.6/2.7 release guide.
 \end{enumerate}
 
 The complete system --- models, scripts, tests, monitoring tools --- is available
@@ -465,22 +409,6 @@ The daemon thread design ensures the monitor cannot block process exit: if the p
 is killed without calling \texttt{\_\_exit\_\_}, the thread terminates automatically
 with no zombie processes.
 
-\subsection{VRAM Budget Enforcement}
-\label{sec:vrambudget}
-
-A per-model VRAM footprint table (\texttt{config.MODEL\_VRAM\_MIB}), populated from
-measured peak values rather than published estimates, backs a pre-flight
-\texttt{ensure\_vram\_available()} check called before every model load and before
-the \texttt{--ollama-polish} pass. Rather than allowing a CUDA out-of-memory error
-to surface mid-inference --- a failure mode that is hard to diagnose because it
-depends on which other processes already hold VRAM --- the check compares the
-requested model's measured footprint against currently free VRAM and raises a
-clean, actionable \texttt{RuntimeError} naming the offending model and the shortfall
-before any GPU memory is allocated. The \texttt{--ollama-polish} pass sequences this
-check between pipeline stages: translate $\to$ unload translator $\to$ pre-flight
-check $\to$ load polish model $\to$ polish per paragraph, ensuring the two models
-are never required to coexist in VRAM.
-
 % ============================================================
 \section{Hardware Constraints and Solutions}
 \label{sec:constraints}
@@ -690,54 +618,39 @@ an artifact of corpus selection.
 
 \subsection{Throughput and Latency Analysis}
 
-Table~\ref{tab:throughput} summarizes inference throughput as measured after the
-July~2026 optimization pass (Section~\ref{sec:optpass}), with load time and
-translate time reported \emph{separately}. This separation matters: the original
-benchmark timer started before model load, so cold-page-cache disk reads (up to
-5\,GB for the largest model) were silently counted as translation time in every
-throughput figure reported before July~2026, including the batch=8 Run~1/Run~2
-figures in Table~\ref{tab:benchmark} (97--100\,chars/s). Those earlier figures are
-retained in Table~\ref{tab:benchmark} for provenance but should not be compared
-directly against Table~\ref{tab:throughput}'s translate-only numbers.
+Table~\ref{tab:throughput} summarizes inference throughput measured across both
+benchmark runs and contrasts the observed GPU performance with the CPU-only baseline
+derived from the fine-tuning smoke test.
 
 \begin{table}[htbp]
-\caption{Translate-Only Throughput and Load Time, RTX 5050 (8\,GB VRAM),
-         FLORES-200 90-sentence devtest, 2026-07-08 close-out run.}
+\caption{Inference Throughput and Latency on RTX 5050 (8\,GB VRAM).}
 \label{tab:throughput}
 \centering
 \resizebox{\columnwidth}{!}{%
 \begin{tabular}{lrrrrr}
 \toprule
-Model (backend) & BLEU & chrF & Load & Translate & Throughput \\
-                 &      &      & (s)  & (s)       & (chars/s) \\
+Configuration & Throughput & Latency & GPU util. & VRAM & Device \\
+              & (chars/s) & (s/sentence) & avg (\%) & (MiB) & \\
 \midrule
-NLLB-600M (CT2 f16)      & \NLLBFLORESBLEU{}   & \NLLBFLORESCHRF{}   & \NLLBLOAD{}    & \NLLBTRANSLATE{}    & \NLLBCHS{} \\
-MiLMMT-46-1B (HF bf16)   & \MILMMTFLORESBLEU{} & \MILMMTFLORESCHRF{} & \MILMMTLOAD{}  & \MILMMTTRANSLATE{}  & \MILMMTCHS{} \\
-Seamless-medium (HF f16) & \SEAMLESSPROJBLEU{} & \SEAMLESSPROJCHRF{} & \SEAMLESSLOAD{}& \SEAMLESSTRANSLATE{}& \SEAMLESSCHS{} \\
+\textit{NLLB-600M (CT2 float16)} & & & & & \\
+\quad batch=8 (Run 1) & 97  & 0.27 & 82 & 1{,}942 & RTX 5050 GPU \\
+\quad batch=8 (Run 2) & 100 & 0.26 & 84 & 1{,}938 & RTX 5050 GPU \\
 \midrule
-CPU only (estimated)$^\dagger$ & --- & --- & n/a & n/a & $\approx$5 \\
+\textit{Seamless-v2 (HF float16)} & & & & & \\
+\quad batch=8 (FLORES-200, 90 sent.) & 32 & 1.33 & 23 & 3{,}919 & RTX 5050 GPU \\
+\midrule
+CPU only (estimated)$^\dagger$ & $\approx$5 & $\approx$5.4 & n/a & 0 & AMD Ryzen \\
+\midrule
+\multicolumn{6}{l}{\textbf{NLLB-600M GPU speedup vs.\ CPU: $\approx$19--20$\times$}} \\
 \bottomrule
 \multicolumn{6}{>{\footnotesize\raggedright\arraybackslash}p{0.9\columnwidth}}{%
   $^\dagger$ CPU estimate derived from the CPU smoke-test run (3,103\,s for 7,863
   training forward passes at 38\,min eval); inference-only CPU throughput is
   approximately 5\,chars/s based on the ratio of smoke-test eval duration to
-  sentence count. Throughput figures are single-run measurements with
-  $\pm$30\% session-to-session noise (Section~\ref{sec:optpass}); BLEU/chrF are
-  the stable quality gate.}
+  sentence count.}
 \end{tabular}%
 }
 \end{table}
-
-NLLB-600M's translate-only GPU throughput (\NLLBCHS{}\,chars/s) is now
-orders of magnitude above the $\approx$5\,chars/s CPU estimate. We do not report
-a precise CPU/GPU ratio here: the CPU figure is derived from load-inclusive
-smoke-test eval duration while the GPU figure is translate-only, so the two are
-not measured on a comparable basis and a computed ratio would conflate the
-device gap with the July~2026 code-level speedup. The $\approx$19--20$\times$
-figure in Table~\ref{tab:throughput}'s CPU comparison predates this
-optimization pass and used the same (pre-fix) load-conflated timing on both
-sides, which is internally consistent but not comparable to the translate-only
-figures reported here.
 
 The throughput figures above apply to a 90-sentence
 curated corpus; performance on longer documents would be expected to be similar per
@@ -747,84 +660,6 @@ for all hardware; on systems with less VRAM, smaller batch sizes would reduce
 throughput proportionally. However, at 8\,GB VRAM, batch size 8 with float16 leaves
 approximately 6\,GB free for system headroom, making this configuration conservative
 and safe for concurrent system usage.
-
-\subsection{July 2026 Inference Optimization Pass}
-\label{sec:optpass}
-
-Three code-level optimizations were applied to the translation pipeline in
-July~2026, each validated with a $\pm$0.3 BLEU-parity gate against the
-pre-change baseline before being accepted:
-
-\begin{enumerate}
-  \item \textbf{Batched sentence translation.} The pipeline previously issued one
-        model call per sentence for HF-backed models (MiLMMT, Seamless). Routing all
-        sentences through the existing \texttt{translate\_sentences()} batch path
-        (already used by the CT2 backend) gave the largest single gain: NLLB-600M
-        \NLLBBEFORECHS{}$\to$2{,}108\,chars/s, MiLMMT-46-1B 74$\to$326\,chars/s,
-        Seamless-medium 73$\to$300\,chars/s, at BLEU parity (NLLB $\Delta$0.0,
-        Seamless $\Delta$0.0, MiLMMT $\Delta{-}$0.3: 65.0$\to$64.7, an expected
-        left-padded-batch-generation effect on causal LMs, not a regression). The
-        original single-sentence loop is retained behind a \texttt{--no-batch} flag
-        for future A/B measurement. (SDPA does not apply to the CT2 backend, and
-        length-sorted batching's effect on NLLB is within session-to-session
-        measurement noise; the cumulative NLLB figure in Table~\ref{tab:optpass},
-        2{,}072\,chars/s, is consistent with this batching-only figure of 2{,}108
-        within that noise band, not a regression from the later steps.)
-
-  \item \textbf{SDPA attention with a per-architecture fallback.} PyTorch's scaled
-        dot-product attention (SDPA) kernel replaces eager attention for
-        architectures that support it, giving MiLMMT (Gemma3-based)
-        326$\to$399\,chars/s (+22\%) at BLEU~64.8 (chrF~79.4), passing the gate
-        against the 64.7 batched baseline. This could not be applied uniformly:
-        T5-based MADLAD-400 raises \texttt{ValueError} on
-        \texttt{attn\_implementation="sdpa"} in transformers~5.4.0
-        (\texttt{T5PreTrainedModel.\_supports\_sdpa=False}), so the shared
-        attention-resolver helper takes a per-architecture \texttt{fallback}
-        parameter (MADLAD $\to$ eager, Gemma3-family $\to$ SDPA). A
-        \texttt{flash-attn}~\cite{dao2022flashattention} build remains unavailable
-        on sm\_120/WSL2, so SDPA is the effective ceiling for this hardware.
-
-  \item \textbf{Length-sorted batching with order restoration.} Sorting inputs by
-        token length before batching reduces padding waste; an index-scatter step
-        restores original sentence order before postprocessing. BLEU parity is the
-        load-bearing correctness proof here (an order bug would silently mis-align
-        translations with source sentences): NLLB~55.27, MiLMMT~65.24, Seamless~67.00,
-        all at or above their respective baselines.
-\end{enumerate}
-
-Table~\ref{tab:optpass} reports the cumulative effect of all three optimizations,
-measured translate-only, warm cache, on the FLORES-200 90-sentence devtest.
-
-\begin{table}[htbp]
-\caption{Phase-1 Cumulative Speedup (Translate-Only, Warm Cache).}
-\label{tab:optpass}
-\centering
-\begin{tabular}{lrrr}
-\toprule
-Model & Before (chars/s) & After (chars/s) & Speedup \\
-\midrule
-NLLB-600M     & \NLLBBEFORECHS{}    & \NLLBAFTERCHS{}    & \NLLBSPEEDUP{} \\
-MiLMMT-46-1B  & \MILMMTBEFORECHS{}  & \MILMMTAFTERCHS{}  & \MILMMTSPEEDUP{} \\
-Seamless-med. & \SEAMLESSBEFORECHS{}& \SEAMLESSAFTERCHS{}& \SEAMLESSSPEEDUP{} \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\textbf{Measurement pitfall: load time vs.\ translate time.} The original
-benchmark harness started its timer before \texttt{with translator:} entered,
-so model load --- including cold-page-cache disk reads of up to 5\,GB for the
-largest model --- was counted as translation time. Load time is also not
-comparable across runs for reasons unrelated to code: a warm page cache halves it
-(Seamless-medium: 96.0\,s cold vs.\ 50.6\,s warm, identical code). The fix reports
-\texttt{Load} and \texttt{Translate} as separate columns (Table~\ref{tab:throughput});
-only the translate-only figure is attributable to the optimizations in this section.
-
-\textbf{Single-run speed noise.} Repeated, identical-code MiLMMT runs in one
-session spanned 146--375\,chars/s, driven by host load rather than cache warming.
-Single-run throughput deltas under roughly 2$\times$ are not attributable to a code
-change on this shared, non-isolated development machine; BLEU/chrF at the
-$\pm$0.3 gate is used for correctness, and multi-run medians (not single closeout
-runs) should be used for any future speed claim beyond this paper's reported figures.
 
 \subsection{Per-Domain BLEU Analysis}
 
@@ -970,7 +805,6 @@ illustrates the performance range achievable with different approaches.
 System & BLEU & chrF & Corpus & Deploy \\
 \midrule
 \textbf{Ours (NLLB-600M)} & \textbf{\NLLBFLORESBLEU} & \textbf{\NLLBFLORESCHRF} & FLORES-200 & \textbf{Local GPU} \\
-\textbf{Ours (MiLMMT-46-1B)} & \textbf{\MILMMTFLORESBLEU} & \textbf{\MILMMTFLORESCHRF} & FLORES-200 & \textbf{Local GPU} \\
 \textbf{Ours (Seamless-v2)} & \textbf{\SEAMLESSPROJBLEU} & \textbf{\SEAMLESSPROJCHRF} & FLORES-200 & \textbf{Local GPU} \\
 \textbf{Ours + LoRA FT} & \textbf{\POSTFTBLEU} & --- & Samanantar & \textbf{Local GPU} \\
 NLLB-200-600M~\cite{nllb2022} & 30.5 & --- & FLORES-200 & Cloud \\
@@ -978,10 +812,8 @@ NLLB-200-1.3B~\cite{nllb2022} & 33.4 & --- & FLORES-200 & Cloud \\
 mBART-50~\cite{liu2020multilingual} & 18.2 & --- & WMT & Cloud \\
 SeamlessM4T-v2~\cite{seamlessm4t2023} & \SEAMLESSBLEU{} & --- & FLORES-200 & Cloud \\
 Google Translate$^\dagger$ & $\sim$35--45 & --- & Various & API \\
-\textbf{Ours (LMT-60-1.7B)$^\ddagger$} & 63.8 & 78.3 & FLORES-200 & \textbf{Local GPU} \\
-\textbf{Ours (Hunyuan-MT-7B Q4)$^\S$} & 54.7 & 74.7 & FLORES-200 & \textbf{Local GPU} \\
 \bottomrule
-\multicolumn{5}{>{\footnotesize\raggedright\arraybackslash}p{0.86\columnwidth}}{$^\dagger$ Informal estimate from~\cite{wu2016googles}; no official bn-en BLEU published. MADLAD-400-3B excluded: even after a clean re-download, the checkpoint still fails a tied-embedding integrity guard (\texttt{shared.weight} $\neq$ \texttt{decoder.embed\_tokens.weight}), indicating source corruption rather than a local deployment error; 8\,GB VRAM is also insufficient for the 3B float16 model without CPU offload. $^\ddagger$ NiuTrans LMT-60-1.7B (Qwen3-based, bf16, num\_beams=5); rejected in favor of MiLMMT-46-1B on BLEU, VRAM (6.6\,GB vs.\ 3.4\,GB), and speed (86 vs.\ \MILMMTCHS{}\,chars/s). $^\S$ Tencent Hunyuan-MT-7B, Q4\_K\_M GGUF via Ollama; rejected due to $>$12-BLEU quantization loss relative to its published full-precision (bf16, WMT25-winning) reputation --- quantization loss dominates model capacity under an 8\,GB budget.}
+\multicolumn{5}{>{\footnotesize\raggedright\arraybackslash}p{0.86\columnwidth}}{$^\dagger$ Informal estimate from~\cite{wu2016googles}; no official bn-en BLEU published. MADLAD-400-3B excluded: 8\,GB VRAM insufficient for 3B float16 model without CPU offload.}
 \end{tabular}%
 }
 \end{table}
@@ -996,46 +828,6 @@ tokenization of Bengali script: without SentencePiece normalization, near-zero n
 overlap against tokenized references gives a lower bound on true model quality rather
 than a genuine regression, consistent with the behavior of all NLLB-200 variants on
 equally challenging open-domain test sets evaluated without SentencePiece normalization.
-
-\subsection{Model Selection Under a Fixed VRAM Budget}
-\label{sec:modelselect}
-
-Two 2026 release candidates were evaluated with the same 90-sentence FLORES-200
-protocol used throughout this paper, under the constraint of an 8\,GB VRAM budget.
-
-\textbf{NiuTrans LMT-60-1.7B} (Qwen3-based, bf16, chat-template prompt,
-num\_beams=5) scored 63.8 BLEU / 78.3 chrF at 86\,chars/s, peaking at 6{,}635\,MiB
-VRAM. It is rejected in favor of the already-deployed MiLMMT-46-1B, which scores
-higher (\MILMMTFLORESBLEU{} vs.\ 63.8 BLEU), uses under half the VRAM (3.4\,GB vs.\
-6.6\,GB), and translates faster (\MILMMTCHS{} vs.\ 86\,chars/s). A methodological
-caution accompanies this result: an initial 5-sentence smoke test of LMT-60 scored
-73.2 BLEU, 9.4 points higher than the 90-sentence measurement (63.8). Small-sample
-BLEU is noisy enough to reverse a model-selection decision; the 90-sentence figure,
-not the smoke test, is the one used for the accept/reject call.
-
-\textbf{Tencent Hunyuan-MT-7B}, deployed as a Q4\_K\_M GGUF quantization via
-Ollama (the WMT25-winning model in its original bf16 release), scored 54.7 BLEU /
-74.7 chrF at 112\,chars/s using $\approx$6.6\,GB VRAM. This is rejected: 54.7 BLEU is
-\emph{below} even the smallest model in this study (NLLB-600M, \NLLBFLORESBLEU{}),
-a $>$12-BLEU gap from Hunyuan-MT-7B's published full-precision standing. On an
-8\,GB budget, 4-bit quantization loss dominates the larger model's raw capacity ---
-larger-but-quantized is not automatically better than smaller-but-full-precision.
-
-\textbf{MADLAD-400-3B} was re-attempted with a clean re-download to rule out a
-one-off corrupted download as the cause of its earlier exclusion. The re-downloaded
-checkpoint still fails a tied-embedding integrity guard added in this optimization
-pass (\texttt{shared.weight} $\neq$ \texttt{decoder.embed\_tokens.weight}), confirming
-the corruption is at the source rather than local to one download. The guard
-converts what was previously silent BLEU-0 garbage output into a load-time
-\texttt{RuntimeError}, so a future corrupted checkpoint fails loudly instead of
-producing an uninterpretable evaluation result.
-
-A final systems observation from this evaluation round: Ollama silently falls back
-to 100\% CPU inference (5.4\,tok/s) rather than GPU (58.5\,tok/s) if VRAM is already
-occupied by another process at model-load time, with no error or warning. GPU
-placement must be verified after load, not assumed from configuration alone ---
-a lesson that generalizes beyond this project to any Ollama-based deployment
-sharing a GPU with other workloads.
 
 \subsection{LoRA Fine-Tuning}
 \label{sec:lora_ft}
@@ -1331,11 +1123,6 @@ The remaining 18\% idle time reflects token-generation decode steps where
 batch occupancy drops as sequences complete at different lengths.
 Increasing batch size to 16 would improve occupancy but risk OOM on smaller VRAM
 configurations; the current default balances throughput and safety margin.
-The July~2026 optimization pass (Section~\ref{sec:optpass}) shows that batch
-occupancy was only one lever: for the HF-backed models (MiLMMT, Seamless), the
-larger gain came from eliminating the one-sentence-per-call loop entirely, since
-no amount of GPU utilisation tuning compensates for issuing $N$ separate forward
-passes instead of $\lceil N/8\rceil$ batched ones.
 
 \subsection{Domain-Specific Performance Gap}
 
@@ -1425,20 +1212,11 @@ The following enhancements are planned in priority order:
 % ============================================================
 
 This work demonstrates that fully offline, privacy-preserving Bengali-to-English NMT
-at 65.2 BLEU (curated in-domain corpus) is achievable on a \$300 consumer laptop GPU
-(NVIDIA RTX~5050, Blackwell sm\_120, 8\,GB GDDR7), and that a July~2026 optimization
-pass (batching, SDPA attention, length-sorted batching) raises translate-only
-throughput \NLLBSPEEDUP{}--\MILMMTSPEEDUP{} at a strict BLEU-parity gate, reaching
-\NLLBCHS{}\,chars/s on NLLB-600M with load and translate time now measured and
-reported separately after a conflation bug was found and fixed in the benchmark
-harness itself.
+at 65.2 BLEU and 97--100\,chars/s is achievable on a \$300 consumer laptop GPU
+(NVIDIA RTX~5050, Blackwell sm\_120, 8\,GB GDDR7).
 LoRA fine-tuning of the same 600M-parameter model completes in \TRAINDURATION{} on
 that hardware, with evaluation loss decreasing monotonically across all three epochs.
-Under a fixed 8\,GB VRAM budget, two 2026 release candidates (NiuTrans LMT-60-1.7B,
-Tencent Hunyuan-MT-7B in 4-bit GGUF) were measured and rejected in favor of the
-already-deployed MiLMMT-46-1B, illustrating that model selection on consumer
-hardware must weigh quantization loss and VRAM footprint alongside raw published
-capability. Neither result required cloud infrastructure, API keys, or multi-GPU scaling.
+Neither result required cloud infrastructure, API keys, or multi-GPU scaling.
 
 The six Blackwell deployment constraints documented here --- cuBLAS INT8 failure,
 corrected SIGBUS root cause (concurrent pip install, not AMD AMX), fast-tokenizer
