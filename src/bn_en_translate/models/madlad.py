@@ -15,21 +15,10 @@ from typing import Any
 from bn_en_translate.config import REPO_ROOT, ModelConfig
 from bn_en_translate.models.base import TranslatorBase
 from bn_en_translate.models.hf_utils import (
-    flash_attn_available as _flash_attn_available,  # noqa: F401
+    free_cuda_memory,
+    resolve_attn_implementation,
+    resolve_device,
 )
-from bn_en_translate.models.hf_utils import free_cuda_memory, resolve_device
-
-
-def _resolve_attn_implementation(use_flash: bool, fallback: str = "sdpa") -> str:
-    """flash_attention_2 if installed and requested; else the given fallback.
-
-    Re-implements hf_utils.resolve_attn_implementation's logic inline (rather
-    than delegating to it) so it reads the module-level `_flash_attn_available`
-    name — this preserves the existing monkeypatch seam tests rely on.
-    """
-    if use_flash and _flash_attn_available():
-        return "flash_attention_2"
-    return fallback
 
 
 # Map FLORES-200 language codes to MADLAD-400 target tags
@@ -94,7 +83,7 @@ class MADLADTranslator(TranslatorBase):
         # Prefer local download; fall back to HF Hub (auto-downloads on first use)
         model_id = self._LOCAL_PATH if Path(self._LOCAL_PATH).exists() else self.HF_MODEL_ID
 
-        attn_impl = _resolve_attn_implementation(self.config.use_flash_attention, fallback="eager")
+        attn_impl = resolve_attn_implementation(self.config.use_flash_attention, fallback="eager")
 
         device = resolve_device(self.config.device)
         # device_map="auto" is necessary because 3B float16 weights (~6 GB) + KV cache

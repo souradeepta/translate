@@ -30,13 +30,20 @@ def resolve_attn_implementation(use_flash: bool, fallback: str = "sdpa") -> str:
 
 def resolve_device(config_device: str) -> str:
     """Resolve 'auto' to the best available device; pass through otherwise."""
+    # Call-time import: no cycle exists, but this matches the repo convention
+    # and keeps the cuda_check.get_best_device monkeypatch seam working.
     from bn_en_translate.utils.cuda_check import get_best_device
 
     return get_best_device() if config_device == "auto" else config_device
 
 
 def free_cuda_memory() -> None:
-    """Release cached CUDA allocations. Safe no-op without torch/CUDA."""
+    """Release cached CUDA allocations. Safe no-op without torch/CUDA.
+
+    Does NOT reset peak-memory statistics, so it is safe to call from
+    unload() without disturbing VRAM measurements — for between-model
+    measurement resets use cuda_check.reset_cuda_state instead.
+    """
     try:
         import torch
 

@@ -51,37 +51,6 @@ def test_madlad_empty_input_returns_empty() -> None:
     assert result == []
 
 
-def test_attn_default_fallback_is_sdpa(monkeypatch) -> None:
-    """Without flash-attn installed, the default fallback (no `fallback=` arg) is sdpa.
-
-    This default suits architectures like Gemma3/MiLMMT; T5 (MADLAD) must override
-    it via fallback="eager" — see test_attn_madlad_fallback_is_eager below.
-    """
-    import bn_en_translate.models.madlad as madlad_mod
-
-    monkeypatch.setattr(madlad_mod, "_flash_attn_available", lambda: False)
-    assert madlad_mod._resolve_attn_implementation(use_flash=True) == "sdpa"
-    assert madlad_mod._resolve_attn_implementation(use_flash=False) == "sdpa"
-
-
-def test_attn_uses_flash_when_available(monkeypatch) -> None:
-    import bn_en_translate.models.madlad as madlad_mod
-
-    monkeypatch.setattr(madlad_mod, "_flash_attn_available", lambda: True)
-    assert madlad_mod._resolve_attn_implementation(use_flash=True) == "flash_attention_2"
-
-
-def test_attn_madlad_fallback_is_eager(monkeypatch) -> None:
-    """T5ForConditionalGeneration does NOT support sdpa (transformers 5.4.0) —
-    MADLADTranslator.load() must pass fallback="eager" explicitly.
-    """
-    import bn_en_translate.models.madlad as madlad_mod
-
-    monkeypatch.setattr(madlad_mod, "_flash_attn_available", lambda: False)
-    assert madlad_mod._resolve_attn_implementation(use_flash=True, fallback="eager") == "eager"
-    assert madlad_mod._resolve_attn_implementation(use_flash=False, fallback="eager") == "eager"
-
-
 def test_madlad_load_passes_resolved_attn_impl_to_from_pretrained(monkeypatch) -> None:
     """load() must pass the resolver's output (not a hardcoded string) as attn_implementation.
 
@@ -89,9 +58,9 @@ def test_madlad_load_passes_resolved_attn_impl_to_from_pretrained(monkeypatch) -
     module (load()'s local `from transformers import ...` resolves to the same class
     objects), and forces device="cpu" so no CUDA/download occurs.
     """
-    import bn_en_translate.models.madlad as madlad_mod
-
-    monkeypatch.setattr(madlad_mod, "_flash_attn_available", lambda: False)
+    monkeypatch.setattr(
+        "bn_en_translate.models.hf_utils.flash_attn_available", lambda: False
+    )
 
     from bn_en_translate.models.madlad import MADLADTranslator
 
@@ -155,9 +124,9 @@ def test_madlad_load_raises_on_untied_checkpoint(monkeypatch) -> None:
     Without this, deleting the guard call in load() leaves every other test
     green. Also proves _loaded stays False when the guard fires.
     """
-    import bn_en_translate.models.madlad as madlad_mod
-
-    monkeypatch.setattr(madlad_mod, "_flash_attn_available", lambda: False)
+    monkeypatch.setattr(
+        "bn_en_translate.models.hf_utils.flash_attn_available", lambda: False
+    )
 
     from bn_en_translate.models.madlad import MADLADTranslator
 

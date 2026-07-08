@@ -132,22 +132,6 @@ def test_milmmt_translate_batch_slices_prompt_tokens() -> None:
     assert generate_kwargs.get("do_sample") is False
 
 
-def test_attn_fallback_is_sdpa(monkeypatch) -> None:
-    """Without flash-attn installed, the fallback must be sdpa, not eager."""
-    import bn_en_translate.models.milmmt as milmmt_mod
-
-    monkeypatch.setattr(milmmt_mod, "_flash_attn_available", lambda: False)
-    assert milmmt_mod._resolve_attn_implementation(use_flash=True) == "sdpa"
-    assert milmmt_mod._resolve_attn_implementation(use_flash=False) == "sdpa"
-
-
-def test_attn_uses_flash_when_available(monkeypatch) -> None:
-    import bn_en_translate.models.milmmt as milmmt_mod
-
-    monkeypatch.setattr(milmmt_mod, "_flash_attn_available", lambda: True)
-    assert milmmt_mod._resolve_attn_implementation(use_flash=True) == "flash_attention_2"
-
-
 def test_milmmt_load_passes_resolved_attn_impl_to_from_pretrained(monkeypatch) -> None:
     """load() must pass the resolver's output (not a hardcoded string) as attn_implementation.
 
@@ -155,9 +139,9 @@ def test_milmmt_load_passes_resolved_attn_impl_to_from_pretrained(monkeypatch) -
     on the real `transformers` module (load()'s local `from transformers import ...`
     resolves to the same class objects), and forces device="cpu" so no CUDA/download occurs.
     """
-    import bn_en_translate.models.milmmt as milmmt_mod
-
-    monkeypatch.setattr(milmmt_mod, "_flash_attn_available", lambda: False)
+    monkeypatch.setattr(
+        "bn_en_translate.models.hf_utils.flash_attn_available", lambda: False
+    )
 
     from bn_en_translate.models.milmmt import MiLMMTTranslator
 
