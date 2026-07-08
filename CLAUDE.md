@@ -96,13 +96,17 @@ make papers        # regenerate figures + compile all 4 PDFs
 
 ---
 
-## Benchmark Results (FLORES-200, 90 sentences, RTX 5050, 2026-04-10)
+## Benchmark Results (FLORES-200, 90 sentences, RTX 5050, updated 2026-07-08)
+
+> Speeds are translate-only ch/s from the batched pipeline (perf/optimization-pass);
+> pre-July figures (191/28/31) conflated model load with translation — do not compare.
+> Single-run ch/s varies ±30%; BLEU/chrF are the stable regression gate.
 
 | Model | BLEU | chrF | VRAM | Speed | Notes |
 |-------|------|------|------|-------|-------|
-| NLLB-600M CT2 float16 | **55.3** | **72.8** | 2.3 GB | 191 ch/s | Fastest |
-| MiLMMT-46-1B bfloat16 | **65.0** | **79.3** | 3.3 GB | 28 ch/s | 2nd best, efficient |
-| Seamless-medium float16 | **67.0** | **80.2** | 4.0 GB | 31 ch/s | Best quality |
+| NLLB-600M CT2 float16 | **55.3** | **72.8** | 2.3 GB | ~2300 ch/s | Fastest (translate-only, batched, 2026-07-08) |
+| MiLMMT-46-1B bfloat16 | **65.2** | **79.6** | 3.3 GB | ~400 ch/s | 2nd best, efficient (batched) |
+| Seamless-medium float16 | **67.0** | **80.2** | 4.0 GB | ~370 ch/s | Best quality (batched) |
 | MADLAD-3B float16 | ~~0.0~~ | — | 8.1 GB | ~2 ch/s | Excluded permanently — corrupt at source (re-verified 2026-07-08), deleted |
 | LMT-60-1.7B bf16 (2026-07-08) | 63.8 | 78.3 | 6.6 GB peak | 86 ch/s | Rejected — loses to MiLMMT on all axes; deleted |
 | Hunyuan-MT-7B Q4 Ollama (2026-07-08) | 54.7 | 74.7 | 6.6 GB | 112 ch/s | Rejected — Q4 below NLLB-600M; deleted |

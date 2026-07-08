@@ -137,3 +137,26 @@ All three models pass the BLEU acceptance gate (±0.3 of the original baseline)
 after every Phase 1 task. Phase 1 (batching + SDPA + length-sorting) delivers a
 4–5x translate-only throughput improvement across all three backends with no
 measurable quality regression.
+
+---
+
+## Branch close-out run — 2026-07-08 (final)
+
+Single 90-sentence run of all kept models at branch end (same command as the
+baseline; single-run ch/s is noisy — see the Task 4 caveat — so treat speeds as
+representative, BLEU/chrF as the gate):
+
+| Model | BLEU | chrF | Load (s) | Translate (s) | ch/s | vs April baseline |
+|-------|------|------|----------|---------------|------|-------------------|
+| nllb-600M | 55.3 | 72.8 | 5.0 | 1.6 | 2346 | BLEU +0.0, 12x speed |
+| milmmt-46-1b | 65.2 | 79.6 | 6.3 | 9.4 | 401 | BLEU +0.2 (padding effect, within gate), 14x speed |
+| seamless-medium | 67.0 | 80.2 | 41.5 | 10.2 | 372 | BLEU +0.0, 12x speed |
+
+(The "x speed" figures compare against the April unbatched-loop ch/s of
+191/28/31, which conflated load and translate time — the honest Phase-1-only
+multiple is 4–5x, per the cumulative summary above.)
+
+New-model evaluations on this branch (both rejected, checkpoints deleted —
+details in docs/MODELS.md): LMT-60-1.7B BLEU 63.8 @ 86 ch/s / 6.6 GB peak;
+Hunyuan-MT-7B Q4 via Ollama BLEU 54.7 @ 112 ch/s. MADLAD-3B re-download failed
+the tied-embedding guard: corrupt at source, permanently excluded.
