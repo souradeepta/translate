@@ -31,6 +31,10 @@ MODEL_VRAM_MIB: dict[str, int] = {
     "milmmt-46-1b":      4100,
     "seamless-medium":   4100,
     "indictrans2-1b":    3100,
+    "sarvam-translate":  5000,  # 4B params, 4-bit bnb — measured 4899 MiB peak (real GPU run,
+                                # after fixing a device-resolution bug that had silently run
+                                # an earlier measurement on CPU), 5-sent smoke
+    "krutrim-translate": 1700,  # distilled IndicTrans2 CT2, measured 1608 MiB peak, 90-sent
     "ollama-qwen2.5:7b": 4800,
     "ollama-gemma3:12b": 4700,
 }
@@ -74,6 +78,8 @@ class ModelConfig:
     inference_batch_size: int = 8
     use_flash_attention: bool = True      # Flash Attention 2 if flash-attn is installed
     max_ct2_batch_size: int = 32          # CT2 translate_batch max_batch_size guard
+    load_in_4bit: bool = False            # bitsandbytes 4-bit quantization for HF causal LMs
+                                           # too large to fit 8 GB VRAM in bf16 (e.g. 4B+ params)
 
     VALID_DEVICES = {"cuda", "cpu", "auto"}
     VALID_COMPUTE_TYPES = {"int8", "float16", "float32", "int8_float16"}

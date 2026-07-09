@@ -57,6 +57,22 @@ MODELS: dict[str, dict[str, str]] = {
         "quantization": "bfloat16",
         "type": "hf_only",
     },
+    "sarvam-translate": {
+        "hf_id": "sarvamai/sarvam-translate",
+        "output_dir": "models/sarvam-translate-hf",
+        "quantization": "bfloat16",  # bf16 checkpoint on disk; loaded 4-bit at runtime
+        "type": "hf_only",
+    },
+    "krutrim-translate": {
+        "hf_id": "krutrim-ai-labs/Krutrim-Translate",
+        # Gated repo — accept the license at the HF repo page first, then
+        # `! huggingface-cli login` (or ensure an existing token is cached).
+        # Ships pre-converted CT2 exports for both directions; we only use
+        # ct_model_indic_english/ (see krutrim_translate.py).
+        "output_dir": "models/krutrim-translate-hf",
+        "quantization": "float16",  # CT2-native; no HF conversion needed
+        "type": "hf_only",
+    },
 }
 
 
@@ -94,8 +110,9 @@ def download_and_convert(model_name: str, force: bool = False) -> None:
     print(f"Converting {hf_id} → {output_dir} ({cfg['quantization']})...")
     print("This downloads the model from HuggingFace Hub first (1–3 GB).")
 
-    # ct2-transformers-converter is the stable CLI entry point across CT2 versions.
-    # The old python -m ctranslate2.tools.transformers module was removed in CT2 4.x.
+    # ct2-transformers-converter is the stable CLI entry point across CT2
+    # versions. The old python -m ctranslate2.tools.transformers module
+    # was removed in CT2 4.x.
     cmd = [
         "ct2-transformers-converter",
         "--model", hf_id,

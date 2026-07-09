@@ -102,6 +102,38 @@ def _make_lmt60(config: PipelineConfig) -> TranslatorBase:
     return LMT60Translator(config.model)
 
 
+@register_model("sarvam-translate")
+@register_model("sarvam")
+def _make_sarvam_translate(config: PipelineConfig) -> TranslatorBase:
+    from dataclasses import replace
+
+    from bn_en_translate.models.sarvam_translate import SarvamTranslateTranslator
+
+    # 4B params in bf16 (~8 GB) is too tight on this 8 GB card; 4-bit bnb
+    # quantization (measured ~1.4 GB VRAM) is the only viable path here, not
+    # an optional preference — force it regardless of ModelConfig's shared
+    # dataclass default (False), mirroring how other translators hard-code
+    # their own known-good settings (e.g. MiLMMT's bf16 dtype).
+    model_config = replace(config.model, load_in_4bit=True)
+    return SarvamTranslateTranslator(model_config)
+
+
+@register_model("krutrim-translate")
+@register_model("krutrim")
+def _make_krutrim_translate(config: PipelineConfig) -> TranslatorBase:
+    from dataclasses import replace
+
+    from bn_en_translate.models.krutrim_translate import KrutrimTranslateTranslator
+
+    # ModelConfig.model_path's shared dataclass default points at nllb-600M's
+    # CT2 dir (the system's global default model) — callers that build a
+    # plain ModelConfig(model_name="krutrim-translate", ...) without setting
+    # model_path (CLI, benchmark.py) would otherwise silently try to load
+    # this translator from the wrong directory.
+    model_config = replace(config.model, model_path=KrutrimTranslateTranslator._LOCAL_PATH)
+    return KrutrimTranslateTranslator(model_config)
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
