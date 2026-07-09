@@ -8,9 +8,24 @@
 | `seamless-medium` | `facebook/seamless-m4t-v2-large` | HF float16 | 3.9 GB | **67.0** ✅ | **80.2** ✅ | 32 ch/s | 5 | Working — `models/seamless-medium-hf/` |
 | `milmmt-46-1b` | `xiaomi-research/MiLMMT-46-1B-v0.1` | HF bfloat16 | 3.3 GB | **65.0** ✅ | **79.3** ✅ | 28 ch/s | 1 | Working — `models/milmmt-46-1B-hf/` |
 | `nllb-1.3B` | `facebook/nllb-200-distilled-1.3B` | CT2 float16 | ~2.6 GB | ~26 (lit.) | — | — | 4 | Needs download |
-| `indicTrans2-1B` | `ai4bharat/indictrans2-indic-en-1B` | CT2 float16 | ~3.0 GB | ~44 (lit.) | — | — | 5 | Needs download |
+| `indicTrans2-1B` | `ai4bharat/indictrans2-indic-en-1B` | HF float16 | ~3.0 GB | ~41 (lit.) | — | — | 5 | ⚠️ BLOCKED — see below |
 | `madlad-3b` | `google/madlad400-3b-mt` | HF float16 | 8.1 GB actual | — | — | — | 4 | ❌ EXCLUDED — corrupt at source, see MADLAD section |
+| `sarvam-translate` | `sarvamai/sarvam-translate` | HF bf16, 4-bit bnb | 4.9 GB | 55.7 | 74.3 | 139 ch/s | 1 | ❌ EXCLUDED — see below |
+| `krutrim-translate` | `krutrim-ai-labs/Krutrim-Translate` | CT2 float16 | 1.6 GB | 44.9 | 73.1 | 7050 ch/s | 3 | ❌ EXCLUDED — see below |
 | `ollama` | N/A (local daemon) | Ollama HTTP | ~4.7 GB | subjective | — | — | N/A | Optional polish |
+
+### Real-world sample run (2026-07-09)
+
+Ran the top-2 FLORES-200 models (seamless-medium, milmmt-46-1b) end-to-end
+against a real 1,703-word Bengali short story (`inputs/RAA -যে আসে
+অন্ধকারে- 1703.docx`, extracted via `python-docx`) to compare load/translate
+time and throughput on non-benchmark text. Full write-up, per-run metrics, and
+translated outputs: `inputs/TRANSLATION_REPORT.md`.
+
+| Model | Load | Translate | Throughput |
+|-------|------|-----------|------------|
+| seamless-medium | 38.2 s | 88.2 s | 114 ch/s |
+| milmmt-46-1b | 22.9 s | 23.5 s | 428 ch/s |
 
 ### Evaluated and rejected (2026-07-08)
 
@@ -28,6 +43,29 @@ checkpoints were deleted to free disk; re-download commands are in each row.
 > exceed the translator's 120 s HTTP timeout; if VRAM is occupied at load time
 > Ollama silently falls back to **100% CPU** (~5 tok/s vs ~58 tok/s on GPU).
 > Check `ollama ps` before trusting an Ollama benchmark number.
+
+### Evaluated and rejected (2026-07-09) — India-origin candidates
+
+Explored as part of "what else does AI4Bharat/the Indian NMT ecosystem
+offer" — both fully wired (factory entries + tests remain), benchmarked on
+FLORES-200 90-sentence, and additionally run on a real 1,703-word Bengali
+story (`inputs/story.bn.txt`) since FLORES rank alone had already proven
+insufficient once this session (see [[feedback_milmmt_preferred_over_seamless]]
+in memory — real-doc quality can diverge from the aggregate benchmark).
+Both checkpoints deleted to free disk.
+
+| Key | BLEU | chrF | ch/s | VRAM peak | Rejection reason |
+|-----|------|------|------|-----------|-------------------|
+| `sarvam-translate` (Sarvam AI + AI4Bharat, Gemma3-4B-IT, the de-facto IndicTrans3 successor) | 55.7 | 74.3 | 139 | 4899 MiB | FLORES score barely ties NLLB-600M despite 4x the params and 2x the VRAM. On the real story, generation **degenerated into a repetition loop** — 145 of 232 output paragraphs (~62%) were just "The translation of the given Marathi text is:" repeated (note: wrong source language named — we were translating Bengali). Real content survived in only a minority of paragraphs. Load also very slow (130-200s) due to on-the-fly 4-bit bnb quantization. |
+| `krutrim-translate` (Ola Krutrim, distilled IndicTrans2, CT2-native, 4096 ctx) | 44.9 | 73.1 | 7050 | 1608 MiB | FLORES BLEU is **below even NLLB-600M** (55.3), our cheapest model. On the real story, the internal `ben_Beng eng_Latn` language-tag prefix (meant only as an input instruction to the model, prepended by `IndicProcessor.preprocess_batch()`) **leaked directly into the visible output text** in ~41% of paragraphs (e.g. "_Beng eng_Latn Man was walking alone from tuition."). Fastest and leanest model we've tried (1.6 GB VRAM, ~5s load) but unusable on real text as configured. |
+
+Both integrations surfaced real bugs in *our own* code along the way (fixed,
+kept): `sarvam_translate.py`/`krutrim_translate.py` initially inherited a
+silent CPU-fallback bug (device `"auto"` never resolved to `"cuda"` before
+comparison — the exact class of bug this repo's GPU-only rule exists to
+prevent) and a wrong-`model_path` bug (both relied on the shared
+`ModelConfig.model_path` dataclass default, which points at nllb-600M's CT2
+dir) — both are now fixed in `factory.py` for any future re-attempt.
 
 The LoRA fine-tuned export `models/nllb-600M-finetuned-ct2/` (BLEU 0.17
 open-domain, failed experiment) was also deleted; training metrics survive in
@@ -117,36 +155,65 @@ Script uses `ct2-transformers-converter` and copies the SentencePiece `.model` f
 
 ---
 
-## IndicTrans2-1B
+## IndicTrans2-1B — ⚠️ BLOCKED (2026-07-09)
 
 **Architecture:** M2M-100 variant, optimized for Indic languages
 **Source:** AI4Bharat
 **License:** MIT
 **Languages:** 22 Indic languages ↔ English
+**Published BLEU:** ~41 — **below** the working Seamless (67.0) and MiLMMT (65.2)
+models, so even if unblocked this would not become the primary model.
 
-Best model for Bengali specifically — purpose-trained on Indic language pairs with more Bengali data than NLLB.
+Checkpoint is downloaded (`models/indicTrans2-1B-hf/`, 2.9 GB, HF-native — CT2
+conversion is architecturally unsupported, its converter registry has no
+IndicTransConfig entry). Loading is blocked by the model's `trust_remote_code`
+files being written against transformers ~4.44 and this repo running 5.4.0:
 
-### IndicTransToolkit (optional)
+1. `configuration_indictrans.py` imports `transformers.onnx` (module deleted
+   in 5.x) — worked around via `hf_utils.stub_transformers_onnx()`.
+2. The PyPI `IndicTransToolkit` package imports `PreTrainedTokenizerBase` from
+   the pre-5.x path — worked around with a small shim in
+   `indicTrans2.py::_load_via_indictrans2_interface`.
+3. `tokenization_indictrans.py`'s custom `IndicTransTokenizer.__init__` sets
+   `self.unk_token = ...` **before** calling `super().__init__()`. transformers
+   5.x's `PreTrainedTokenizerBase.__setattr__` requires `self._special_tokens_map`
+   (created in the base `__init__`, not yet run) to already exist →
+   `AttributeError: IndicTransTokenizer has no attribute _special_tokens_map`.
+   This is an ordering bug in AI4Bharat's own remote code, not something fixable
+   from our side without patching/vendoring their file. **Not attempted** —
+   given point (0) above, fixing it would not improve translation quality over
+   already-working models, so further effort here is not worthwhile.
 
-The `IndicTransToolkit` library provides an `IndicProcessor` for script normalization and transliteration:
+**Verdict:** deprioritized. Revisit only if AI4Bharat ships a transformers-5.x
+compatible remote-code update, or if a use case specifically needs its more
+Bengali-heavy training data despite the lower aggregate BLEU.
+
+### IndicTransToolkit
+
+The `IndicTransToolkit` PyPI package provides an `IndicProcessor` for script
+normalization and transliteration:
 
 ```bash
-pip install git+https://github.com/AI4Bharat/IndicTransToolkit.git
+pip install IndicTransToolkit
 ```
 
-When installed, `IndicTrans2Ct2Translator.load()` picks it up automatically for pre/post-processing. Without it, raw SentencePiece tokenization is used (still works, slightly lower quality).
+When installed, `IndicTrans2Translator.load()` picks it up automatically for
+pre/post-processing. Without it, raw SentencePiece tokenization is used. As of
+2026-07-09 this doesn't matter in practice — loading fails before reaching the
+processor either way (see blocker #3 above).
 
 ### Source Language Code
 
 IndicTrans2 uses `ben_Beng` (same as NLLB) for Bengali.
 
-### Download and Convert
+### Download
 
 ```bash
 python scripts/download_models.py --model indicTrans2-1B
 ```
 
-This downloads ~3 GB from HuggingFace and converts to CT2 float16 (~3 GB on disk).
+Downloads ~2.9 GB from HuggingFace to `models/indicTrans2-1B-hf/` (HF-native,
+no CT2 conversion — see blocker note above).
 
 ### Flash Attention 2
 

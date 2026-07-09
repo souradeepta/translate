@@ -14,8 +14,9 @@ make papers        # regenerate figures + compile all 4 PDFs
 - `models/seamless-medium-hf/` ✅ HF float16, `.to("cuda")` — **BLEU 67.0 / chrF 80.2** on FLORES-200
 - `madlad-3b` ❌ **PERMANENTLY EXCLUDED, checkpoint deleted** — clean re-download (2026-07-08) still failed the tied-embedding guard: corruption is at source, not a local artifact
 - New-model evaluation (2026-07-08, both **rejected**, checkpoints deleted): LMT-60-1.7B BLEU 63.8 (loses to MiLMMT on BLEU/VRAM/speed); Hunyuan-MT-7B Q4 via Ollama BLEU 54.7 (Q4 drops below NLLB-600M). Code + tests remain (`lmt-60-1.7b`, `hunyuan-mt-7b` factory keys)
-- `models/indicTrans2-1B-ct2/` — **gated repo**: accept terms at huggingface.co/ai4bharat/indictrans2-indic-en-1B then `! huggingface-cli login` and `python scripts/download_models.py --model indicTrans2-1B`
+- `models/indicTrans2-1B-hf/` downloaded (2.9 GB, HF-native — CT2 conversion unsupported for IndicTransConfig) but **BLOCKED (2026-07-09)**: AI4Bharat's `trust_remote_code` files target transformers ~4.44; on 5.4.0 the custom tokenizer's `__init__` sets special tokens before `super().__init__()` runs, so `PreTrainedTokenizerBase.__setattr__` can't find `_special_tokens_map` yet → `AttributeError`. Published BLEU (~41) is below Seamless/MiLMMT anyway — deprioritized, not worth vendoring a fix. Full detail: `docs/MODELS.md`
 - `models/milmmt-46-1B-hf/` ✅ HF bfloat16 — **BLEU 65.0 / chrF 79.3** on FLORES-200 (2nd best, 3.3 GB VRAM, 28 ch/s)
+- India-origin candidates evaluated 2026-07-09, both **rejected**, checkpoints deleted: `sarvam-translate` (Sarvam AI + AI4Bharat Gemma3-4B, the de-facto IndicTrans3 successor) BLEU 55.7 on FLORES but **degenerated into a repetition loop on the real story** (62% of output paragraphs just repeated filler text); `krutrim-translate` (Ola Krutrim, distilled IndicTrans2, CT2) BLEU 44.9 — below NLLB-600M — and its internal `ben_Beng eng_Latn` tag **leaked into ~41% of real-story output**. Code + tests remain (`sarvam-translate`, `krutrim-translate` factory keys). Full detail: `docs/MODELS.md`
 - `corpus/` ✅ 90-sentence built-in + 9,829 Samanantar pairs (train/val/test splits)
 - `paper/pdf/` — run `make papers` to rebuild all 4 PDFs (tectonic, no sudo needed)
 - All 217 unit/integration tests passing
@@ -84,6 +85,12 @@ make papers        # regenerate figures + compile all 4 PDFs
 - ❌ Benchmarking sentences one-per-call → batch_size=1 for HF models. `pipeline.translate_sentences()` batches properly: 4-5.5× faster at BLEU parity. `--no-batch` restores the old loop for A/B.
 - ⚠️ Batched left-padded generation on causal LMs (MiLMMT) can shift BLEU ±0.3 vs single-sentence — expected padding effect, not a regression.
 - ❌ Watcher loops with `pgrep -f "<pattern containing the watched command>"` → the pattern matches the watcher's own cmdline; the loop never exits. Use a narrower pattern or poll for a log sentinel.
+
+### Ollama Literary Translation (learned 2026-07-09)
+- ❌ **Per-paragraph literary translation via gemma3:12b hallucinates fabricated scenes.** Given a real 90-paragraph Bengali story, translating with the "professional literary translator, preserve narrative tone" prompt (one isolated paragraph per call, no shared context) invented ~30% of the output: a fictional grandmother-tells-ghost-stories frame narrative, a monsoon river-crossing scene, and a wartime-telegram subplot — none present in the source. Story swelled from 90 source paragraphs to 146 output paragraphs. Root cause: short/ambiguous chunks (e.g. a title line) translated with zero surrounding context + a prompt that invites creative license → model improvises generic genre tropes instead of translating literally.
+- ❌ Do not trust `--model ollama` (or any LLM-as-translator via `OllamaTranslator`) for unattended, whole-document literary translation without either (a) a strict no-invention prompt + rolling/document context per call, or (b) per-paragraph length-ratio or manual verification against the source. Untested as of 2026-07-09 — reverted before retrying, not fixed.
+- ✅ `OllamaTranslator` httpx client timeout raised 120s → 300s (see next section) — a genuine, separate fix; keep it regardless of the hallucination issue.
+- ✅ For faithful (if literal) translation, the working NMT models (Seamless 67.0 BLEU, MiLMMT 65.2 BLEU) remain the reliable choice.
 
 ### Miscellaneous
 - ❌ `pynvml` package → deprecated; use `nvidia-ml-py` (same `import pynvml` API, no code changes)
@@ -237,10 +244,10 @@ Bengali .txt  →  [Preprocessor]  →  [Chunker]  →  [Translator]  →  [Post
 | `nllb-600M` | `facebook/nllb-200-distilled-600M` | CT2 float16 | 2.0 GB | **55.3 / 72.8** (measured) | ✅ Working |
 | `seamless-medium` | `facebook/seamless-m4t-v2-large` | HF float16 `.to(cuda)` | 3.9 GB | **67.0 / 80.2** (measured) | ✅ Working |
 | `nllb-1.3B` | `facebook/nllb-200-distilled-1.3B` | CT2 float16 | 2.6 GB | 33.4 (published) | Needs download |
-| `indicTrans2-1B` | `ai4bharat/indictrans2-indic-en-1B` | CT2 float16 | 3.0 GB | 41.4 (published) | Needs download |
+| `indicTrans2-1B` | `ai4bharat/indictrans2-indic-en-1B` | HF float16 | 3.0 GB | 41.4 (published) | ⚠️ BLOCKED — transformers 5.x incompat, see MODELS.md |
 | `madlad-3b` | `google/madlad400-3b-mt` | HF T5 float16 | 8.1 GB | ❌ EXCLUDED | Checkpoint corrupted |
 | `milmmt-46-1b` | `xiaomi-research/MiLMMT-46-1B-v0.1` | HF causal LM bfloat16 | 3.3 GB | **65.0 / 79.3** (measured) | ✅ Working |
-| `ollama` | `gemma3:12b` via Ollama | HTTP | ~4.7 GB | subjective | Optional polish |
+| `ollama` | `gemma3:12b` via Ollama | HTTP | ~4.7 GB | subjective | ⚠️ Hallucination risk as primary translator, see below — default fixed 2026-07-09 (was stale `qwen2.5:7b`, model no longer on disk) |
 
 ---
 
