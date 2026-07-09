@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
-from bn_en_translate.config import ModelConfig
+from bn_en_translate.config import REPO_ROOT, ModelConfig
 from bn_en_translate.models.base import TranslatorBase
-from bn_en_translate.models.hf_utils import free_cuda_memory, resolve_attn_implementation
+from bn_en_translate.models.hf_utils import (
+    free_cuda_memory,
+    resolve_attn_implementation,
+    stub_transformers_onnx,
+)
 
 
 class IndicTrans2Translator(TranslatorBase):
@@ -19,14 +24,19 @@ class IndicTrans2Translator(TranslatorBase):
     Language codes: ben_Beng → eng_Latn (same FLORES-200 format as NLLB)
 
     Setup (one-time):
-        pip install git+https://github.com/AI4Bharat/IndicTrans2.git#subdirectory=huggingface_interface
+        pip install IndicTransToolkit
         # Then download the model:
         python scripts/download_models.py --model indicTrans2-1B
 
-    VRAM usage (INT8 via CTranslate2): ~1.0–1.5 GB
+    Backend: HF-native (AutoModelForSeq2SeqLM), not CTranslate2 — CT2's
+    converter registry has no entry for IndicTransConfig, so conversion is
+    architecturally unsupported.
+
+    VRAM usage (float16, HF-native): ~3 GB
     """
 
     HF_MODEL_ID = "ai4bharat/indictrans2-indic-en-1B"
+    _LOCAL_PATH: str = str(REPO_ROOT / "models/indicTrans2-1B-hf")
     DEFAULT_BEAM_SIZE: int = 5
 
     def __init__(self, config: ModelConfig | None = None) -> None:
@@ -55,22 +65,40 @@ class IndicTrans2Translator(TranslatorBase):
 
     def _load_via_indictrans2_interface(self) -> None:
         import torch
-        from IndicTransToolkit import IndicProcessor
         from transformers import (
             AutoModelForSeq2SeqLM,
             AutoTokenizer,
         )
 
+        stub_transformers_onnx()
+
+        try:
+            from IndicTransToolkit import IndicProcessor
+        except ImportError:
+            # IndicTransToolkit (PyPI) imports PreTrainedTokenizerBase from the
+            # pre-5.x location; transformers 5.4 moved it to tokenization_utils_base.
+            # Patch the old path back before retrying rather than losing the
+            # IndicProcessor preprocessing (script/numeral normalization) to
+            # the generic transformers_fallback path.
+            import transformers.tokenization_utils as _ttu
+            from transformers.tokenization_utils_base import (
+                PreTrainedTokenizerBase as _PTB,
+            )
+
+            _ttu.PreTrainedTokenizerBase = _PTB
+            from IndicTransToolkit import IndicProcessor
+
         from bn_en_translate.utils.cuda_check import require_cuda
 
+        model_id = self._LOCAL_PATH if Path(self._LOCAL_PATH).exists() else self.HF_MODEL_ID
         self._tokenizer = AutoTokenizer.from_pretrained(
-            self.HF_MODEL_ID, trust_remote_code=True
+            model_id, trust_remote_code=True
         )
         # IndicTrans2's sdpa support is unverified — keep eager as the fallback
         # (behavior-preserving; do not switch to sdpa without dedicated testing).
         attn_impl = resolve_attn_implementation(self.config.use_flash_attention, fallback="eager")
         self._model = AutoModelForSeq2SeqLM.from_pretrained(
-            self.HF_MODEL_ID,
+            model_id,
             trust_remote_code=True,
             attn_implementation=attn_impl,
             dtype=torch.float16,
@@ -91,10 +119,14 @@ class IndicTrans2Translator(TranslatorBase):
 
         from bn_en_translate.utils.cuda_check import require_cuda
 
-        self._tokenizer = AutoTokenizer.from_pretrained(self.HF_MODEL_ID)
+        stub_transformers_onnx()
+
+        model_id = self._LOCAL_PATH if Path(self._LOCAL_PATH).exists() else self.HF_MODEL_ID
+        self._tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
         attn_impl = resolve_attn_implementation(self.config.use_flash_attention, fallback="eager")
         self._model = AutoModelForSeq2SeqLM.from_pretrained(
-            self.HF_MODEL_ID,
+            model_id,
+            trust_remote_code=True,
             attn_implementation=attn_impl,
             dtype=torch.float16,
         )

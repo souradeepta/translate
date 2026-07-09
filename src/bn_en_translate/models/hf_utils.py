@@ -7,6 +7,52 @@ free of model-specific logic.
 from __future__ import annotations
 
 import importlib.util
+import sys
+import types
+
+
+def stub_transformers_onnx() -> None:
+    """Stub the removed `transformers.onnx` module for trust_remote_code models.
+
+    transformers 5.x deleted the onnx export submodule entirely. Some HF
+    remote-code repos (e.g. ai4bharat/indictrans2-indic-en-1B) still
+    unconditionally `from transformers.onnx import OnnxConfig,
+    OnnxSeq2SeqConfigWithPast` at module import time for an ONNX-export
+    config class we never instantiate. Without this stub, AutoConfig/
+    AutoModel.from_pretrained(trust_remote_code=True) raises ModuleNotFoundError
+    before the real (needed) code ever runs.
+    """
+    if "transformers.onnx" in sys.modules:
+        return
+
+    class _OnnxConfig:
+        default_fixed_batch = 2
+        default_fixed_sequence = 8
+
+    class _OnnxSeq2SeqConfigWithPast(_OnnxConfig):
+        pass
+
+    def _compute_effective_axis_dimension(
+        dimension: int, fixed_dimension: int, num_token_to_add: int = 0
+    ) -> int:
+        if dimension <= 0:
+            dimension = fixed_dimension
+        dimension -= num_token_to_add
+        return dimension
+
+    stub = types.ModuleType("transformers.onnx")
+    stub.__path__ = []  # mark as a package
+    stub.OnnxConfig = _OnnxConfig  # type: ignore[attr-defined]
+    stub.OnnxSeq2SeqConfigWithPast = _OnnxSeq2SeqConfigWithPast  # type: ignore[attr-defined]
+
+    utils_stub = types.ModuleType("transformers.onnx.utils")
+    utils_stub.compute_effective_axis_dimension = (  # type: ignore[attr-defined]
+        _compute_effective_axis_dimension
+    )
+    stub.utils = utils_stub  # type: ignore[attr-defined]
+
+    sys.modules["transformers.onnx"] = stub
+    sys.modules["transformers.onnx.utils"] = utils_stub
 
 
 def flash_attn_available() -> bool:

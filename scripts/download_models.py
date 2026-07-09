@@ -25,9 +25,13 @@ MODELS: dict[str, dict[str, str]] = {
     },
     "indicTrans2-1B": {
         "hf_id": "ai4bharat/indictrans2-indic-en-1B",
-        "output_dir": CT2_MODEL_PATHS["indictrans2-1b"],
+        # CTranslate2's converter registry has no entry for IndicTransConfig —
+        # conversion is architecturally unsupported, not just a missing flag.
+        # Pre-download the HF checkpoint instead; indicTrans2.py loads it
+        # HF-native (AutoModelForSeq2SeqLM + IndicTransToolkit).
+        "output_dir": "models/indicTrans2-1B-hf",
         "quantization": "float16",
-        "type": "indictrans2",
+        "type": "hf_only",
     },
     "madlad-3b": {
         "hf_id": "google/madlad400-3b-mt",
