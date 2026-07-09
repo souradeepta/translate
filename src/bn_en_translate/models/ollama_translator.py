@@ -63,7 +63,11 @@ class OllamaTranslator(TranslatorBase):
     def load(self) -> None:
         self._client = httpx.Client(
             base_url=self.config.ollama_base_url,
-            timeout=120.0,
+            # 120s was measured to time out under partial CPU/GPU offload
+            # (e.g. gemma3:12b + 4096 ctx doesn't fully fit in 8 GB VRAM,
+            # Ollama auto-splits layers to CPU — generation slows well below
+            # the GPU-only tok/s a 120s budget assumed).
+            timeout=300.0,
         )
         # Verify Ollama is reachable
         try:

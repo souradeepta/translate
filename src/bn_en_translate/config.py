@@ -166,7 +166,7 @@ class PipelineConfig:
     model: ModelConfig = field(default_factory=ModelConfig)
     chunk: ChunkConfig = field(default_factory=ChunkConfig)
     ollama_polish: bool = False
-    ollama_model: str = "qwen2.5:7b-instruct-q4_K_M"
+    ollama_model: str = "gemma3:12b"
     ollama_base_url: str = "http://localhost:11434"
 
 
