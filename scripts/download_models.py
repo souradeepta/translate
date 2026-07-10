@@ -51,6 +51,12 @@ MODELS: dict[str, dict[str, str]] = {
         "quantization": "bfloat16",
         "type": "hf_only",
     },
+    "milmmt-46-4B": {
+        "hf_id": "xiaomi-research/MiLMMT-46-4B-v0.1",
+        "output_dir": "models/milmmt-46-4B-hf",
+        "quantization": "bfloat16",  # bf16 checkpoint on disk; loaded 4-bit at runtime
+        "type": "hf_only",
+    },
     "lmt-60-1.7B": {
         "hf_id": "NiuTrans/LMT-60-1.7B",
         "output_dir": "models/lmt-60-1.7B-hf",

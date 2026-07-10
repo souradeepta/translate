@@ -95,6 +95,22 @@ def _make_milmmt(config: PipelineConfig) -> TranslatorBase:
     return MiLMMTTranslator(config.model)
 
 
+@register_model("milmmt-46-4b")
+def _make_milmmt_4b(config: PipelineConfig) -> TranslatorBase:
+    from dataclasses import replace
+
+    from bn_en_translate.models.milmmt import MiLMMT4BTranslator
+
+    # Same two ModelConfig-shared-default pitfalls as sarvam-translate:
+    # model_path defaults to nllb-600M's CT2 dir, and load_in_4bit defaults
+    # to False. 4B params in bf16 (~8 GB) doesn't fit this 8 GB card, so
+    # 4-bit is required, not optional, for this specific translator.
+    model_config = replace(
+        config.model, model_path="", load_in_4bit=True
+    )
+    return MiLMMT4BTranslator(model_config)
+
+
 @register_model("lmt-60-1.7b")
 @register_model("lmt-60")
 def _make_lmt60(config: PipelineConfig) -> TranslatorBase:

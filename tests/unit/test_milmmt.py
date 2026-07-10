@@ -165,3 +165,42 @@ def test_milmmt_load_passes_resolved_attn_impl_to_from_pretrained(monkeypatch) -
 
     _, kwargs = mock_from_pretrained.call_args
     assert kwargs["attn_implementation"] == "sdpa"
+
+
+def test_milmmt_load_in_4bit_passes_quantization_config(monkeypatch) -> None:
+    """load_in_4bit=True must build a BitsAndBytesConfig and pin device_map={'':0}.
+
+    Mirrors sarvam_translate.py's quantization path — bitsandbytes 4-bit models
+    require device placement at from_pretrained() time, not a later .to("cuda").
+    """
+    monkeypatch.setattr(
+        "bn_en_translate.models.hf_utils.flash_attn_available", lambda: False
+    )
+    monkeypatch.setattr(
+        "bn_en_translate.utils.cuda_check.require_cuda", lambda name: None
+    )
+
+    from bn_en_translate.models.milmmt import MiLMMTTranslator
+
+    cfg = ModelConfig(
+        model_name="milmmt-46-1b",
+        model_path="",
+        src_lang="ben_Beng",
+        tgt_lang="eng_Latn",
+        device="cuda",
+        load_in_4bit=True,
+    )
+    t = MiLMMTTranslator(cfg)
+
+    mock_tokenizer = MagicMock()
+    mock_model = MagicMock()
+
+    with patch("transformers.AutoTokenizer.from_pretrained", return_value=mock_tokenizer), \
+         patch(
+             "transformers.AutoModelForCausalLM.from_pretrained", return_value=mock_model
+         ) as mock_from_pretrained:
+        t.load()
+
+    _, kwargs = mock_from_pretrained.call_args
+    assert kwargs["quantization_config"] is not None
+    assert kwargs["device_map"] == {"": 0}

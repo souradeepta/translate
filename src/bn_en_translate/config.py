@@ -35,6 +35,8 @@ MODEL_VRAM_MIB: dict[str, int] = {
                                 # after fixing a device-resolution bug that had silently run
                                 # an earlier measurement on CPU), 5-sent smoke
     "krutrim-translate": 1700,  # distilled IndicTrans2 CT2, measured 1608 MiB peak, 90-sent
+    "milmmt-46-4b":      8100,  # 4B params, 4-bit bnb — measured 8050 MiB peak, 90-sent —
+                                # VERY TIGHT against this 8151 MiB card, ~100 MiB headroom
     "ollama-qwen2.5:7b": 4800,
     "ollama-gemma3:12b": 4700,
 }

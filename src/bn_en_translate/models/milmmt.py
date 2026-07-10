@@ -108,12 +108,29 @@ class MiLMMTTranslator(TranslatorBase):
         # Causal attention is left-to-right; right-padded batches produce misaligned KV cache.
         self._tokenizer.padding_side = "left"
 
+        quantization_config = None
+        device_map: dict[str, int] | None = None
+        if self.config.load_in_4bit:
+            from transformers import BitsAndBytesConfig
+
+            require_cuda(type(self).__name__)  # 4-bit bnb here is CUDA-only
+            quantization_config = BitsAndBytesConfig(  # type: ignore[no-untyped-call]
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.bfloat16,
+            )
+            # Explicit single-GPU pin — NOT "auto" (which permits silent CPU
+            # offload under VRAM pressure). bitsandbytes quantized layers must
+            # be placed at load time; a later .to("cuda") is not supported.
+            device_map = {"": 0}
+
         self._model = AutoModelForCausalLM.from_pretrained(
             model_id,
             attn_implementation=attn_impl,
             dtype=torch.bfloat16,  # Gemma3 native dtype; float16 risks NaN
+            quantization_config=quantization_config,
+            device_map=device_map,
         )
-        if device == "cuda":
+        if device_map is None and device == "cuda":
             require_cuda(type(self).__name__)
             self._model = self._model.to("cuda")
 
@@ -157,3 +174,31 @@ class MiLMMTTranslator(TranslatorBase):
         return list(self._tokenizer.batch_decode(
             new_tokens, skip_special_tokens=True
         ))
+
+
+class MiLMMT4BTranslator(MiLMMTTranslator):
+    """
+    Xiaomi MiLMMT-46-4B (Gemma3-4B based causal LM) — larger sibling of
+    MiLMMT-46-1B, same prompt format and loading contract. 4B params in
+    bf16 (~8 GB) is too tight on an 8 GB card, so this loads 4-bit via
+    bitsandbytes by default (probe-verified working on this repo's sm_120
+    GPU: docs/MODELS.md "Deferred: MiLMMT-46-4B in 4-bit").
+
+    Setup:
+        python scripts/download_models.py --model milmmt-46-4B
+    """
+
+    HF_MODEL_ID: str = "xiaomi-research/MiLMMT-46-4B-v0.1"
+    _LOCAL_PATH: str = str(REPO_ROOT / "models/milmmt-46-4B-hf")
+
+    def __init__(self, config: ModelConfig | None = None) -> None:
+        super().__init__(
+            config
+            or ModelConfig(
+                model_name="milmmt-46-4b",
+                model_path="",
+                src_lang="ben_Beng",
+                tgt_lang="eng_Latn",
+                load_in_4bit=True,
+            )
+        )
