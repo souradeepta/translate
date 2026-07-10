@@ -4,7 +4,7 @@
 
 ```bash
 source .venv/bin/activate && export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH
-make test          # 217 tests, ~27s — confirms env is working
+make test          # 294 tests, ~27s — confirms env is working
 python scripts/benchmark.py --models nllb-600M --sentences 5   # quick GPU smoke test
 make papers        # regenerate figures + compile all 4 PDFs
 ```
@@ -17,9 +17,10 @@ make papers        # regenerate figures + compile all 4 PDFs
 - `models/indicTrans2-1B-hf/` downloaded (2.9 GB, HF-native — CT2 conversion unsupported for IndicTransConfig) but **BLOCKED (2026-07-09)**: AI4Bharat's `trust_remote_code` files target transformers ~4.44; on 5.4.0 the custom tokenizer's `__init__` sets special tokens before `super().__init__()` runs, so `PreTrainedTokenizerBase.__setattr__` can't find `_special_tokens_map` yet → `AttributeError`. Published BLEU (~41) is below Seamless/MiLMMT anyway — deprioritized, not worth vendoring a fix. Full detail: `docs/MODELS.md`
 - `models/milmmt-46-1B-hf/` ✅ HF bfloat16 — **BLEU 65.0 / chrF 79.3** on FLORES-200 (2nd best, 3.3 GB VRAM, 28 ch/s)
 - India-origin candidates evaluated 2026-07-09, both **rejected**, checkpoints deleted: `sarvam-translate` (Sarvam AI + AI4Bharat Gemma3-4B, the de-facto IndicTrans3 successor) BLEU 55.7 on FLORES but **degenerated into a repetition loop on the real story** (62% of output paragraphs just repeated filler text); `krutrim-translate` (Ola Krutrim, distilled IndicTrans2, CT2) BLEU 44.9 — below NLLB-600M — and its internal `ben_Beng eng_Latn` tag **leaked into ~41% of real-story output**. Code + tests remain (`sarvam-translate`, `krutrim-translate` factory keys). Full detail: `docs/MODELS.md`
+- `models/milmmt-46-4B-hf/` ✅ **BEST BLEU/chrF found (2026-07-10): 68.5 / 81.8** on FLORES-200 — beats Seamless. Xiaomi's own next-size-up sibling of milmmt-46-1b, 4-bit bnb quantized (deferred task from 2026-07-08, resumed). Verified on the real story too: no hallucination, paragraph count matched exactly, and it fixed real mistranslations the 1B model made (e.g. "lion" → correct "jackals"). **VRAM peaks at 8050/8151 MiB — kept opt-in via `--model milmmt-46-4b`, not the default**, given the OOM risk if anything else touches the GPU. `milmmt-46-1b` remains the default for routine use.
 - `corpus/` ✅ 90-sentence built-in + 9,829 Samanantar pairs (train/val/test splits)
 - `paper/pdf/` — run `make papers` to rebuild all 4 PDFs (tectonic, no sudo needed)
-- All 217 unit/integration tests passing
+- All 294 unit/integration tests passing
 - **PyTorch 2.7.0+cu128** — GPU training FULLY UNLOCKED (6/6 sm_120 probes pass)
 - LoRA fine-tune done: 2.46h, 3 epochs, eval_loss 1.992, post-FT BLEU 0.17 (open-domain) — export `models/nllb-600M-finetuned-ct2/` deleted 2026-07-08 (failed experiment; metrics live in runs.db)
 - Papers: `paper/ieee_paper.tex`, `paper/survey_paper.tex`, `paper/ieee_transactions_paper.tex`, `paper/acm_paper.tex`
@@ -103,7 +104,7 @@ make papers        # regenerate figures + compile all 4 PDFs
 
 ---
 
-## Benchmark Results (FLORES-200, 90 sentences, RTX 5050, updated 2026-07-08)
+## Benchmark Results (FLORES-200, 90 sentences, RTX 5050, updated 2026-07-10)
 
 > Speeds are translate-only ch/s from the batched pipeline (perf/optimization-pass);
 > pre-July figures (191/28/31) conflated model load with translation — do not compare.
@@ -113,10 +114,13 @@ make papers        # regenerate figures + compile all 4 PDFs
 |-------|------|------|------|-------|-------|
 | NLLB-600M CT2 float16 | **55.3** | **72.8** | 2.3 GB | ~2300 ch/s | Fastest (translate-only, batched, 2026-07-08) |
 | MiLMMT-46-1B bfloat16 | **65.2** | **79.6** | 3.3 GB | ~400 ch/s | 2nd best, efficient (batched) |
-| Seamless-medium float16 | **67.0** | **80.2** | 4.0 GB | ~370 ch/s | Best quality (batched) |
+| Seamless-medium float16 | **67.0** | **80.2** | 4.0 GB | ~370 ch/s | Best quality among defaults (batched) |
+| MiLMMT-46-4B 4-bit bnb (2026-07-10) | **68.5** | **81.8** | 8.05 GB peak ⚠️ | 34 ch/s | Best overall — opt-in only (`--model milmmt-46-4b`), VRAM too tight for default use |
 | MADLAD-3B float16 | ~~0.0~~ | — | 8.1 GB | ~2 ch/s | Excluded permanently — corrupt at source (re-verified 2026-07-08), deleted |
 | LMT-60-1.7B bf16 (2026-07-08) | 63.8 | 78.3 | 6.6 GB peak | 86 ch/s | Rejected — loses to MiLMMT on all axes; deleted |
 | Hunyuan-MT-7B Q4 Ollama (2026-07-08) | 54.7 | 74.7 | 6.6 GB | 112 ch/s | Rejected — Q4 below NLLB-600M; deleted |
+| sarvam-translate 4-bit bnb (2026-07-09) | 55.7 | 74.3 | 4.9 GB | 139 ch/s | Rejected — degenerated into a repetition loop on the real story; deleted |
+| krutrim-translate CT2 (2026-07-09) | 44.9 | 73.1 | 1.6 GB | 7050 ch/s | Rejected — below NLLB-600M, tag-leakage bug on real story; deleted |
 
 ---
 
@@ -246,7 +250,10 @@ Bengali .txt  →  [Preprocessor]  →  [Chunker]  →  [Translator]  →  [Post
 | `nllb-1.3B` | `facebook/nllb-200-distilled-1.3B` | CT2 float16 | 2.6 GB | 33.4 (published) | Needs download |
 | `indicTrans2-1B` | `ai4bharat/indictrans2-indic-en-1B` | HF float16 | 3.0 GB | 41.4 (published) | ⚠️ BLOCKED — transformers 5.x incompat, see MODELS.md |
 | `madlad-3b` | `google/madlad400-3b-mt` | HF T5 float16 | 8.1 GB | ❌ EXCLUDED | Checkpoint corrupted |
-| `milmmt-46-1b` | `xiaomi-research/MiLMMT-46-1B-v0.1` | HF causal LM bfloat16 | 3.3 GB | **65.0 / 79.3** (measured) | ✅ Working |
+| `milmmt-46-1b` | `xiaomi-research/MiLMMT-46-1B-v0.1` | HF causal LM bfloat16 | 3.3 GB | **65.0 / 79.3** (measured) | ✅ Working, default |
+| `milmmt-46-4b` | `xiaomi-research/MiLMMT-46-4B-v0.1` | HF causal LM, 4-bit bnb | 8.05 GB ⚠️ | **68.5 / 81.8** (measured) — best of all models tried | ✅ Working, opt-in only (VRAM too tight for default) |
+| `sarvam-translate` | `sarvamai/sarvam-translate` | HF bf16, 4-bit bnb | 4.9 GB | 55.7 / 74.3 (measured) | ❌ EXCLUDED — repetition loop on real text, checkpoint deleted |
+| `krutrim-translate` | `krutrim-ai-labs/Krutrim-Translate` | CT2 float16 | 1.6 GB | 44.9 / 73.1 (measured) | ❌ EXCLUDED — tag-leakage bug, checkpoint deleted |
 | `ollama` | `gemma3:12b` via Ollama | HTTP | ~4.7 GB | subjective | ⚠️ Hallucination risk as primary translator, see below — default fixed 2026-07-09 (was stale `qwen2.5:7b`, model no longer on disk) |
 
 ---

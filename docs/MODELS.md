@@ -7,6 +7,7 @@
 | `nllb-600M` | `facebook/nllb-200-distilled-600M` | CT2 float16 | 2.0 GB | **55.3** ✅ | **72.8** ✅ | 197 ch/s | 4 | Working — `models/nllb-600M-ct2/` |
 | `seamless-medium` | `facebook/seamless-m4t-v2-large` | HF float16 | 3.9 GB | **67.0** ✅ | **80.2** ✅ | 32 ch/s | 5 | Working — `models/seamless-medium-hf/` |
 | `milmmt-46-1b` | `xiaomi-research/MiLMMT-46-1B-v0.1` | HF bfloat16 | 3.3 GB | **65.0** ✅ | **79.3** ✅ | 28 ch/s | 1 | Working — `models/milmmt-46-1B-hf/` |
+| `milmmt-46-4b` | `xiaomi-research/MiLMMT-46-4B-v0.1` | HF bf16, 4-bit bnb | 8.05 GB ⚠️ | **68.5** ✅ | **81.8** ✅ | 34 ch/s | 1 | ✅ Working, best BLEU/chrF of all models tried — see below for VRAM caveat |
 | `nllb-1.3B` | `facebook/nllb-200-distilled-1.3B` | CT2 float16 | ~2.6 GB | ~26 (lit.) | — | — | 4 | Needs download |
 | `indicTrans2-1B` | `ai4bharat/indictrans2-indic-en-1B` | HF float16 | ~3.0 GB | ~41 (lit.) | — | — | 5 | ⚠️ BLOCKED — see below |
 | `madlad-3b` | `google/madlad400-3b-mt` | HF float16 | 8.1 GB actual | — | — | — | 4 | ❌ EXCLUDED — corrupt at source, see MADLAD section |
@@ -26,6 +27,40 @@ translated outputs: `inputs/TRANSLATION_REPORT.md`.
 |-------|------|-----------|------------|
 | seamless-medium | 38.2 s | 88.2 s | 114 ch/s |
 | milmmt-46-1b | 22.9 s | 23.5 s | 428 ch/s |
+
+### MiLMMT-46-4B — best BLEU/chrF found, kept as opt-in (2026-07-10)
+
+Resumed the deferred MiLMMT-46-4B task (see the old "Deferred" note below —
+now superseded) after the sarvam-translate/krutrim-translate rejections
+prompted a fresh look at "what's actually better than MiLMMT-1B." Xiaomi's
+own MiLMMT-46 family (same lineage as the working `milmmt-46-1b`) includes
+1B/4B/12B sizes; 4B is the largest that fits an 8 GB card at all, via
+bitsandbytes 4-bit (the 4-bit path already probe-verified working on this
+GPU — see below).
+
+**FLORES-200 90-sentence: BLEU 68.5 / chrF 81.8** — beats every other model
+tried, including Seamless-medium (67.0/80.2). Verified on the real story too
+(not just FLORES, per this project's now-standard practice): paragraph count
+matched exactly (187 lines, same as milmmt-46-1b), no hallucination or
+repetition-loop markers found, and it visibly **fixed real mistranslations**
+the 1B model made on the same sentence — e.g. 1B's "the sounds of a **lion**
+could be heard" (nonsensical — lions aren't native to rural Bengal) became
+4B's "the howls of the **jackals**" (correct); 1B's garbled "The **herds**
+are now hiding their faces behind the clouds" became 4B's coherent "The
+**stars** are now hiding behind the clouds."
+
+**Caveat — VRAM is very tight**: 8050 MiB peak on an 8151 MiB card, ~100 MiB
+headroom. Load is also slow (~140-185s) due to on-the-fly 4-bit
+quantization, same as sarvam-translate. **Kept as an explicit opt-in
+(`--model milmmt-46-4b`), not the default** — user decision, given the OOM
+risk if anything else touches the GPU concurrently (see
+[[feedback_no_concurrent_gpu_models]]). MiLMMT-46-1B remains the safer
+default for routine use.
+
+```bash
+python scripts/download_models.py --model milmmt-46-4B   # ~9.98 GB
+bn-translate --input story.bn.txt --output out.en.txt --model milmmt-46-4b
+```
 
 ### Evaluated and rejected (2026-07-08)
 
@@ -71,15 +106,13 @@ The LoRA fine-tuned export `models/nllb-600M-finetuned-ct2/` (BLEU 0.17
 open-domain, failed experiment) was also deleted; training metrics survive in
 `monitor/runs.db` and the papers.
 
-### Deferred: MiLMMT-46-4B in 4-bit (probe passed 2026-07-08)
+### Resolved: MiLMMT-46-4B in 4-bit (deferred 2026-07-08, resumed and kept 2026-07-10)
 
-bitsandbytes 0.49.2 4-bit inference **works on sm_120** — verified by loading the
-existing MiLMMT-46-1B checkpoint with
-`BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_compute_dtype=torch.bfloat16)`
-and generating a correct translation. The 4B attempt (~8.6 GB download, ~3 GB
-VRAM quantized) was deferred by user decision (disk space). To resume: extend
-`milmmt.py` with a `load_in_4bit` config path, register `milmmt-46-4b`,
-download, benchmark against Seamless 67.0.
+See "MiLMMT-46-4B — best BLEU/chrF found, kept as opt-in" above. The
+bitsandbytes 4-bit probe on MiLMMT-46-1B (passed 2026-07-08) generalized
+correctly to the 4B checkpoint — actual measured VRAM (8050 MiB) was higher
+than the ~3 GB estimated at probe time, since the 1B probe didn't scale
+linearly to 4B's larger activation/KV-cache footprint.
 
 > **FLORES BLEU / chrF** numbers marked ✅ are directly measured on FLORES-200 devtest (90 sentences) on this hardware.  
 > Literature figures (no ✅) are from published papers and may not reflect in-domain Bengali performance.  
