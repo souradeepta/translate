@@ -251,3 +251,149 @@ Diffs:
 - `paper/archive/survey_v3_to_v4.diff`
 - `paper/archive/ieee_transactions_v3_to_v4.diff`
 - `paper/archive/acm_tallip_v3_to_v4.diff`
+
+## v5 — 2026-07-10 (2026-07-09/07-10 model-evaluation results: MiLMMT-46-4B accepted opt-in, sarvam-translate and krutrim-translate rejected)
+
+Scope: `paper/ieee_conference/ieee_conference.tex`, `paper/survey/survey.tex`,
+`paper/efficiency/efficiency.tex` only, per the multi-model-roster brief.
+`paper/ieee_transactions/ieee_transactions.tex` and
+`paper/acm_tallip/acm_tallip.tex` are out of scope by design (NLLB-deployment-
+focused, never carried the MiLMMT/LMT-60/Hunyuan roster) and were not touched.
+
+New measured results incorporated (FLORES-200 devtest, 90 sentences, RTX 5050
+8 GB, batched pipeline, translate-only speeds; ground truth in
+`docs/MODELS.md`, `CLAUDE.md` benchmark table, `monitor/runs.db`):
+- **MiLMMT-46-4B** (`xiaomi-research/MiLMMT-46-4B-v0.1`, 4-bit bitsandbytes
+  NF4): 68.5 BLEU / 81.8 chrF, 34 chars/s, VRAM peak 8,050/8,151 MiB
+  (98.8%) — best quality of any model evaluated in this project; accepted
+  **opt-in only** (`--model milmmt-46-4b`), MiLMMT-46-1B remains the
+  default. Qualitatively verified on a real 90-paragraph Bengali story: no
+  hallucination, exact paragraph-count match, corrected 1B mistranslations.
+- **sarvam-translate** (`sarvamai/sarvam-translate`, Gemma3-4B fine-tune,
+  4-bit bnb): 55.7 BLEU / 74.3 chrF, 4,880 MiB, 139 chars/s — REJECTED:
+  degenerated into a repetition loop on real story text (62% of paragraphs
+  repeated filler) despite an acceptable FLORES score.
+- **krutrim-translate** (`krutrim-ai-labs/Krutrim-Translate`, distilled
+  IndicTrans2, CT2 float16): 44.9 BLEU / 73.1 chrF, 1,608 MiB, ~7,050
+  chars/s — REJECTED: below the NLLB-600M incumbent (55.3), and its
+  internal `ben_Beng eng_Latn` control tag leaked into ~41% of real-story
+  output paragraphs.
+
+No new bibliography entries were fabricated: MiLMMT-46-4B, sarvam-translate,
+and krutrim-translate are referenced by name + HF model ID in prose/table
+footnotes (`\texttt{...}`), following the existing convention already used
+for MiLMMT-46-1B (which also has no `\bibitem`) — no independently
+verifiable publication exists for any of the three.
+
+### ieee_conference/ieee_conference.tex
+- Added `\newcommand` placeholders for all new measured constants
+  (`\MILMMTFOURBBLEU`, `\MILMMTFOURBCHRF`, `\MILMMTFOURBCHS`,
+  `\MILMMTFOURBVRAM`, `\SARVAMBLEU`/`\SARVAMCHRF`/`\SARVAMCHS`/`\SARVAMVRAM`,
+  `\KRUTRIMBLEU`/`\KRUTRIMCHRF`/`\KRUTRIMCHS`/`\KRUTRIMVRAM`).
+- Abstract: extended the "two 2026 release candidates" sentence to "six ...
+  across three rounds," adding the MiLMMT-46-4B accept and the
+  sarvam/krutrim rejections.
+- Introduction contribution #5 (model comparison): updated to "six 2026
+  release candidates across three rounds," naming the accept and five
+  rejects.
+- §V-D ("Comparison with Related Systems") prose: updated the "Seamless is
+  the highest of all locally-evaluated models" claim — now scoped to "the
+  three default-deployment models," with a forward pointer to the higher
+  opt-in MiLMMT-46-4B result.
+- `tab:comparison`: added 3 rows (MiLMMT-46-4B, sarvam-translate,
+  krutrim-translate) with new footnote markers ($\P$, $\|$, $**$)
+  explaining each.
+- §V-E (`sec:modelselect`, "Model Selection Under a Fixed VRAM Budget"):
+  updated the opening sentence to "six further 2026 release candidates
+  across three rounds"; added three new paragraphs (MiLMMT-46-4B accept,
+  sarvam-translate reject, krutrim-translate reject) plus a closing
+  synthesis paragraph on FLORES-200 BLEU vs. real-document reliability,
+  inserted before the existing Ollama CPU-fallback observation.
+- Conclusion: rewrote the VRAM-budget-selection sentence to reflect all six
+  candidates (five rejected, one opt-in accept) and the new best-quality
+  figure.
+
+### survey/survey.tex
+- Abstract finding (4): appended a clause on the MiLMMT-46-4B opt-in result
+  and the two same-round rejections.
+- `tab:bleu`: added 3 new rows — `sarvam-translate` and `krutrim-translate`
+  under the existing "measured, rejected" block, and a new "measured,
+  accepted opt-in" block for `MiLMMT-46-4B`; added footnote markers $\|$,
+  $**$, $\dagger\dagger$ with full explanations.
+- `tab:compute`: added 3 rows (sarvam-translate, krutrim-translate,
+  MiLMMT-46-4B) with matching footnotes.
+- `tab:headtohead`: left the 4 existing columns unchanged (adding a 5th
+  column risked overfull hbox in this single-column table); instead
+  appended a footnote sentence noting the opt-in MiLMMT-46-4B result
+  exceeds both "Ours" rows in quality but is excluded from the table as a
+  non-default deployment.
+- §VI ("Our System in Context") subsection "July 2026 Inference
+  Optimization and Model Selection": added two new paragraphs (MiLMMT-46-4B
+  accept; sarvam-translate + krutrim-translate rejects) after the existing
+  LMT-60/Hunyuan paragraph.
+- Pareto-frontier tikz figure and its "BLEU Score Trends" figure were left
+  unchanged (out of scope — no "pareto commentary in prose" numbers needed
+  updating, and the previous LMT-60/Hunyuan round was likewise never added
+  to that scatter plot, so this preserves existing style precedent).
+
+### efficiency/efficiency.tex
+- Added `\newcommand` placeholders for all new measured constants (same set
+  as ieee_conference.tex).
+- Abstract: extended "two 2026 release candidates" to "five ... across two
+  rounds," adding the MiLMMT-46-4B accept (framed as quantization-as-a-win)
+  and the sarvam/krutrim rejections (framed as FLORES-BLEU-does-not-predict-
+  reliability).
+- Introduction: added a 4th generalizable finding (quantization loss is not
+  a fixed penalty; FLORES-200 BLEU does not predict real-document
+  reliability), alongside the existing 3.
+- §II ("Background"): added one-sentence model descriptions for
+  MiLMMT-46-4B, sarvam-translate, krutrim-translate (matching the existing
+  MiLMMT-46-1B/MADLAD-400 description style, no citations).
+- §V (`sec:modelselect`): updated opening sentence to "five 2026 model
+  releases, across two rounds"; added three new subsections with labels
+  (`sec:milmmt4b`, `sec:sarvam`, `sec:krutrim`) between the existing MADLAD
+  subsection and the Ollama CPU-fallback subsection — each with full
+  measured figures and an explicit tie-back to the Hunyuan-MT-7B
+  quantization-loss finding for symmetry/contrast.
+- §VII ("VRAM Budget Enforcement"): added one paragraph noting MiLMMT-46-4B
+  is both the highest-quality and tightest-VRAM measured case for the
+  pre-flight-check pattern.
+- §VIII ("Threats to Validity"): rewrote the "one model, one quantization
+  level" paragraph to "two models, two quantization implementations, with
+  opposite outcomes," since the study no longer has only one quantization
+  data point.
+- Conclusion: extended Finding 3 with the follow-up round's results
+  (quantization-as-a-win counter-example, FLORES-BLEU-does-not-predict-
+  reliability counter-examples).
+- Figure `optimization_speedup.png` (model-selection scatter) was **not**
+  regenerated — this pass explicitly does not run benchmarks or load
+  models; the existing PNG still shows only the original LMT-60/Hunyuan
+  scatter, and the caption was left as an accurate description of that
+  existing image.
+
+### Slides
+- Not touched (out of scope per brief).
+
+### Compile status (2026-07-10, `make paper-ieee paper-survey paper-efficiency`)
+All three edited papers compiled cleanly with `tectonic`: zero errors, only
+pre-existing classes of warning (Bengali-glyph-in-Latin-font, under/overfull
+hbox). Verified via `pypdf` text extraction: zero unresolved `[?]` citation
+markers in any of the three PDFs. `survey.pdf` page 12 (the extended
+`tab:bleu`) produces a handful of cosmetic "Annotation out of page boundary"
+warnings from `xdvipdfmx` (link-box geometry on a table that now spans
+close to a page break) — text content on that page was verified intact via
+`pypdf` extraction; this is a rendering-annotation cosmetic warning, not a
+compile error, and was not present before the table was extended.
+`ieee_transactions.pdf` and `acm_tallip.pdf` timestamps confirm they were
+not rebuilt/touched by this pass. Page counts: ieee_conference 13 (unchanged
+from v4), survey 13 (unchanged), efficiency 6 → 7.
+
+Archived:
+- `paper/archive/ieee_conference_2026-07-10_v5_pre.tex`
+- `paper/archive/survey_2026-07-10_v5_pre.tex`
+- `paper/archive/efficiency_2026-07-10_v5_pre.tex`
+
+Diffs:
+- `paper/archive/ieee_conference_v4_to_v5.diff`
+- `paper/archive/survey_v4_to_v5.diff`
+- `paper/archive/efficiency_v4_to_v5.diff`

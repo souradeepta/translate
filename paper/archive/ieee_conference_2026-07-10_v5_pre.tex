@@ -85,22 +85,6 @@
 \newcommand{\SEAMLESSBEFORECHS}{73}
 \newcommand{\SEAMLESSAFTERCHS}{317}
 \newcommand{\SEAMLESSSPEEDUP}{4.3$\times$}
-% 2026-07-09/07-10 follow-up model-evaluation round (measured, same
-% 90-sentence FLORES-200 protocol, RTX 5050 8 GB, real-story qualitative
-% verification as described in prose): MiLMMT-46-4B accepted opt-in,
-% sarvam-translate and krutrim-translate rejected.
-\newcommand{\MILMMTFOURBBLEU}{68.5}
-\newcommand{\MILMMTFOURBCHRF}{81.8}
-\newcommand{\MILMMTFOURBCHS}{34}
-\newcommand{\MILMMTFOURBVRAM}{8{,}050}
-\newcommand{\SARVAMBLEU}{55.7}
-\newcommand{\SARVAMCHRF}{74.3}
-\newcommand{\SARVAMCHS}{139}
-\newcommand{\SARVAMVRAM}{4{,}880}
-\newcommand{\KRUTRIMBLEU}{44.9}
-\newcommand{\KRUTRIMCHRF}{73.1}
-\newcommand{\KRUTRIMCHS}{$\approx$7{,}050}
-\newcommand{\KRUTRIMVRAM}{1{,}608}
 
 % ============================================================
 \begin{document}
@@ -140,19 +124,10 @@ translate-only throughput by \NLLBSPEEDUP{}--\MILMMTSPEEDUP{} at BLEU parity
 and \SEAMLESSCHS{}~chars/s (Seamless-medium); load and translate time are now
 measured separately after discovering that combined timing conflated cold-page-cache
 disk reads with inference.
-Under the resulting 8\,GB VRAM budget we evaluate six 2026 release candidates across
-three rounds: NiuTrans LMT-60-1.7B (63.8 BLEU, rejected on quality/VRAM/speed vs.\
+Under the resulting 8\,GB VRAM budget we additionally evaluate two 2026 release
+candidates: NiuTrans LMT-60-1.7B (63.8 BLEU, rejected on quality/VRAM/speed vs.\
 MiLMMT-46-1B) and Tencent Hunyuan-MT-7B in 4-bit GGUF (54.7 BLEU, a $>$12-point drop
-from its full-precision reputation, rejected on quantization loss); a re-downloaded
-MADLAD-400-3B (still excluded, corruption confirmed at source); and, in a follow-up
-round, MiLMMT-46-4B (4-bit bitsandbytes NF4) at \MILMMTFOURBBLEU{} BLEU /
-\MILMMTFOURBCHRF{} chrF --- the best quality of any model evaluated in this project,
-accepted opt-in only given an \MILMMTFOURBVRAM{}\,MiB VRAM peak (98.8\% of the 8\,GB
-card) --- alongside two further rejections, Sarvam AI's sarvam-translate
-(\SARVAMBLEU{} BLEU, degenerated into a repetition loop on real narrative text despite
-an acceptable FLORES-200 score) and Ola Krutrim's krutrim-translate (\KRUTRIMBLEU{}
-BLEU, below the NLLB-600M incumbent, with an internal control tag leaking into
-real-story output).
+from its full-precision reputation, rejected on quantization loss).
 LoRA fine-tuning~\cite{hu2021lora} via PEFT~\cite{peft2022} with bf16 precision
 runs 3~epochs on 7,863 Samanantar pairs in \TRAINDURATION, yielding \POSTFTBLEU{}
 BLEU on the 984-pair open-domain test set (sacreBLEU, no SentencePiece normalization).
@@ -221,15 +196,11 @@ three barriers. Our contributions are:
         decreasing evaluation loss (2.111 $\to$ 2.003 $\to$ 1.992).
 
   \item A comprehensive model comparison covering NLLB-200 (600M--54B), IndicTrans2,
-        MADLAD-400, SeamlessM4T-v2, MiLMMT-46-1B/4B, and commercial APIs, with per-domain
+        MADLAD-400, SeamlessM4T-v2, MiLMMT-46-1B, and commercial APIs, with per-domain
         BLEU breakdown across 10 corpus domains (75.9-point spread within a single
-        model) and a fixed-VRAM-budget model-selection study spanning six 2026
-        release candidates across three rounds --- accepting MiLMMT-46-4B
-        (\MILMMTFOURBBLEU{} BLEU / \MILMMTFOURBCHRF{} chrF, the best quality found in
-        this project, opt-in due to a VRAM peak at 98.8\% of the 8\,GB card) and
-        rejecting five others (NiuTrans LMT-60-1.7B, Tencent Hunyuan-MT-7B Q4,
-        MADLAD-400-3B, sarvam-translate, krutrim-translate) on measured quality,
-        VRAM, quantization-loss, or real-document reliability grounds.
+        model) and a fixed-VRAM-budget model-selection study rejecting two 2026
+        release candidates (NiuTrans LMT-60-1.7B, Tencent Hunyuan-MT-7B Q4) on
+        measured quality, VRAM, and quantization-loss grounds.
 
   \item Documentation and resolution of six previously undocumented deployment
         constraints on Blackwell sm\_120 hardware, including a corrected SIGBUS
@@ -904,18 +875,17 @@ with proper nouns in low-resource configurations.
 The Proverbs score (42.7) reflects the fundamental challenge of idiomatic translation,
 where literal word-for-word transfer fails semantically
 (see qualitative examples in Table~\ref{tab:qualitative}).
-Fig.~\ref{fig:combined} presents the per-domain BLEU distribution alongside
-the measured-versus-published quality comparison for the deployed models.
+Fig.~\ref{fig:combined} presents both the per-domain BLEU distribution and the
+corresponding inference resource profile side by side.
 
 \begin{figure*}[htbp]
   \centering
   \includegraphics[width=\textwidth]{combined_results.png}
   \caption{Left: per-domain BLEU scores (same as Fig.~\ref{fig:domain_bleu},
-           shown for reference). Right: measured BLEU and chrF for the four
-           deployed models (MiLMMT-46-4B, Seamless-v2, MiLMMT-46-1B,
-           NLLB-600M) on the FLORES-200 90-sentence set, alongside published
-           baselines; rejected candidates are compared in
-           Section~\ref{sec:modelselect}.}
+           shown for reference). Right: inference resource profile showing
+           GPU utilisation, VRAM consumption, CPU load, and RAM usage on
+           the RTX~5050 during a benchmark run. VRAM bar shows actual MiB
+           divided by 100 for scale alignment.}
   \label{fig:combined}
 \end{figure*}
 
@@ -1010,11 +980,8 @@ SeamlessM4T-v2~\cite{seamlessm4t2023} & \SEAMLESSBLEU{} & --- & FLORES-200 & Clo
 Google Translate$^\dagger$ & $\sim$35--45 & --- & Various & API \\
 \textbf{Ours (LMT-60-1.7B)$^\ddagger$} & 63.8 & 78.3 & FLORES-200 & \textbf{Local GPU} \\
 \textbf{Ours (Hunyuan-MT-7B Q4)$^\S$} & 54.7 & 74.7 & FLORES-200 & \textbf{Local GPU} \\
-\textbf{Ours (MiLMMT-46-4B)$^\P$} & \textbf{\MILMMTFOURBBLEU} & \textbf{\MILMMTFOURBCHRF} & FLORES-200 & \textbf{Local GPU (opt-in)} \\
-Ours (sarvam-translate)$^\|$ & \SARVAMBLEU & \SARVAMCHRF & FLORES-200 & Local GPU (rejected) \\
-Ours (krutrim-translate)$^{**}$ & \KRUTRIMBLEU & \KRUTRIMCHRF & FLORES-200 & Local GPU (rejected) \\
 \bottomrule
-\multicolumn{5}{>{\footnotesize\raggedright\arraybackslash}p{0.86\columnwidth}}{$^\dagger$ Informal estimate from~\cite{wu2016googles}; no official bn-en BLEU published. MADLAD-400-3B excluded: even after a clean re-download, the checkpoint still fails a tied-embedding integrity guard (\texttt{shared.weight} $\neq$ \texttt{decoder.embed\_tokens.weight}), indicating source corruption rather than a local deployment error; 8\,GB VRAM is also insufficient for the 3B float16 model without CPU offload. $^\ddagger$ NiuTrans LMT-60-1.7B (Qwen3-based, bf16, num\_beams=5); rejected in favor of MiLMMT-46-1B on BLEU, VRAM (6.6\,GB vs.\ 3.4\,GB), and speed (86 vs.\ \MILMMTCHS{}\,chars/s). $^\S$ Tencent Hunyuan-MT-7B, Q4\_K\_M GGUF via Ollama; rejected due to $>$12-BLEU quantization loss relative to its published full-precision (bf16, WMT25-winning) reputation --- quantization loss dominates model capacity under an 8\,GB budget. $^\P$ \texttt{xiaomi-research/MiLMMT-46-4B-v0.1}, 4-bit bitsandbytes NF4; the best quality of any model evaluated in this project, but deployed opt-in only (VRAM peak \MILMMTFOURBVRAM{} of 8{,}151\,MiB, 98.8\% of the card). $^\|$ \texttt{sarvamai/sarvam-translate} (Sarvam AI, Gemma3-4B fine-tune, 4-bit bnb); rejected despite an acceptable FLORES-200 score after degenerating into a repetition loop on real narrative text (Section~\ref{sec:modelselect}). $^{**}$ \texttt{krutrim-ai-labs/Krutrim-Translate} (Ola Krutrim, distilled IndicTrans2, CT2 float16); rejected for scoring below NLLB-600M and leaking an internal control tag into real-story output (Section~\ref{sec:modelselect}).}
+\multicolumn{5}{>{\footnotesize\raggedright\arraybackslash}p{0.86\columnwidth}}{$^\dagger$ Informal estimate from~\cite{wu2016googles}; no official bn-en BLEU published. MADLAD-400-3B excluded: even after a clean re-download, the checkpoint still fails a tied-embedding integrity guard (\texttt{shared.weight} $\neq$ \texttt{decoder.embed\_tokens.weight}), indicating source corruption rather than a local deployment error; 8\,GB VRAM is also insufficient for the 3B float16 model without CPU offload. $^\ddagger$ NiuTrans LMT-60-1.7B (Qwen3-based, bf16, num\_beams=5); rejected in favor of MiLMMT-46-1B on BLEU, VRAM (6.6\,GB vs.\ 3.4\,GB), and speed (86 vs.\ \MILMMTCHS{}\,chars/s). $^\S$ Tencent Hunyuan-MT-7B, Q4\_K\_M GGUF via Ollama; rejected due to $>$12-BLEU quantization loss relative to its published full-precision (bf16, WMT25-winning) reputation --- quantization loss dominates model capacity under an 8\,GB budget.}
 \end{tabular}%
 }
 \end{table}
@@ -1023,10 +990,7 @@ Our NLLB-600M reaches \NLLBFLORESBLEU{} BLEU (\NLLBFLORESCHRF{} chrF) on FLORES-
 outperforming the published NLLB-600M figure of 30.5 (which uses the smaller 90-sentence
 FLORES-200 devtest without SentencePiece normalization in some evaluations). Our
 Seamless-medium run achieves \SEAMLESSPROJBLEU{} BLEU (\SEAMLESSPROJCHRF{} chrF),
-the highest of the three default-deployment models in this study; an opt-in
-MiLMMT-46-4B configuration evaluated under Section~\ref{sec:modelselect} reaches a
-higher \MILMMTFOURBBLEU{} BLEU (\MILMMTFOURBCHRF{} chrF), the best quality of any
-model measured in this project, within a tighter VRAM budget.
+the highest of all locally-evaluated models in this study.
 The Samanantar open-domain fine-tuning BLEU of \POSTFTBLEU{} reflects SacreBLEU
 tokenization of Bengali script: without SentencePiece normalization, near-zero n-gram
 overlap against tokenized references gives a lower bound on true model quality rather
@@ -1036,10 +1000,8 @@ equally challenging open-domain test sets evaluated without SentencePiece normal
 \subsection{Model Selection Under a Fixed VRAM Budget}
 \label{sec:modelselect}
 
-Across three evaluation rounds (2026-07-08 through 2026-07-10), six further 2026
-release candidates were evaluated with the same 90-sentence FLORES-200 protocol used
-throughout this paper, under the constraint of an 8\,GB VRAM budget: five are rejected
-and one, MiLMMT-46-4B, is accepted as an opt-in deployment option.
+Two 2026 release candidates were evaluated with the same 90-sentence FLORES-200
+protocol used throughout this paper, under the constraint of an 8\,GB VRAM budget.
 
 \textbf{NiuTrans LMT-60-1.7B} (Qwen3-based, bf16, chat-template prompt,
 num\_beams=5) scored 63.8 BLEU / 78.3 chrF at 86\,chars/s, peaking at 6{,}635\,MiB
@@ -1067,51 +1029,6 @@ the corruption is at the source rather than local to one download. The guard
 converts what was previously silent BLEU-0 garbage output into a load-time
 \texttt{RuntimeError}, so a future corrupted checkpoint fails loudly instead of
 producing an uninterpretable evaluation result.
-
-\textbf{MiLMMT-46-4B} (\texttt{xiaomi-research/MiLMMT-46-4B-v0.1}, Gemma3-based
-causal LM, 4-bit bitsandbytes NF4 quantization) scored \MILMMTFOURBBLEU{} BLEU /
-\MILMMTFOURBCHRF{} chrF at \MILMMTFOURBCHS{}\,chars/s, the highest quality of any
-model evaluated in this project --- exceeding even Seamless-medium's float16
-\SEAMLESSPROJBLEU{} BLEU. VRAM peaked at \MILMMTFOURBVRAM{} of 8{,}151\,MiB available
-(98.8\% of the card), leaving essentially no headroom for concurrent processes.
-Given this OOM risk, MiLMMT-46-4B is deployed opt-in only (\texttt{--model
-milmmt-46-4b}); MiLMMT-46-1B (\MILMMTFLORESBLEU{} BLEU, 3.4\,GB) remains the default.
-Qualitative verification on a real 90-paragraph Bengali story confirmed no
-hallucination, an exact paragraph-count match, and correction of mistranslations
-present in the 1B model's output (e.g., ``lion'' $\to$ the correct ``jackals''). This
-result illustrates that a 4-bit-quantized 4B model can outperform a float16 2.3B
-specialist within the same 8\,GB budget --- the inverse of the Hunyuan-MT-7B finding
-above, where 4-bit quantization was the dominant loss. Quantization loss is thus
-architecture- and training-data dependent, not a fixed penalty predictable from
-parameter count alone: it must be measured per model rather than assumed.
-
-\textbf{Sarvam AI's sarvam-translate} (\texttt{sarvamai/sarvam-translate}, a
-Gemma3-4B fine-tune positioned as the de-facto IndicTrans3 successor, 4-bit
-bitsandbytes) scored \SARVAMBLEU{} BLEU / \SARVAMCHRF{} chrF at \SARVAMCHS{}\,chars/s
-using \SARVAMVRAM{}\,MiB VRAM --- an acceptable FLORES-200 score. It is nonetheless
-rejected: on the same real 90-paragraph story used to verify MiLMMT-46-4B,
-sarvam-translate degenerated into a repetition loop, with 62\% of output paragraphs
-repeating filler text rather than translating the source. This is the second instance
-in this study (after Hunyuan-MT-7B) of a benchmark score that does not predict
-real-document reliability.
-
-\textbf{Ola Krutrim's krutrim-translate} (\texttt{krutrim-ai-labs/Krutrim-Translate},
-a CTranslate2 float16 distillation of IndicTrans2) scored \KRUTRIMBLEU{} BLEU /
-\KRUTRIMCHRF{} chrF at \KRUTRIMCHS{}\,chars/s using \KRUTRIMVRAM{}\,MiB VRAM ---
-below even the smallest model in this study, NLLB-600M (\NLLBFLORESBLEU{} BLEU). It
-is rejected on this basis alone, and a second defect confirms the decision: the
-model's internal \texttt{ben\_Beng eng\_Latn} control tag leaked into approximately
-41\% of output paragraphs on the same real-story evaluation, indicating incomplete
-tokenizer/decoder integration in the distillation.
-
-These five rejections (NiuTrans LMT-60-1.7B, Tencent Hunyuan-MT-7B Q4, MADLAD-400-3B,
-sarvam-translate, krutrim-translate), together with the MiLMMT-46-4B acceptance,
-reinforce a theme specific to consumer-GPU deployment: FLORES-200 BLEU predicts
-relative model quality reasonably well within a model family and precision, but real
-narrative text can expose failure modes --- repetition loops, control-token leakage,
-hallucination --- invisible to sentence-level automatic metrics. Every model in this
-study that passed the FLORES-200 bar was subsequently verified against a real story
-before acceptance.
 
 A final systems observation from this evaluation round: Ollama silently falls back
 to 100\% CPU inference (5.4\,tok/s) rather than GPU (58.5\,tok/s) if VRAM is already
@@ -1517,17 +1434,11 @@ reported separately after a conflation bug was found and fixed in the benchmark
 harness itself.
 LoRA fine-tuning of the same 600M-parameter model completes in \TRAINDURATION{} on
 that hardware, with evaluation loss decreasing monotonically across all three epochs.
-Under a fixed 8\,GB VRAM budget, six 2026 release candidates were evaluated across
-three rounds: five (NiuTrans LMT-60-1.7B, Tencent Hunyuan-MT-7B Q4, a re-downloaded
-MADLAD-400-3B, sarvam-translate, and krutrim-translate) were rejected on quantization
-loss, VRAM footprint, or real-document reliability failures (repetition loops,
-control-tag leakage) invisible to FLORES-200 BLEU alone, while MiLMMT-46-4B (4-bit
-bitsandbytes NF4) was accepted as an opt-in option, reaching \MILMMTFOURBBLEU{} BLEU
-/ \MILMMTFOURBCHRF{} chrF --- the best quality of any model evaluated in this
-project --- at a VRAM peak of 98.8\% of the 8\,GB card. This illustrates that model
-selection on consumer hardware must weigh quantization loss, VRAM footprint, and
-real-document robustness alongside raw published capability and FLORES-200 rank.
-None of these results required cloud infrastructure, API keys, or multi-GPU scaling.
+Under a fixed 8\,GB VRAM budget, two 2026 release candidates (NiuTrans LMT-60-1.7B,
+Tencent Hunyuan-MT-7B in 4-bit GGUF) were measured and rejected in favor of the
+already-deployed MiLMMT-46-1B, illustrating that model selection on consumer
+hardware must weigh quantization loss and VRAM footprint alongside raw published
+capability. Neither result required cloud infrastructure, API keys, or multi-GPU scaling.
 
 The six Blackwell deployment constraints documented here --- cuBLAS INT8 failure,
 corrected SIGBUS root cause (concurrent pip install, not AMD AMX), fast-tokenizer

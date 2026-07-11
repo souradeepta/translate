@@ -1,0 +1,284 @@
+--- paper/archive/efficiency_2026-07-10_v5_pre.tex	2026-07-10 19:48:20.073107355 -0700
++++ paper/efficiency/efficiency.tex	2026-07-10 19:56:15.087834253 -0700
+@@ -80,6 +80,25 @@
+ \newcommand{\HUNYUANCHS}{112}
+ \newcommand{\HUNYUANVRAM}{$\approx$6.6\,GB}
+ 
++% 2026-07-09/07-10 follow-up model-evaluation round (measured, same
++% 90-sentence FLORES-200 protocol, real-story qualitative verification
++% as described in prose): MiLMMT-46-4B accepted opt-in, sarvam-translate
++% and krutrim-translate rejected.
++\newcommand{\MILMMTFOURBBLEU}{68.5}
++\newcommand{\MILMMTFOURBCHRF}{81.8}
++\newcommand{\MILMMTFOURBCHS}{34}
++\newcommand{\MILMMTFOURBVRAM}{8{,}050\,MiB}
++
++\newcommand{\SARVAMBLEU}{55.7}
++\newcommand{\SARVAMCHRF}{74.3}
++\newcommand{\SARVAMCHS}{139}
++\newcommand{\SARVAMVRAM}{4{,}880\,MiB}
++
++\newcommand{\KRUTRIMBLEU}{44.9}
++\newcommand{\KRUTRIMCHRF}{73.1}
++\newcommand{\KRUTRIMCHS}{$\approx$7{,}050}
++\newcommand{\KRUTRIMVRAM}{1{,}608\,MiB}
++
+ % ============================================================
+ \begin{document}
+ % ============================================================
+@@ -119,17 +138,28 @@
+ inflating apparent latency by an order of magnitude; the fix was separating
+ two timer calls, but the resulting historical numbers had already propagated
+ into prior reporting.
+-Under the resulting 8\,GB budget we evaluate two 2026 release candidates:
+-NiuTrans LMT-60-1.7B (\LMTBLEU{} BLEU, rejected against MiLMMT-46-1B on
+-quality, VRAM, and speed) and Tencent Hunyuan-MT-7B in 4-bit GGUF
+-quantization (\HUNYUANBLEU{} BLEU, a $>$12-point drop from its published
+-full-precision, WMT25-winning reputation), showing quantization loss can
+-dominate a larger model's raw capacity under a fixed budget. A 5-sentence
+-smoke test of LMT-60 scored \LMTSMOKEBLEU{} BLEU against \LMTBLEU{} on the
+-full set, showing small-sample BLEU is unreliable for model selection. We
+-close with a measured-VRAM pre-flight check converting CUDA out-of-memory
+-crashes into clean errors, and threats to validity: single-GPU,
+-single-language-pair, and single-run speed noise ($\pm$30\%).
++Under the resulting 8\,GB budget we evaluate five 2026 release candidates
++across two rounds: NiuTrans LMT-60-1.7B (\LMTBLEU{} BLEU, rejected against
++MiLMMT-46-1B on quality, VRAM, and speed) and Tencent Hunyuan-MT-7B in
++4-bit GGUF quantization (\HUNYUANBLEU{} BLEU, a $>$12-point drop from its
++published full-precision, WMT25-winning reputation), showing quantization
++loss can dominate a larger model's raw capacity under a fixed budget. A
++5-sentence smoke test of LMT-60 scored \LMTSMOKEBLEU{} BLEU against
++\LMTBLEU{} on the full set, showing small-sample BLEU is unreliable for
++model selection. A follow-up round complicates the quantization-loss
++picture: MiLMMT-46-4B (4-bit bitsandbytes NF4) reaches \MILMMTFOURBBLEU{}
++BLEU / \MILMMTFOURBCHRF{} chrF, the best quality of any model measured in
++this study, at a VRAM peak of \MILMMTFOURBVRAM{} (98.8\% of the 8\,GB
++budget), showing 4-bit quantization can also be a net \emph{win} depending
++on the model and training data, not a fixed penalty; meanwhile
++sarvam-translate (\SARVAMBLEU{} BLEU) and krutrim-translate
++(\KRUTRIMBLEU{} BLEU) both pass the FLORES-200 bar yet are rejected after
++degenerating into a repetition loop and leaking an internal control tag,
++respectively, on real narrative text outside the benchmark corpus ---
++evidence that FLORES-200 BLEU alone does not predict real-document
++reliability. We close with a measured-VRAM pre-flight check converting
++CUDA out-of-memory crashes into clean errors, and threats to validity:
++single-GPU, single-language-pair, and single-run speed noise ($\pm$30\%).
+ \end{abstract}
+ 
+ \begin{IEEEkeywords}
+@@ -182,6 +212,23 @@
+         candidate models on-device, at full sample size, under the actual
+         deployment budget, rather than trusting a leaderboard number scaled
+         to a different hardware or precision configuration.
++
++  \item \textbf{Quantization loss is not a fixed penalty, and FLORES-200
++        BLEU does not predict real-document reliability.} A follow-up
++        evaluation round found the inverse of Finding 3 for a different
++        model: 4-bit quantization of a 4B model (MiLMMT-46-4B) beat a
++        full-precision 2.3B specialist, reaching the highest quality
++        measured in this study (\MILMMTFOURBBLEU{} BLEU) within \MILMMTFOURBVRAM{}
++        of an 8\,GB budget. In the same round, two further candidates
++        (sarvam-translate, krutrim-translate) scored acceptably on
++        FLORES-200 yet failed outright --- a repetition loop and a leaked
++        internal control tag, respectively --- when run on real narrative
++        text outside the benchmark corpus. Together these argue that
++        neither quantization level nor sentence-level automatic metrics
++        alone are sufficient signals for a consumer-GPU deployment
++        decision; both must be measured per model, and quality claims
++        must be verified against realistic input, not only a benchmark
++        devtest.
+ \end{enumerate}
+ 
+ The remainder of this paper describes the measurement methodology
+@@ -207,7 +254,14 @@
+ here in bfloat16 via HuggingFace Transformers with a translation prompt
+ template. MADLAD-400~\cite{kudugunta2023madlad} is a T5-based multilingual
+ translation model from Google, included in this study as a negative
+-result (Section~\ref{sec:modelselect}).
++result (Section~\ref{sec:modelselect}). MiLMMT-46-4B is the 4B-parameter
++sibling of MiLMMT-46-1B, deployed here in 4-bit bitsandbytes NF4
++quantization. Sarvam AI's \texttt{sarvamai/sarvam-translate} is a
++Gemma3-4B fine-tune positioned as the de-facto IndicTrans3 successor,
++also deployed in 4-bit bitsandbytes. Ola Krutrim's
++\texttt{krutrim-ai-labs/Krutrim-Translate} is a CTranslate2 float16
++distillation of IndicTrans2. All three are evaluated in
++Section~\ref{sec:modelselect}.
+ 
+ \textbf{Evaluation.} All BLEU~\cite{papineni2002bleu} scores are computed
+ with sacreBLEU~\cite{post2018call} for tokenization-reproducible reporting;
+@@ -431,9 +485,13 @@
+ % ============================================================
+ 
+ With the pipeline's own three backends optimized, we evaluated whether
+-two 2026 model releases would improve on the already-deployed
+-MiLMMT-46-1B under the same 8\,GB VRAM budget, using the identical
+-90-sentence FLORES-200 protocol.
++five 2026 model releases, across two rounds (2026-07-08 and 2026-07-09
++through 2026-07-10), would improve on the already-deployed MiLMMT-46-1B
++under the same 8\,GB VRAM budget, using the identical 90-sentence
++FLORES-200 protocol. Every candidate that passed the FLORES-200 bar was
++additionally verified against a real 90-paragraph Bengali story before an
++accept/reject call, a step that changed the outcome for two of the five
++candidates (Sections~\ref{sec:sarvam} and~\ref{sec:krutrim}).
+ 
+ \subsection{NiuTrans LMT-60-1.7B: Quality and the Small-Sample BLEU Trap}
+ 
+@@ -499,6 +557,76 @@
+ weight tying should be validated for that invariant at load time, not
+ discovered by evaluation.
+ 
++\subsection{MiLMMT-46-4B: Quantization as a Net Win}
++\label{sec:milmmt4b}
++
++A follow-up evaluation round (2026-07-09 through 2026-07-10) tested three
++further candidates. MiLMMT-46-4B (\texttt{xiaomi-research/MiLMMT-46-4B-v0.1},
++the same Gemma3-based causal-LM family as the already-deployed MiLMMT-46-1B,
++quantized to 4-bit bitsandbytes NF4) scored \MILMMTFOURBBLEU{} BLEU /
++\MILMMTFOURBCHRF{} chrF at \MILMMTFOURBCHS{}\,chars/s --- the highest quality
++of any model measured in this study, exceeding even the full-precision
++Seamless-medium's \SEAMLESSBLEU{} BLEU. VRAM peaked at \MILMMTFOURBVRAM{} of
++8{,}151\,MiB available on the test GPU (98.8\% of the card), leaving
++essentially no headroom for a concurrent process; the pipeline therefore
++deploys it opt-in only (\texttt{--model milmmt-46-4b}), keeping MiLMMT-46-1B
++(\MILMMTBLEU{} BLEU, 3.4\,GB) as the default. Qualitative verification
++against a real 90-paragraph Bengali story found no hallucination, an exact
++paragraph-count match, and correction of mistranslations present in the 1B
++model's own output (e.g., a mistranslated animal name corrected to the
++contextually correct one).
++
++This result is the direct inverse of the Hunyuan-MT-7B finding
++(Section~\ref{sec:modelselect}): there, 4-bit quantization of a 7B model lost
++more than 12 BLEU points relative to its full-precision reputation and fell
++below a 600M float16 model; here, 4-bit quantization of a 4B model beats a
++1.2B float16 specialist by 1.5 BLEU. Reading the two results together, the
++paper's Finding 3 (Section~\ref{sec:optimizations}) generalizes further than
++originally stated: quantization loss is architecture- and training-data
++dependent, not a fixed penalty predictable from parameter count or bit-width
++alone, and can be net-positive or net-negative for the same nominal
++4-bit budget depending on the specific model. It must be measured per model,
++not assumed in either direction.
++
++\subsection{sarvam-translate: A Repetition-Loop Failure Invisible to FLORES-200}
++\label{sec:sarvam}
++
++Sarvam AI's \texttt{sarvamai/sarvam-translate} (a Gemma3-4B fine-tune by
++Sarvam AI in collaboration with AI4Bharat, positioned as the de-facto
++IndicTrans3 successor, deployed in 4-bit bitsandbytes) scored \SARVAMBLEU{}
++BLEU / \SARVAMCHRF{} chrF at \SARVAMCHS{}\,chars/s using \SARVAMVRAM{} VRAM
++--- an acceptable FLORES-200 score, comparable to NLLB-600M. On the same
++real 90-paragraph story used to verify MiLMMT-46-4B, however,
++sarvam-translate degenerated into a repetition loop: 62\% of output
++paragraphs repeated filler text rather than translating the source
++paragraph. The model is rejected on this basis, despite its acceptable
++benchmark score. This is the second instance in this study (after
++Hunyuan-MT-7B, though for a different underlying reason) of a candidate
++whose FLORES-200 BLEU did not predict its behavior once deployed on
++realistic input, and the first instance in this study where the benchmark
++score itself gave no warning sign at all --- Hunyuan-MT-7B's failure was at
++least visible in its BLEU number; sarvam-translate's was not.
++
++\subsection{krutrim-translate: Below-Baseline Quality Plus Control-Tag Leakage}
++\label{sec:krutrim}
++
++Ola Krutrim's \texttt{krutrim-ai-labs/Krutrim-Translate} (a CTranslate2
++float16 distillation of IndicTrans2) scored \KRUTRIMBLEU{} BLEU /
++\KRUTRIMCHRF{} chrF at \KRUTRIMCHS{}\,chars/s using \KRUTRIMVRAM{} VRAM ---
++below even the smallest model in this study, NLLB-600M (\NLLBBLEU{} BLEU).
++This alone is sufficient grounds for rejection. A second, independent
++defect confirms the decision: on the real-story evaluation, the model's
++internal \texttt{ben\_Beng eng\_Latn} control tag (evidently a source/target
++language marker intended for internal use during distillation from
++IndicTrans2) leaked into approximately 41\% of output paragraphs, appearing
++verbatim in translated text. This indicates incomplete tokenizer/decoder
++integration in the distillation process, a defect class distinct from both
++the quantization-loss mechanism (Hunyuan-MT-7B) and the repetition-loop
++failure mode (sarvam-translate) documented above --- a reminder that
++``passes the BLEU bar'' and ``safe to deploy'' are measuring different
++things, and that a full-corpus, on-device BLEU measurement is necessary but
++not sufficient for a deployment decision.
++
+ \subsection{A Deployment Gotcha: Silent CPU Fallback in Ollama}
+ 
+ A final observation from this evaluation round, orthogonal to the model
+@@ -549,7 +677,14 @@
+ estimates, which typically omit activation memory, KV-cache, and
+ framework overhead), and gate every load behind a check against those
+ measured numbers rather than allowing the first out-of-memory error to be
+-the mechanism by which a VRAM budget is discovered.
++the mechanism by which a VRAM budget is discovered. MiLMMT-46-4B
++(Section~\ref{sec:milmmt4b}), the highest-quality model in this study,
++is also the tightest measured case for this pattern: its \MILMMTFOURBVRAM{}
++peak against an 8{,}151\,MiB card leaves under 100\,MiB of headroom, so it
++is registered in the measured-VRAM table and gated behind the pre-flight
++check like every other model, and deployed opt-in rather than as the
++pipeline default precisely because that headroom is too thin to
++guarantee against a concurrent process on a shared machine.
+ 
+ % ============================================================
+ \section{Threats to Validity}
+@@ -586,18 +721,25 @@
+ already-deployed, actively-developed research system operated on shared
+ consumer hardware.
+ 
+-\textbf{Quantization comparison is one model, one quantization level.}
+-The Hunyuan-MT-7B result (Section~\ref{sec:modelselect}) is a single
+-data point at Q4\_K\_M quantization for one 7B model. It should not be
+-read as a general claim that 4-bit quantization always costs more than
+-12 BLEU points; different quantization schemes (e.g.\ AWQ, GPTQ, higher
+-bit-widths) and different base models are known in the broader
+-quantization literature to preserve quality substantially
+-better~\cite{dettmers2023qlora}. Our claim is narrower and specific to
+-this measurement: for this model, at this quantization level, on this
+-task, the full-precision reputation did not predict the quantized,
+-on-device result, which is sufficient to justify measuring rather than
+-assuming for any specific deployment decision.
++\textbf{Quantization comparison is two models, two quantization
++implementations, with opposite outcomes.} The Hunyuan-MT-7B result
++(Section~\ref{sec:modelselect}) is a Q4\_K\_M GGUF quantization of a 7B
++model that lost more than 12 BLEU points relative to its full-precision
++reputation; the MiLMMT-46-4B result (Section~\ref{sec:milmmt4b}) is a
++4-bit bitsandbytes NF4 quantization of a 4B model that \emph{gained}
++relative to a larger float16 competitor. Having both outcomes in the same
++study is useful precisely because it forecloses a general claim in either
++direction: 4-bit quantization does not reliably cost $>$12 BLEU points, nor
++does it reliably preserve quality. Different quantization schemes (GGUF
++Q4\_K\_M vs.\ bitsandbytes NF4), different base architectures, and
++different amounts of quantization-aware fine-tuning in the base model's
++own training are all known in the broader quantization literature to
++produce divergent outcomes~\cite{dettmers2023qlora}. Our claim remains
++narrow and specific to each measurement: for a given model, at a given
++quantization scheme, on this task, neither the full-precision reputation
++nor the bit-width alone predicted the quantized, on-device result, which
++is sufficient to justify measuring rather than assuming --- in either
++direction --- for any specific deployment decision.
+ 
+ % ============================================================
+ \section{Conclusion}
+@@ -617,10 +759,23 @@
+ correctly-quantized measurement --- a larger model's published,
+ full-precision benchmark score is not a reliable predictor of its
+ quantized, budget-constrained performance, and a handful of evaluation
+-sentences is not a reliable predictor of full-corpus quality. All three
+-findings were reached only because BLEU-parity gating, rather than
+-throughput alone, was treated as the correctness criterion for every
+-change accepted into the pipeline.
++sentences is not a reliable predictor of full-corpus quality. A follow-up
++evaluation round sharpened this finding rather than merely repeating it:
++4-bit quantization of one model (MiLMMT-46-4B) beat a larger float16
++competitor and became the best-quality model measured in this study
++(\MILMMTFOURBBLEU{} BLEU), the inverse of the Hunyuan-MT-7B result, showing
++quantization loss is not a fixed penalty predictable from bit-width or
++parameter count alone --- it must be measured per model. The same round
++showed that FLORES-200 BLEU is necessary but not sufficient evidence for a
++deployment decision: two further candidates (sarvam-translate,
++krutrim-translate) scored acceptably on the benchmark corpus yet failed
++outright on a real Bengali story via a repetition loop and a leaked
++internal control tag respectively, failure modes invisible to
++sentence-level automatic metrics. All findings in this paper were reached
++only because BLEU-parity gating on the benchmark corpus, and --- for the
++2026-07-09/07-10 round specifically --- verification against a real
++document outside that corpus, were treated as the correctness criteria for
++every change and every model accepted into the pipeline.
+ 
+ % ============================================================
+ \section*{Acknowledgments}
