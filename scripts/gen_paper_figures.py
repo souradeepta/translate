@@ -651,13 +651,19 @@ def main() -> None:
 
     print(f"\nGenerating paper figures → {FIGURES_DIR}/\n")
 
-    # Build measured dict from DB (most recent run per model with BLEU > 5)
+    # Build measured dict from DB (most recent run per model with BLEU > 5).
+    # Only deployed models: rejected candidates (checkpoints deleted) live in
+    # fig_optimization_speedup's deployed-vs-rejected panel, not here.
+    deployed = {"nllb-600M", "nllb-600m", "milmmt-46-1b",
+                "seamless-medium", "seamless", "milmmt-46-4b"}
     measured: dict[str, dict] = {}
     seen: set[str] = set()
     for r in runs:
         if r.get("run_type") != "benchmark":
             continue
         model = r.get("model_name", "")
+        if model not in deployed:
+            continue
         if model in seen:
             continue
         bleu = r.get("bleu_score")
