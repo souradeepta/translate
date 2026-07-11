@@ -479,8 +479,11 @@ MODEL_SELECTION = {
     "NLLB-600M":        {"bleu": 55.3, "vram": 1.9, "deployed": True},
     "MiLMMT-46-1B":     {"bleu": 65.2, "vram": 3.4, "deployed": True},
     "Seamless-med.":    {"bleu": 67.0, "vram": 3.9, "deployed": True},
+    "MiLMMT-46-4B 4bit": {"bleu": 68.5, "vram": 8.05, "deployed": True},
     "LMT-60-1.7B":      {"bleu": 63.8, "vram": 6.6, "deployed": False},
     "Hunyuan-MT-7B Q4": {"bleu": 54.7, "vram": 6.6, "deployed": False},
+    "sarvam-translate": {"bleu": 55.7, "vram": 4.9, "deployed": False},
+    "krutrim-transl.":  {"bleu": 44.9, "vram": 1.6, "deployed": False},
 }
 
 
