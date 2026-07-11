@@ -1,3 +1,68 @@
+## 2026-07-10 — new-model evaluation (milmmt-46-4b) — ACCEPTED, opt-in only (best BLEU/chrF of all models tried)
+
+**New-model evaluation:**
+
+- **milmmt-46-4b** (xiaomi-research/MiLMMT-46-4B-v0.1, 4-bit bitsandbytes quantization, 90-sentence FLORES, run `272694b8409a`): BLEU 68.55 / chrF 81.8, 34.0 ch/s translate-only, duration 305.9 s, VRAM peak 8,050 MiB (of 8,151 MiB total — **~101 MiB headroom, ~99% of card**), GPU util peak 100% / avg 19%, RAM peak 7,225 MiB, swap peak 654 MiB, CPU peak 99.7% / avg 50.2%.
+- Beats every model previously benchmarked: seamless-medium (67.0/80.2), milmmt-46-1b (65.2/79.3), nllb-600M (55.3/72.8), and all rejected candidates. New best-quality result for this project.
+- Verified on the real 90-paragraph story (not just FLORES): no hallucination, paragraph count matched exactly, corrected mistranslations the 1B sibling made (e.g. "lion" → "jackals").
+- **Decision: KEPT, opt-in only** (`--model milmmt-46-4b`), NOT made the default. VRAM headroom of ~100 MiB is inside the noise band of a single extra CUDA context or concurrent process — any other GPU activity (Ollama, a second benchmark, a stray notebook kernel) risks OOM. `milmmt-46-1b` remains the default for routine use.
+- Companion 5-sentence smoke run (`c35b7faef15d`): BLEU 88.90, VRAM peak only 6,852 MiB, chars/s 60.0. **Flag as small-sample artifact — do not use for quality ranking or as a rolling-average input.** Same small-sample BLEU inflation mechanism documented for lmt-60-1.7b (73.2 vs 63.8) and the nllb/milmmt-1b 5-sentence rows in the 2026-07-08 entry below. The lower VRAM peak on the smoke run (6,852 vs 8,050 MiB) is expected — VRAM scales with the volume of text held in flight — not a discrepancy to investigate.
+
+**Regressions vs incumbents:** nllb-600M (55.3), milmmt-46-1b (65.2), seamless-medium (67.0) were **not re-run** on 2026-07-10 — no new data exists for those three models, so there is nothing to flag as a regression against their 2026-07-08 baselines. milmmt-46-4b itself has no prior baseline (first-ever run of this model), so no regression check applies to it either. `show_stats.py regressions --lookback 5` (no `--model` filter) does fire four WARNINGs (`duration_s`, `gpu_vram_peak_mib`, `ram_peak_mib`, `chars_per_sec`) comparing the `272694b8409a` row against a "prior 5" window built from sarvam-translate and krutrim-translate rows — this is the same cross-model rolling-average false-alarm mechanism already documented on 2026-07-08 (point 1 under Regressions); it is not a genuine regression and should be disregarded. Filtering `--model milmmt-46-4b` correctly returns no output (fewer than the 3 same-model prior runs required for a baseline).
+
+**Patterns detected:**
+
+- VRAM budget: milmmt-46-4b alone consumes essentially the entire 7.5 GB usable ceiling. Per the VRAM budget table, it cannot be run alongside Ollama (4.7 GB) or any second model — this is the reason it is opt-in-only, confirmed by today's measured 8,050 MiB peak.
+- `swap_peak_mib > 0` on both milmmt-46-4b runs (654 MiB final, 536 MiB smoke) — part of a session-wide swap pattern shared with the 2026-07-09 entry below; see that entry's note on likely host/WSL2-level (not code-level) cause.
+- GPU util avg 19% despite peak 100% on the final run — consistent with wall-clock time spent on 4-bit dequantization/decode setup and idle gaps between sequential per-sentence generations, not an undersized batch. **Do not raise `ChunkConfig.batch_size`** for this model — VRAM is already at ~99% capacity; any larger in-flight batch risks the exact OOM this model is opt-in to avoid.
+
+**Optimization suggestions:**
+
+- No source-code changes indicated for milmmt-46-4b — its resource profile is a function of the 4-bit quantized 4B parameter count, not a chunking/threading inefficiency. Leave `ChunkConfig.batch_size=8` unchanged for this model (`src/bn_en_translate/config.py`).
+- Reiterate the 2026-07-08 tooling gap: `RunDatabase`/`show_stats.py regressions` (`scripts/show_stats.py`, `regressions` command) still has no `num_sentences`/`is_smoke` column. The false-alarm firing above is at least the third occurrence of this exact gap in three days (2026-07-08 nllb/milmmt smoke rows, 2026-07-08 cross-model comparison, now this run) — recommend prioritizing the schema fix before the next new-model evaluation session adds more noise to the rolling window.
+
+**Resource snapshot:**
+- BLEU: 68.55 (final, 90-sentence), prior avg: none (first run of this model); smoke row 88.90 excluded from any average per the flag above
+- Duration: 305.9s
+- VRAM peak: 8,050 MiB (of 8,151 MiB), GPU util peak: 100%
+- RAM peak: 7,225 MiB, Swap: 654 MiB
+- CPU avg: 50.2%
+
+---
+
+## 2026-07-09 — new-model evaluation (sarvam-translate, krutrim-translate) — both REJECTED, checkpoints deleted
+
+**New-model evaluations — both REJECTED (FLORES BLEU adequate; both failed on real text):**
+
+- **sarvam-translate** (sarvamai/sarvam-translate, Gemma3-4B + AI4Bharat, 4-bit bnb, 90-sentence FLORES final run `a4ac5158189d`): BLEU 55.67 / chrF 74.3, 139.0 ch/s translate-only, duration 162.4 s, VRAM peak 4,880 MiB, GPU util peak 72% / avg 14%, RAM peak 3,850 MiB, swap peak 977 MiB, CPU avg 19.0%. FLORES score is roughly on par with nllb-600M (55.3) and comfortably above krutrim (44.9). **Rejected anyway**: on the real 90-paragraph story it degenerated into a repetition loop — ~62% of output paragraphs repeated filler text instead of translating. FLORES BLEU did not predict this failure mode. Checkpoint deleted.
+  - Four earlier same-day runs recorded during integration/debugging (not independent quality data points): `4f99daef363a` (46.5 s, BLEU 63.90, chars/s 7.0, VRAM 1,385 MiB — duration and throughput point to a 5-sentence smoke run; flag as small-sample) and three 90-sentence-scale iterations at markedly lower throughput than the final run (`07077bf1a8b7`: 28 ch/s, 1,410 MiB VRAM; `da917ad103ae`: 33 ch/s, 4,926 MiB VRAM; `e01d97576642`: 12 ch/s, 4,899 MiB VRAM) — all well below the final run's 139 ch/s, consistent with harness fixes made mid-session rather than four independent benchmark results. Only `a4ac5158189d` should be treated as the canonical sarvam-translate result.
+- **krutrim-translate** (krutrim-ai-labs/Krutrim-Translate, CT2 float16, 90-sentence FLORES final run `782553d37359`): BLEU 44.87 / chrF 73.1, 7,050 ch/s, duration 5.3 s, VRAM peak 1,608 MiB, GPU util peak 4% / avg 4%, RAM peak 3,386 MiB, swap peak 987 MiB, CPU avg 12.5%. Below the nllb-600M incumbent (55.3) on BLEU alone — and separately, its internal `ben_Beng eng_Latn` language tag leaked into ~41% of real-story output paragraphs, a correctness bug independent of the BLEU gap. Checkpoint deleted.
+  - `826554d8642c` (BLEU 0.00, 4.5 s) is the run that first surfaced the tag-leakage failure at full severity — a genuine bug reproduction, not noise; kept as evidence of the defect, not a candidate for averaging.
+  - `56131eabb68a` (5-sentence smoke, BLEU 64.77, VRAM 1,613 MiB): **flag as small-sample artifact**, do not use for ranking — same mechanism as sarvam's smoke row above and the lmt-60-1.7b/nllb/milmmt-1b smoke rows on 2026-07-08.
+
+**Regressions vs incumbents:** nllb-600M (55.3), milmmt-46-1b (65.2), seamless-medium (67.0) were **not re-run** on 2026-07-09 — nothing to compare, no regression possible for those three. Both sarvam-translate and krutrim-translate are first-time model entries in `runs.db`, so `show_stats.py regressions --model <name>` correctly returns no output for either (fewer than 3 same-model prior runs required for a baseline). The unfiltered `regressions --lookback 5` command should not be run across these mixed-model rows without `--model` — see the cross-model false-alarm mechanism already documented on 2026-07-08 and reiterated in the 2026-07-10 entry above.
+
+**Patterns detected:**
+
+- **Small-sample BLEU inflation, again:** both new models show the same 5-sentence-smoke-inflates-BLEU pattern as every prior new-model evaluation this project has run (lmt-60-1.7b +9.3 pts, hunyuan-mt-7b +6.6 pts on 2026-07-08; sarvam +8.2 pts, krutrim +19.9 pts here). This is now a consistent, reproducible artifact across 5+ independent model evaluations — reiterating the 2026-07-08 tooling recommendation with added urgency: the gap is large and directionally consistent enough that any dashboard or report reading `runs.db` unfiltered will systematically overstate quality for whichever model was smoke-tested most recently.
+- **Elevated swap on every run this session (both models, all 8 runs: 624-994 MiB peak)** — materially different from the 2026-07-08 close-out entry, which reported swap ≤5 MiB on the three production models and dismissed 100-126 MiB swap on old smoke rows as WSL2 background noise. Here the swap magnitude is 5-10x larger and appears uniformly regardless of model size or VRAM footprint: krutrim-translate (1.4-1.6 GB VRAM, the lightest model in the whole project) shows the *highest* swap of the session (987-994 MiB), while heavier sarvam-translate (4.9 GB VRAM) shows comparable or lower swap (624-977 MiB). Swap magnitude does not track VRAM/RAM footprint or `ChunkConfig.batch_size`, which argues against a code-level fix (the diagnostic table's default suggestion of reducing `batch_size` from 8 to 4 is unlikely to help here) and toward host/WSL2-level memory pressure — e.g. `vmmem` fragmentation or a lingering process from earlier work — as the more likely cause. Recommend checking `free -h` and WSL2 memory state (`wsl --shutdown` and cold-restart if it recurs) before the next benchmark session, rather than touching `ChunkConfig`. The same pattern continued into the 2026-07-10 milmmt-46-4b runs (536-654 MiB swap), suggesting the condition persisted across sessions rather than being a one-off.
+- `cpu_avg_pct` stayed low across all runs this session (11-50%) — no CPU-bound data-loading bottleneck; the `nllb_ct2.py` `inter_threads`/`intra_threads` settings checked on 2026-07-08 remain adequate and are not implicated by krutrim's CT2 backend today.
+
+**Optimization suggestions:**
+
+- No source-code changes indicated by sarvam-translate or krutrim-translate data — both are excluded models with deleted checkpoints; their resource profiles are moot going forward.
+- Reiterate (now a repeated finding, see 2026-07-10 entry above): add `num_sentences`/`is_smoke` to the `RunDatabase` schema and exclude smoke rows from rolling averages by default in `scripts/show_stats.py` (`regressions` command).
+- New: investigate the session-wide swap pattern at the host/WSL2 level (not a `bn_en_translate` code change) before the next benchmark session — `free -h` / `wsl --shutdown` as a first check, per the pattern note above.
+
+**Resource snapshot:**
+- BLEU: sarvam-translate 55.67 (final), krutrim-translate 44.87 (final); prior avg: none (both first-run models)
+- Duration: sarvam 162.4s, krutrim 5.3s
+- VRAM peak: sarvam 4,880 MiB (GPU util peak 72%), krutrim 1,608 MiB (GPU util peak 4%)
+- RAM peak: sarvam 3,850 MiB (swap 977 MiB), krutrim 3,386 MiB (swap 987 MiB)
+- CPU avg: sarvam 19.0%, krutrim 12.5%
+
+---
+
 ## 2026-07-08 — new-model evaluation (lmt-60-1.7b, hunyuan-mt-7b) + close-out benchmark + MADLAD re-download verdict (branch: perf/optimization-pass)
 
 **New-model evaluations — both REJECTED:**
