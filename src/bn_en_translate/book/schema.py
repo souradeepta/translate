@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import unicodedata
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 from types import MappingProxyType
@@ -36,6 +37,10 @@ class InlineRun:
     underline: bool = False
     href: str | None = None
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.text, str):
+            raise TypeError("inline run text must be a string")
+
 
 @dataclass(frozen=True)
 class BookMetadata:
@@ -45,13 +50,18 @@ class BookMetadata:
     target_language: str = "eng_Latn"
     source_format: str = "txt"
 
+    def __post_init__(self) -> None:
+        for name in ("source_language", "target_language", "source_format"):
+            if not isinstance(getattr(self, name), str) or not getattr(self, name):
+                raise ValueError(f"{name} must be a non-empty string")
+
 
 def canonical_text(text: str) -> str:
     """Normalize text used for content identity without destroying layout elsewhere."""
     return unicodedata.normalize("NFC", text)
 
 
-def source_hash(text: str, kind: BlockKind, attrs: dict[str, Any] | None = None) -> str:
+def source_hash(text: str, kind: BlockKind, attrs: Mapping[str, Any] | None = None) -> str:
     """Return a stable hash for a source block's translatable identity."""
     payload = {"attrs": _jsonable(attrs or {}), "kind": kind.value, "text": canonical_text(text)}
     serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
@@ -96,12 +106,13 @@ class BookBlock:
     source_text: str
     source_hash: str
     runs: tuple[InlineRun, ...] = ()
-    attrs: dict[str, Any] = field(default_factory=dict)
+    attrs: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         # ``frozen=True`` protects attribute replacement but not a nested dict;
         # freeze imported source metadata as well to prevent accidental mutation.
         object.__setattr__(self, "attrs", _freeze(dict(self.attrs)))
+        object.__setattr__(self, "runs", tuple(self.runs))
 
     @classmethod
     def create(
@@ -113,7 +124,7 @@ class BookBlock:
         kind: BlockKind,
         source_text: str,
         runs: tuple[InlineRun, ...] = (),
-        attrs: dict[str, Any] | None = None,
+        attrs: Mapping[str, Any] | None = None,
     ) -> BookBlock:
         normalized_attrs = dict(attrs or {})
         normalized_text = canonical_text(source_text)
@@ -149,6 +160,9 @@ class Chapter:
     title: str | None
     block_ids: tuple[str, ...]
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "block_ids", tuple(self.block_ids))
+
 
 @dataclass(frozen=True)
 class BookDocument:
@@ -157,6 +171,10 @@ class BookDocument:
     chapters: tuple[Chapter, ...]
     blocks: tuple[BookBlock, ...]
     schema_version: int = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "chapters", tuple(self.chapters))
+        object.__setattr__(self, "blocks", tuple(self.blocks))
 
     def validate(self) -> None:
         if self.schema_version != SCHEMA_VERSION:
@@ -171,9 +189,8 @@ class BookDocument:
         blocks_by_id = {block.block_id: block for block in self.blocks}
         if len(blocks_by_id) != len(self.blocks):
             raise ValueError("block IDs must be unique")
-        ordered_blocks = sorted(self.blocks, key=lambda block: block.ordinal)
-        expected_block_ids = [block.block_id for block in ordered_blocks]
-        if [block.ordinal for block in ordered_blocks] != list(range(1, len(self.blocks) + 1)):
+        expected_block_ids = [block.block_id for block in self.blocks]
+        if [block.ordinal for block in self.blocks] != list(range(1, len(self.blocks) + 1)):
             raise ValueError("block ordinals must be contiguous and start at one")
         listed_block_ids = [block_id for chapter in self.chapters for block_id in chapter.block_ids]
         if listed_block_ids != expected_block_ids:

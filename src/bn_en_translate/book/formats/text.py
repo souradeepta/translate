@@ -28,10 +28,20 @@ def _document_id(path: Path, text: str) -> str:
 class TextReader:
     """Import a UTF-8 text file as a single or heading-delimited chapter sequence."""
 
+    def __init__(self, *, detect_headings: bool = True, detect_scene_breaks: bool = True) -> None:
+        self.detect_headings = detect_headings
+        self.detect_scene_breaks = detect_scene_breaks
+
     def read(self, path: Path) -> BookDocument:
-        text = path.read_text(encoding="utf-8")
+        # ``Path.read_text`` enables universal-newline conversion; bytes are
+        # required here because newline style is part of the format contract.
+        text = path.read_bytes().decode("utf-8")
         newline = "\r\n" if "\r\n" in text else "\n"
-        paragraphs = re.split(r"(?:\r?\n){2,}", text)
+        # Keep separators verbatim.  Splitting with a capturing group means every
+        # source newline remains attached to the preceding block's format map.
+        parts = re.split(r"((?:\r\n|\n|\r){2,})", text)
+        paragraphs = parts[::2]
+        separators = parts[1::2]
         blocks: list[BookBlock] = []
         chapters: list[Chapter] = []
         chapter_ordinal = 1
@@ -50,9 +60,10 @@ class TextReader:
                     )
                 )
 
-        for raw_paragraph in paragraphs:
-            text_value = raw_paragraph.strip()
-            if _HEADING.match(text_value):
+        for index, raw_paragraph in enumerate(paragraphs):
+            text_value = raw_paragraph
+            inspected = text_value.strip()
+            if self.detect_headings and _HEADING.match(inspected):
                 if chapter_block_ids:
                     finish_chapter()
                     chapter_ordinal += 1
@@ -60,9 +71,9 @@ class TextReader:
                     chapter_block_ids = []
                 chapter_title = text_value
                 kind = BlockKind.CHAPTER_HEADING
-            elif not text_value:
+            elif not inspected:
                 kind = BlockKind.BLANK
-            elif _SCENE_BREAK.match(text_value):
+            elif self.detect_scene_breaks and _SCENE_BREAK.match(inspected):
                 kind = BlockKind.SCENE_BREAK
             else:
                 kind = BlockKind.PARAGRAPH
@@ -73,7 +84,10 @@ class TextReader:
                 ordinal=ordinal,
                 kind=kind,
                 source_text=text_value,
-                attrs={"newline": newline},
+                attrs={
+                    "newline": newline,
+                    "separator_after": separators[index] if index < len(separators) else "",
+                },
             )
             blocks.append(block)
             chapter_block_ids.append(block.block_id)
@@ -94,17 +108,16 @@ class TextWriter:
     def write(self, document: BookDocument, translations: Mapping[str, str], path: Path) -> None:
         document.validate()
         output: list[str] = []
-        newline = "\n"
         for block in document.blocks:
-            newline = str(block.attrs.get("newline", newline))
             if block.kind in {BlockKind.BLANK, BlockKind.SCENE_BREAK}:
                 output.append(block.source_text)
-                continue
-            try:
-                output.append(translations[block.block_id])
-            except KeyError as exc:
-                raise ValueError(f"missing translation for {block.block_id}") from exc
+            else:
+                try:
+                    output.append(translations[block.block_id])
+                except KeyError as exc:
+                    raise ValueError(f"missing translation for {block.block_id}") from exc
+            output.append(str(block.attrs.get("separator_after", "")))
         path.parent.mkdir(parents=True, exist_ok=True)
         temporary = path.with_suffix(path.suffix + ".tmp")
-        temporary.write_text((newline * 2).join(output), encoding="utf-8")
+        temporary.write_text("".join(output), encoding="utf-8", newline="")
         temporary.replace(path)

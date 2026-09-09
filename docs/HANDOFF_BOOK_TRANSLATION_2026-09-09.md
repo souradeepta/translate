@@ -22,6 +22,10 @@ with the design contract in the corresponding `specs` document.
   compatibility reporting.
 - Initial Phase 1 book package: schema, serialization, project/store scaffolding,
   TXT format support, `bn-book` entry point, and unit tests.
+- Phase 1 narrow remediation: approval-pointer protection, graph-based stale
+  invalidation with approved-output revalidation, CRLF/separator-preserving TXT
+  round trips, and packaged SQL migration resources with schema markers and backup
+  support. GPT-Terra approved this narrow remediation.
 
 ## Verification
 
@@ -33,6 +37,7 @@ GPT-Luna reported:
 - `git diff --check`: passed
 - Focused compatibility and fixture tests: passed
 - Local CPU NLLB-CT2 smoke translation: passed
+- Phase 1 book tests: **19 passed** (GPT-Terra gate)
 
 ## Review findings still open
 
@@ -44,17 +49,16 @@ The highest-priority items are:
 2. Align the Transformers pin in `requirements.txt` with `pyproject.toml`.
 3. Add registry-wide CLI acceptance coverage and direct tests for the IndicTrans2
    tokenizer compatibility shim.
-4. Complete Phase 1 stable-ID re-import reconciliation with dry-run ambiguity abort,
-   file-based migrations/backup behavior, immutable attributes, lossless TXT
-   separators, approval-pointer protection, and transitive dependency invalidation.
+4. Complete the remaining Phase 1 stable-ID/immutable-schema acceptance coverage,
+   including ambiguous re-import dry runs and full JSONL migration dispatch.
 5. Add the missing Phase 1 acceptance tests for crash boundaries, leases/CAS,
    migrations, approval preservation, JSONL, and separator/source coverage.
 
 ## Delegation state
 
-GPT-Luna is assigned the Phase 1 remediation. GPT-Terra is the independent gate
-reviewer. The next handoff should only advance to Phase 2 after Terra approves the
-Phase 1 schema evolution, transaction boundaries, stable IDs, and stale semantics.
+GPT-Luna implemented the narrow Phase 1 remediation. GPT-Terra approved that scope
+after review. The next handoff should only advance to Phase 2 after the remaining
+stable-ID/immutability coverage is completed and reviewed.
 
 ## Repository safety notes
 

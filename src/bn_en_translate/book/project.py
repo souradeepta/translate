@@ -173,6 +173,15 @@ def reconcile_documents(
             if len(candidates) == 1 and len(old_candidates) == 1:
                 matched[candidates[0].block_id] = old_candidates[0].block_id
                 used_existing.add(old_candidates[0].block_id)
+            elif candidates and old_candidates:
+                ambiguous.append(
+                    {
+                        "reason": "duplicate_source_locator",
+                        "locator": locator,
+                        "incoming": [item.block_id for item in candidates],
+                        "candidates": [item.block_id for item in old_candidates],
+                    }
+                )
 
         for block in new_blocks:
             if block.block_id in matched:
@@ -211,15 +220,25 @@ def reconcile_documents(
             if len(bounded) == 1:
                 matched[block.block_id] = bounded[0].block_id
                 used_existing.add(bounded[0].block_id)
-            elif len(bounded) > 1 and len(new_blocks) == len(old_blocks):
+            elif len(bounded) > 1:
                 ambiguous.append(
                     {
+                        "reason": "multiple_sequence_candidates",
                         "incoming": block.block_id,
                         "candidates": [item.block_id for item in bounded],
                     }
                 )
 
-    max_ordinal = max((block.ordinal for block in existing.blocks), default=0)
+    # IDs for inserted records are monotonic project identities.  Ordinals remain
+    # positional fields and are rebuilt from the incoming document so validation
+    # can retain contiguous order without renumbering any existing IDs.
+    used_numeric_ids = [
+        int(item.block_id.rsplit("-b", 1)[1])
+        for item in existing.blocks
+        if "-b" in item.block_id and item.block_id.rsplit("-b", 1)[1].isdigit()
+    ]
+    max_ordinal = max(used_numeric_ids, default=0)
+    position = 0
     new_block_records: list[BookBlock] = []
     id_map: dict[str, str] = {}
     for chapter in incoming.chapters:
@@ -227,21 +246,24 @@ def reconcile_documents(
         chapter_id = old_chapter.chapter_id if old_chapter else chapter.chapter_id
         for block_id in chapter.block_ids:
             block = incoming.blocks_by_id[block_id]
+            position += 1
             output_id = matched.get(block_id)
             if output_id is None:
                 max_ordinal += 1
                 output_id = make_block_id(chapter.ordinal, max_ordinal)
                 inserted.append(output_id)
             id_map[block_id] = output_id
-            new_block_records.append(BookBlock.create(
-                block_id=output_id,
-                chapter_id=chapter_id,
-                ordinal=block.ordinal,
-                kind=block.kind,
-                source_text=block.source_text,
-                runs=block.runs,
-                attrs=dict(block.attrs),
-            ))
+            new_block_records.append(
+                BookBlock.create(
+                    block_id=output_id,
+                    chapter_id=chapter_id,
+                    ordinal=position,
+                    kind=block.kind,
+                    source_text=block.source_text,
+                    runs=block.runs,
+                    attrs=dict(block.attrs),
+                )
+            )
     chapters = tuple(
         Chapter(
             chapter_id=existing_chapters_by_ordinal.get(chapter.ordinal, chapter).chapter_id,

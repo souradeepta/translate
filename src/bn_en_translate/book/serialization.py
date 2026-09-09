@@ -20,6 +20,22 @@ from bn_en_translate.book.schema import (
 SOURCE_JSONL_VERSION = 1
 
 
+def migrate_document_dict(value: dict[str, Any]) -> dict[str, Any]:
+    """Migrate a serialized document to the current schema.
+
+    Keeping this dispatch point explicit makes an upgrade auditable.  Version one
+    is the first released representation, so it currently needs no transformation.
+    Future versions must add a step here instead of silently accepting newer data.
+    """
+    version = value.get("schema_version")
+    if not isinstance(version, int) or version > SCHEMA_VERSION or version < 1:
+        raise ValueError(f"unsupported schema version: {version}")
+    migrated = dict(value)
+    while version < SCHEMA_VERSION:
+        raise ValueError(f"no migration registered for schema version {version}")
+    return migrated
+
+
 def document_to_dict(document: BookDocument) -> dict[str, Any]:
     document.validate()
     return {
@@ -52,9 +68,7 @@ def document_to_dict(document: BookDocument) -> dict[str, Any]:
 
 
 def document_from_dict(value: dict[str, Any]) -> BookDocument:
-    version = value.get("schema_version")
-    if version != SCHEMA_VERSION:
-        raise ValueError(f"unsupported schema version: {version}")
+    value = migrate_document_dict(value)
     metadata = BookMetadata(**value["metadata"])
     blocks = tuple(
         BookBlock(
@@ -154,7 +168,8 @@ def document_from_source_jsonl(value: str) -> BookDocument:
     if not rows or rows[0].get("record_type") != "header":
         raise ValueError("source JSONL must begin with a header record")
     header = rows[0]
-    if header.get("schema_version") != SOURCE_JSONL_VERSION:
+    version = header.get("schema_version")
+    if not isinstance(version, int) or version != SOURCE_JSONL_VERSION:
         raise ValueError(f"unsupported source JSONL version: {header.get('schema_version')}")
     if any(row.get("record_type") != "block" for row in rows[1:]):
         raise ValueError("source JSONL contains an unknown record type")
