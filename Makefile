@@ -1,4 +1,4 @@
-.PHONY: install test test-fast test-slow test-e2e lint typecheck clean setup-cuda \
+.PHONY: install test test-fast test-slow test-gpu test-e2e test-all lint typecheck clean setup-cuda \
         papers slides figures \
         paper-ieee paper-survey paper-ieee-tr paper-acm paper-efficiency \
         slides-ieee slides-survey slides-ieee-tr slides-acm
@@ -9,19 +9,24 @@ install:
 
 # ── Tests ──────────────────────────────────────────────────────────────────────
 test:
-	pytest -m "not slow and not e2e" -v
+	pytest -m "not slow and not e2e and not gpu" -v
+
+test-fast: test
 
 test-unit:
 	pytest tests/unit/ -v
 
 test-slow:
-	pytest -m "slow" -v --timeout=300
+	pytest -m "slow and not e2e and not gpu" -v
+
+test-gpu:
+	pytest -m "gpu" -v
 
 test-e2e:
-	pytest -m "e2e" -v --timeout=600
+	pytest -m "e2e" -v
 
 test-all:
-	pytest -v --timeout=600
+	pytest -m "" -v
 
 # ── Code quality ───────────────────────────────────────────────────────────────
 lint:

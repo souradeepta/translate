@@ -6,6 +6,7 @@ from typing import Any
 
 from bn_en_translate.config import ModelConfig
 from bn_en_translate.models.base import TranslatorBase
+from bn_en_translate.models.hf_utils import free_cuda_memory, resolve_device
 
 
 class NLLBTranslator(TranslatorBase):
@@ -24,54 +25,74 @@ class NLLBTranslator(TranslatorBase):
     def __init__(self, config: ModelConfig | None = None) -> None:
         super().__init__()
         self.config = config or ModelConfig(model_name="nllb-600M")
-        self._pipeline: Any = None
+        self._model: Any = None
+        self._tokenizer: Any = None
 
     def load(self) -> None:
-        from transformers import pipeline
+        import torch
+        from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+        from bn_en_translate.utils.cuda_check import require_cuda
 
         model_id = self._resolve_model_id()
-        device = 0 if self.config.device == "cuda" else -1  # HF pipeline convention
+        device = resolve_device(self.config.device)
 
-        # Do not pass max_length here: for encoder-decoder models it caps total tokens
-        # (input + output), not just new tokens. Pass max_new_tokens per-call instead.
-        # HF stubs' pipeline() overloads don't cover translation kwargs
-        self._pipeline = pipeline(  # type: ignore[call-overload]
-            "translation",
-            model=model_id,
-            device=device,
-            src_lang=self.config.src_lang,
-            tgt_lang=self.config.tgt_lang,
-            num_beams=self._effective_beam_size(),
+        # Use the explicit seq2seq API rather than pipeline("translation"). The
+        # generic translation pipeline was removed/changed across Transformers
+        # releases and hid language-token and output-length configuration.
+        self._tokenizer = AutoTokenizer.from_pretrained(model_id)
+        self._model = AutoModelForSeq2SeqLM.from_pretrained(
+            model_id,
+            dtype=torch.float16 if device == "cuda" else torch.float32,
         )
+        if device == "cuda":
+            require_cuda(type(self).__name__)
+            self._model = self._model.to("cuda")
+        self._model.eval()
         self._loaded = True
 
     def unload(self) -> None:
-        self._pipeline = None
+        self._model = None
+        self._tokenizer = None
         self._loaded = False
-        # Release GPU memory if torch is available
-        try:
-            import torch
-
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-        except ImportError:
-            pass
+        free_cuda_memory()
 
     def _translate_batch(self, texts: list[str], src_lang: str, tgt_lang: str) -> list[str]:
-        assert self._pipeline is not None
-        results = self._pipeline(
+        import torch
+
+        assert self._model is not None
+        assert self._tokenizer is not None
+        model_device = next(self._model.parameters()).device
+
+        # NLLB requires the source language on the tokenizer and the target
+        # language as the forced first decoder token for every request.
+        self._tokenizer.src_lang = src_lang
+        inputs = self._tokenizer(
             texts,
-            src_lang=src_lang,
-            tgt_lang=tgt_lang,
-            batch_size=self.config.inference_batch_size,
-            max_new_tokens=self.config.max_decoding_length,
-        )
-        return [r["translation_text"] for r in results]
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=512,
+        ).to(model_device)
+        target_id = self._tokenizer.convert_tokens_to_ids(tgt_lang)
+        with torch.no_grad():
+            output_ids = self._model.generate(
+                **inputs,
+                forced_bos_token_id=target_id,
+                num_beams=self._effective_beam_size(),
+                max_new_tokens=self.config.max_decoding_length,
+            )
+
+        return list(self._tokenizer.batch_decode(
+            output_ids,
+            skip_special_tokens=True,
+            clean_up_tokenization_spaces=True,
+        ))
 
     def _resolve_model_id(self) -> str:
         """Map short model names to HuggingFace model IDs."""
         aliases = {
-            "nllb-600M": "facebook/nllb-200-distilled-600M",
-            "nllb-1.3B": "facebook/nllb-200-distilled-1.3B",
+            "nllb-600m": "facebook/nllb-200-distilled-600M",
+            "nllb-1.3b": "facebook/nllb-200-distilled-1.3B",
         }
-        return aliases.get(self.config.model_name, self.config.model_name)
+        return aliases.get(self.config.model_name.lower(), self.config.model_name)

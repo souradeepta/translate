@@ -28,6 +28,11 @@ def register_model(name: str) -> Callable[[_Factory], _Factory]:
     return _decorator
 
 
+def supported_model_names() -> tuple[str, ...]:
+    """Return registered model names in deterministic order for UIs and validation."""
+    return tuple(sorted(_REGISTRY))
+
+
 # ---------------------------------------------------------------------------
 # Model factories
 # ---------------------------------------------------------------------------
@@ -158,21 +163,25 @@ def get_translator(config: PipelineConfig) -> TranslatorBase:
     """
     Return the appropriate translator based on PipelineConfig.model.model_name.
 
-    Supported model names:
-      - "nllb-600M"       -> NLLBCt2Translator if CT2 model exists, else NLLBTranslator
-      - "nllb-1.3B"       -> NLLBCt2Translator if CT2 model exists, else NLLBTranslator
-      - "indicTrans2-1B"  -> IndicTrans2Ct2Translator if CT2 exists, else IndicTrans2Translator
-      - "ollama"          -> OllamaTranslator (local Ollama LLM)
-      - "madlad-3b"       -> MADLADTranslator (Google MADLAD-400-3B)
-      - "seamless-medium" -> SeamlessTranslator (Meta SeamlessM4T-v2)
-      - "milmmt-46-1b"    -> MiLMMTTranslator (Xiaomi MiLMMT-46-1B, Gemma3-based)
+    Supported model names (aliases are accepted case-insensitively):
+      - ``nllb-600m``, ``nllb-1.3b`` -> NLLB CT2 when available, otherwise HF NLLB
+      - ``indictrans2-1b``, ``indictrans2`` -> IndicTrans2 CT2/HF backend
+      - ``ollama`` -> OllamaTranslator (local Ollama LLM)
+      - ``hunyuan-mt-7b``, ``hunyuan`` -> Ollama Hunyuan-MT prompt/backend
+      - ``madlad-3b``, ``madlad`` -> MADLADTranslator (Google MADLAD-400-3B)
+      - ``seamless-medium``, ``seamless`` -> SeamlessTranslator (Meta SeamlessM4T-v2)
+      - ``milmmt-46-1b``, ``milmmt`` -> MiLMMTTranslator (Xiaomi MiLMMT-46-1B)
+      - ``milmmt-46-4b`` -> MiLMMT4BTranslator (4-bit Gemma3-based model)
+      - ``lmt-60-1.7b``, ``lmt-60`` -> LMT-60Translator
+      - ``sarvam-translate``, ``sarvam`` -> SarvamTranslateTranslator
+      - ``krutrim-translate``, ``krutrim`` -> KrutrimTranslateTranslator
 
     Extend by calling @register_model("new-name") on a new factory function.
     """
     name = config.model.model_name.lower()
     factory = _REGISTRY.get(name)
     if factory is None:
-        supported = ", ".join(sorted(_REGISTRY.keys()))
+        supported = ", ".join(supported_model_names())
         raise ValueError(
             f"Unknown model name: '{config.model.model_name}'. "
             f"Supported: {supported}"

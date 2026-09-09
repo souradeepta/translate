@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -9,9 +10,12 @@ from bn_en_translate.config import REPO_ROOT, ModelConfig
 from bn_en_translate.models.base import TranslatorBase
 from bn_en_translate.models.hf_utils import (
     free_cuda_memory,
+    load_indictrans_tokenizer,
     resolve_attn_implementation,
     stub_transformers_onnx,
 )
+
+LOGGER = logging.getLogger(__name__)
 
 
 class IndicTrans2Translator(TranslatorBase):
@@ -59,16 +63,19 @@ class IndicTrans2Translator(TranslatorBase):
         """
         try:
             self._load_via_indictrans2_interface()
-        except ImportError:
+        except ImportError as exc:
+            LOGGER.warning(
+                "IndicTransToolkit unavailable; using the lower-level IndicTrans2 "
+                "fallback tokenizer (%s). Install IndicTransToolkit for the supported "
+                "pre/post-processing path.",
+                exc,
+            )
             self._load_via_transformers_fallback()
         self._loaded = True
 
     def _load_via_indictrans2_interface(self) -> None:
         import torch
-        from transformers import (
-            AutoModelForSeq2SeqLM,
-            AutoTokenizer,
-        )
+        from transformers import AutoModelForSeq2SeqLM
 
         stub_transformers_onnx()
 
@@ -91,9 +98,7 @@ class IndicTrans2Translator(TranslatorBase):
         from bn_en_translate.utils.cuda_check import require_cuda
 
         model_id = self._LOCAL_PATH if Path(self._LOCAL_PATH).exists() else self.HF_MODEL_ID
-        self._tokenizer = AutoTokenizer.from_pretrained(
-            model_id, trust_remote_code=True
-        )
+        self._tokenizer = load_indictrans_tokenizer(model_id)
         # IndicTrans2's sdpa support is unverified — keep eager as the fallback
         # (behavior-preserving; do not switch to sdpa without dedicated testing).
         attn_impl = resolve_attn_implementation(self.config.use_flash_attention, fallback="eager")
@@ -112,17 +117,14 @@ class IndicTrans2Translator(TranslatorBase):
     def _load_via_transformers_fallback(self) -> None:
         """Fallback: load as a standard seq2seq model (lower quality tokenization)."""
         import torch
-        from transformers import (
-            AutoModelForSeq2SeqLM,
-            AutoTokenizer,
-        )
+        from transformers import AutoModelForSeq2SeqLM
 
         from bn_en_translate.utils.cuda_check import require_cuda
 
         stub_transformers_onnx()
 
         model_id = self._LOCAL_PATH if Path(self._LOCAL_PATH).exists() else self.HF_MODEL_ID
-        self._tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
+        self._tokenizer = load_indictrans_tokenizer(model_id)
         attn_impl = resolve_attn_implementation(self.config.use_flash_attention, fallback="eager")
         self._model = AutoModelForSeq2SeqLM.from_pretrained(
             model_id,

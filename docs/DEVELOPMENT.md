@@ -74,8 +74,9 @@ make typecheck      # mypy strict
 
 | Tier | Command | Time | Requires |
 |------|---------|------|----------|
-| Unit + mock integration | `make test` | ~12s | nothing |
+| Unit + mock integration | `make test` | ~12s | nothing (plain `pytest` has same filters) |
 | Real NLLB-600M | `make test-slow` | ~30s | `models/nllb-600M-ct2/` |
+| GPU smoke/quality prerequisites | `make test-gpu` | varies | CUDA device + declared model fixtures |
 | E2E quality (BLEU) | `make test-e2e` | ~60s+ | GPU + IndicTrans2 model |
 | All | `make test-all` | ~90s+ | GPU + all models |
 
@@ -91,6 +92,10 @@ Run with coverage:
 ```bash
 pytest --cov=bn_en_translate --cov-report=term-missing tests/unit/
 ```
+
+The default pytest configuration excludes `slow`, `gpu`, and `e2e` tests. Use the
+named Makefile target when those resources are intentionally available; `test-all`
+clears the marker filter and is the deliberate opt-in for every tier.
 
 ### Test Structure
 

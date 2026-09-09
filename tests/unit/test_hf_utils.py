@@ -38,3 +38,10 @@ def test_resolve_device_passthrough(monkeypatch) -> None:
 
 def test_free_cuda_memory_never_raises() -> None:
     hf_utils.free_cuda_memory()
+
+
+def test_compatibility_report_includes_actionable_backend_versions() -> None:
+    report = hf_utils.compatibility_report()
+    assert "transformers=" in report
+    assert "IndicTransToolkit=" in report
+    assert "tested range" in report or "OK:" in report

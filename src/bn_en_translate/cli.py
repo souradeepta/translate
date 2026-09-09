@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import click
 
-from bn_en_translate.config import ModelConfig, PipelineConfig
-from bn_en_translate.models.factory import get_translator
+from bn_en_translate.config import ChunkConfig, ModelConfig, PipelineConfig
+from bn_en_translate.models.factory import get_translator, supported_model_names
+from bn_en_translate.models.hf_utils import compatibility_report
 from bn_en_translate.pipeline.pipeline import TranslationPipeline
 from bn_en_translate.utils.cuda_check import get_best_device
 
@@ -20,10 +21,8 @@ from bn_en_translate.utils.cuda_check import get_best_device
     "-m",
     default="nllb-600M",
     show_default=True,
-    help=(
-        "Translation model: nllb-600M | nllb-1.3B | indicTrans2-1B | "
-        "madlad-3b | seamless-medium | ollama"
-    ),
+    type=click.Choice(supported_model_names(), case_sensitive=False),
+    help="Translation model (including registered aliases).",
 )
 @click.option(
     "--device",
@@ -31,7 +30,13 @@ from bn_en_translate.utils.cuda_check import get_best_device
     show_default=True,
     help="Device: cuda | cpu | auto (auto picks cuda if available)",
 )
-@click.option("--batch-size", default=8, show_default=True, help="Translation batch size")
+@click.option(
+    "--batch-size",
+    default=8,
+    show_default=True,
+    type=click.IntRange(min=1),
+    help="Translation batch size",
+)
 @click.option(
     "--beam-size",
     default=None,
@@ -66,6 +71,7 @@ def main(
     """Translate a Bengali story file to English using a local open-source model."""
 
     resolved_device = get_best_device() if device == "auto" else device
+    click.echo(compatibility_report())
     click.echo(f"Device: {resolved_device} | Model: {model}")
 
     config = PipelineConfig(
@@ -74,6 +80,7 @@ def main(
             device=resolved_device,
             beam_size=beam_size,
         ),
+        chunk=ChunkConfig(batch_size=batch_size),
         ollama_polish=ollama_polish,
         ollama_model=ollama_model,
     )

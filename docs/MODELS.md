@@ -188,7 +188,7 @@ Script uses `ct2-transformers-converter` and copies the SentencePiece `.model` f
 
 ---
 
-## IndicTrans2-1B — ⚠️ BLOCKED (2026-07-09)
+## IndicTrans2-1B — compatibility adapter (2026-09-09)
 
 **Architecture:** M2M-100 variant, optimized for Indic languages
 **Source:** AI4Bharat
@@ -199,8 +199,8 @@ models, so even if unblocked this would not become the primary model.
 
 Checkpoint is downloaded (`models/indicTrans2-1B-hf/`, 2.9 GB, HF-native — CT2
 conversion is architecturally unsupported, its converter registry has no
-IndicTransConfig entry). Loading is blocked by the model's `trust_remote_code`
-files being written against transformers ~4.44 and this repo running 5.4.0:
+IndicTransConfig entry). The project pins the tested Transformers 5.4.x range and
+isolates the model's `trust_remote_code` compatibility shims to its tokenizer load:
 
 1. `configuration_indictrans.py` imports `transformers.onnx` (module deleted
    in 5.x) — worked around via `hf_utils.stub_transformers_onnx()`.
@@ -208,18 +208,15 @@ files being written against transformers ~4.44 and this repo running 5.4.0:
    the pre-5.x path — worked around with a small shim in
    `indicTrans2.py::_load_via_indictrans2_interface`.
 3. `tokenization_indictrans.py`'s custom `IndicTransTokenizer.__init__` sets
-   `self.unk_token = ...` **before** calling `super().__init__()`. transformers
-   5.x's `PreTrainedTokenizerBase.__setattr__` requires `self._special_tokens_map`
-   (created in the base `__init__`, not yet run) to already exist →
-   `AttributeError: IndicTransTokenizer has no attribute _special_tokens_map`.
-   This is an ordering bug in AI4Bharat's own remote code, not something fixable
-   from our side without patching/vendoring their file. **Not attempted** —
-   given point (0) above, fixing it would not improve translation quality over
-   already-working models, so further effort here is not worthwhile.
+   `self.unk_token = ...` **before** calling `super().__init__()`. The narrow
+   `load_indictrans_tokenizer()` adapter initializes the missing map only during
+   this remote `AutoTokenizer` call and restores Transformers immediately after.
+   Any load failure still surfaces with the package/model versions in the startup
+   compatibility report; it is never silently treated as a working backend.
 
-**Verdict:** deprioritized. Revisit only if AI4Bharat ships a transformers-5.x
-compatible remote-code update, or if a use case specifically needs its more
-Bengali-heavy training data despite the lower aggregate BLEU.
+**Verdict:** available as an opt-in compatibility path, but still not the default
+quality model. Revisit the adapter when AI4Bharat ships a native Transformers-5.x
+remote-code update.
 
 ### IndicTransToolkit
 
@@ -231,9 +228,8 @@ pip install IndicTransToolkit
 ```
 
 When installed, `IndicTrans2Translator.load()` picks it up automatically for
-pre/post-processing. Without it, raw SentencePiece tokenization is used. As of
-2026-07-09 this doesn't matter in practice — loading fails before reaching the
-processor either way (see blocker #3 above).
+pre/post-processing. Without it, the translator uses its documented lower-level
+fallback and reports that choice at startup.
 
 ### Source Language Code
 

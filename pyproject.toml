@@ -8,7 +8,9 @@ version = "0.1.0"
 description = "Local Bengali-to-English story translation using open-source models"
 requires-python = ">=3.12"
 dependencies = [
-    "transformers>=4.45.0",
+    # 5.4 is the tested range for the explicit NLLB API and HF helpers. The
+    # IndicTrans2 remote-code adapter is intentionally tested against this line.
+    "transformers>=5.4.0,<5.5.0",
     "sentencepiece>=0.2.0",
     "protobuf>=4.0.0",
     "ctranslate2>=4.4.0",
@@ -45,6 +47,7 @@ dev = [
 
 [project.scripts]
 bn-translate = "bn_en_translate.cli:main"
+bn-book = "bn_en_translate.book_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -61,7 +64,9 @@ markers = [
     "training: marks tests that require training dependencies (peft, datasets)",
     "monitor: marks tests for the resource monitoring subsystem",
 ]
-addopts = "-ra -q --tb=short"
+# A plain pytest run must stay hermetic. Resource-intensive tiers are explicit
+# Makefile targets (test-slow, test-gpu, and test-e2e).
+addopts = "-ra -q --tb=short -m 'not slow and not e2e and not gpu'"
 
 [tool.ruff]
 line-length = 100

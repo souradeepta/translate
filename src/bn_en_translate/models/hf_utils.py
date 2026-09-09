@@ -6,9 +6,12 @@ free of model-specific logic.
 
 from __future__ import annotations
 
+import importlib.metadata
 import importlib.util
 import sys
 import types
+from collections.abc import Callable
+from typing import Any
 
 
 def stub_transformers_onnx() -> None:
@@ -53,6 +56,62 @@ def stub_transformers_onnx() -> None:
 
     sys.modules["transformers.onnx"] = stub
     sys.modules["transformers.onnx.utils"] = utils_stub
+
+
+def load_indictrans_tokenizer(model_id: str) -> Any:
+    """Load an IndicTrans2 tokenizer with a narrow Transformers 5.x shim.
+
+    AI4Bharat's remote tokenizer assigns special-token attributes before calling
+    ``PreTrainedTokenizerBase.__init__``. Transformers 5.x validates those
+    assignments against ``_special_tokens_map``, which does not exist until the
+    base initializer runs. The shim initializes only that missing map during the
+    remote ``AutoTokenizer`` call and restores the public class immediately after
+    loading. This keeps the compatibility workaround isolated from other models.
+    """
+    from transformers import AutoTokenizer
+    from transformers.tokenization_utils_base import PreTrainedTokenizerBase
+
+    original_setattr: Callable[[Any, str, Any], None] = PreTrainedTokenizerBase.__setattr__
+
+    def _compat_setattr(instance: Any, name: str, value: Any) -> None:
+        if name != "_special_tokens_map" and not hasattr(instance, "_special_tokens_map"):
+            object.__setattr__(instance, "_special_tokens_map", {})
+        original_setattr(instance, name, value)
+
+    # The dynamic remote class delegates attribute handling to this base class.
+    # Restore it in finally so a failed model load cannot alter unrelated backends.
+    PreTrainedTokenizerBase.__setattr__ = _compat_setattr  # type: ignore[method-assign]
+    try:
+        return AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
+    finally:
+        PreTrainedTokenizerBase.__setattr__ = original_setattr  # type: ignore[method-assign]
+
+
+def compatibility_report() -> str:
+    """Return an actionable startup report for model-backend dependencies."""
+    try:
+        transformers_version = importlib.metadata.version("transformers")
+    except importlib.metadata.PackageNotFoundError:
+        transformers_version = "not installed"
+
+    try:
+        toolkit_version = importlib.metadata.version("IndicTransToolkit")
+    except importlib.metadata.PackageNotFoundError:
+        toolkit_version = "not installed (IndicTrans2 uses its tokenizer fallback)"
+
+    if transformers_version == "not installed":
+        status = "ERROR: install transformers>=5.4,<5.5"
+    elif not transformers_version.startswith("5.4."):
+        status = (
+            "WARNING: tested range is transformers>=5.4,<5.5; "
+            "install that range before loading IndicTrans2 remote code"
+        )
+    else:
+        status = "OK: NLLB uses explicit seq2seq API; IndicTrans2 tokenizer shim enabled"
+    return (
+        f"Backend compatibility: transformers={transformers_version}; "
+        f"IndicTransToolkit={toolkit_version}; {status}"
+    )
 
 
 def flash_attn_available() -> bool:

@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "fixture": "consistency",
+  "provenance": {
+    "license": "CC0-1.0",
+    "origin": "Synthetic text written for bn-en-translate tests; no copyrighted source text is included.",
+    "redistributable": true,
+    "created": "2026-09-09",
+    "source_language": "bn",
+    "target_language": "en",
+    "block_separator": "\\n\\n",
+    "block_numbering": "one-based, in file order"
+  },
+  "blocks": 12,
+  "terms": [
+    {
+      "source": "রহিম মিয়া",
+      "canonical": "Rahim Mia",
+      "category": "name",
+      "occurrences": [2, 4, 8, 12]
+    },
+    {
+      "source": "গীতা",
+      "canonical": "Geeta",
+      "category": "name",
+      "occurrences": [3, 4, 8, 9]
+    },
+    {
+      "source": "মাস্টার সাহেব",
+      "canonical": "Master Sahib",
+      "category": "honorific",
+      "occurrences": [2, 9]
+    },
+    {
+      "source": "পান্তা ভাত",
+      "canonical": "panta bhat",
+      "category": "cultural_term",
+      "occurrences": [6, 12]
+    },
+    {
+      "source": "১২ বৈশাখ ১৪৩২",
+      "canonical": "12 Baishakh 1432",
+      "category": "date",
+      "occurrences": [6]
+    },
+    {
+      "source": "১২ বৈশাখ",
+      "canonical": "12 Baishakh",
+      "category": "date",
+      "occurrences": [12]
+    }
+  ]
+}

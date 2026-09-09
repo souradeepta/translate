@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from bn_en_translate.config import ModelConfig, PipelineConfig
-from bn_en_translate.models.indicTrans2 import IndicTrans2Translator
+from bn_en_translate.models.factory import get_translator
 from bn_en_translate.pipeline.pipeline import TranslationPipeline
 
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
@@ -18,7 +18,7 @@ MIN_BLEU_SCORE = 25.0  # Conservative floor — IndicTrans2 typically scores 30+
 @pytest.mark.gpu
 def test_indictrans2_model_loads() -> None:
     config = ModelConfig(model_name="indicTrans2-1B", device="cuda")
-    translator = IndicTrans2Translator(config)
+    translator = get_translator(PipelineConfig(model=config))
     translator.load()
     translator.unload()
 
@@ -30,7 +30,7 @@ def test_bleu_score_above_threshold() -> None:
     sacrebleu = pytest.importorskip("sacrebleu")
 
     config = ModelConfig(model_name="indicTrans2-1B", device="cuda")
-    translator = IndicTrans2Translator(config)
+    translator = get_translator(PipelineConfig(model=config))
     pipeline = TranslationPipeline(translator, PipelineConfig(model=config))
 
     bengali_text = (FIXTURES_DIR / "sample_short.bn.txt").read_text(encoding="utf-8")
@@ -51,7 +51,7 @@ def test_bleu_score_above_threshold() -> None:
 def test_named_entities_preserved() -> None:
     """Proper nouns like 'Rabindranath' should appear in the output."""
     config = ModelConfig(model_name="indicTrans2-1B", device="cuda")
-    translator = IndicTrans2Translator(config)
+    translator = get_translator(PipelineConfig(model=config))
     pipeline = TranslationPipeline(translator, PipelineConfig(model=config))
 
     bengali_text = (FIXTURES_DIR / "sample_short.bn.txt").read_text(encoding="utf-8")
@@ -70,7 +70,7 @@ def test_named_entities_preserved() -> None:
 @pytest.mark.gpu
 def test_full_medium_story_translated(fixtures_dir: Path) -> None:
     config = ModelConfig(model_name="indicTrans2-1B", device="cuda")
-    translator = IndicTrans2Translator(config)
+    translator = get_translator(PipelineConfig(model=config))
     pipeline = TranslationPipeline(translator, PipelineConfig(model=config))
 
     bengali_text = (fixtures_dir / "sample_medium.bn.txt").read_text(encoding="utf-8")

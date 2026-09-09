@@ -54,6 +54,23 @@ python scripts/download_models.py --model indicTrans2-1B
 bn-translate --input my_story.bn.txt --output translated.en.txt --model nllb-600M
 ```
 
+## Experimental book projects
+
+`bn-book` is the resumable, structure-aware path for long-form work. The initial
+release imports UTF-8 TXT into a persistent project and preserves stable block IDs;
+DOCX/EPUB import, source-grounded revision, QA, and review export are being added on
+top of this project format. It does not replace the short-story `bn-translate` CLI.
+
+```bash
+bn-book init novel.bn.txt --project work/novel
+bn-book inspect work/novel
+```
+
+New projects record the book workflow's intended local model roles: `milmmt-46-4b`
+for quality-first drafts, `milmmt-46-1b` as the lower-VRAM fallback, and
+`gemma3:12b` for a later source-grounded revision pass. Models must be loaded
+sequentially; the 4B draft model is opt-in because it nearly fills an 8 GB GPU.
+
 ---
 
 ## Model Comparison
