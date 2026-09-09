@@ -10,8 +10,16 @@ from docx.opc.constants import RELATIONSHIP_TYPE as RT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
-from bn_en_translate.book.formats.docx import DocxImportError, DocxImportWarning, DocxReader
-from bn_en_translate.book.schema import BlockKind
+from bn_en_translate.book.formats.docx import (
+    DocxExportError,
+    DocxExportWarning,
+    DocxImportError,
+    DocxImportWarning,
+    DocxReader,
+    DocxWriter,
+    validate_docx_round_trip,
+)
+from bn_en_translate.book.schema import BlockKind, BookBlock, BookDocument
 
 
 def _add_hyperlink(paragraph, text: str, url: str) -> None:
@@ -141,3 +149,104 @@ def test_docx_import_rejects_non_package_input(tmp_path) -> None:
     with pytest.raises(DocxImportError, match="password-protected, corrupt"):
         DocxReader().read(source)
     assert not zipfile.is_zipfile(source)
+
+
+def test_docx_export_preserves_semantic_coverage_and_private_ids(tmp_path) -> None:
+    source = tmp_path / "book.bn.docx"
+    destination = tmp_path / "book.en.docx"
+    _write_fixture(source)
+    imported = DocxReader().read(source)
+    translations = {
+        block.block_id: (
+            block.source_text if block.ordinal == 2 else f"Target {block.ordinal}"
+        )
+        for block in imported.blocks
+    }
+
+    with pytest.warns(DocxExportWarning, match="inline styles"):
+        DocxWriter().write(imported, translations, destination)
+
+    report = validate_docx_round_trip(imported, destination)
+    assert report.ok
+    output = Document(destination)
+    assert all(
+        block.block_id not in paragraph.text
+        for paragraph in output.paragraphs
+        for block in imported.blocks
+    )
+    assert output.paragraphs[0].style.name.startswith("Heading 1")
+    with zipfile.ZipFile(destination) as package:
+        metadata = package.read("customXml/bn_book_blocks.json").decode("utf-8")
+    assert imported.blocks[0].block_id in metadata
+
+
+def test_docx_export_does_not_guess_changed_inline_run_alignment(tmp_path) -> None:
+    source = tmp_path / "book.bn.docx"
+    destination = tmp_path / "book.en.docx"
+    _write_fixture(source)
+    imported = DocxReader().read(source)
+    body = imported.blocks[1]
+    # Equal character counts still do not make Bengali/English run offsets
+    # reliable, so changed text must remain one unstyled target run.
+    target = "A" * len(body.source_text)
+    writer = DocxWriter()
+    with pytest.warns(DocxExportWarning, match="inline styles"):
+        writer.write(
+            imported,
+            {
+                block.block_id: target if block.block_id == body.block_id else block.source_text
+                for block in imported.blocks
+            },
+            destination,
+        )
+    assert writer.findings[0]["rule"] == "inline_style_projection"
+    exported = DocxReader().read(destination)
+    runs = exported.blocks[1].runs
+    assert len(runs) == 1
+    assert not runs[0].bold and not runs[0].italic and not runs[0].underline
+
+
+def test_docx_export_reconstructs_direct_numbering_metadata(tmp_path) -> None:
+    source = tmp_path / "book.bn.docx"
+    destination = tmp_path / "book.en.docx"
+    _write_fixture(source)
+    imported = DocxReader().read(source)
+    list_block = imported.blocks[2]
+    attrs = dict(list_block.attrs)
+    attrs["paragraph_style"] = "Normal"
+    attrs["list"] = {"level": 1, "num_id": "1"}
+    replacement = BookBlock.create(
+        block_id=list_block.block_id,
+        chapter_id=list_block.chapter_id,
+        ordinal=list_block.ordinal,
+        kind=BlockKind.LIST_ITEM,
+        source_text=list_block.source_text,
+        attrs=attrs,
+    )
+    blocks = (*imported.blocks[:2], replacement, *imported.blocks[3:])
+    modified = BookDocument(
+        document_id=imported.document_id,
+        metadata=imported.metadata,
+        chapters=imported.chapters,
+        blocks=blocks,
+    )
+    modified.validate()
+    DocxWriter().write(
+        modified,
+        {block.block_id: block.source_text for block in modified.blocks},
+        destination,
+    )
+    exported = DocxReader().read(destination)
+    assert exported.blocks[2].kind is BlockKind.LIST_ITEM
+    assert exported.blocks[2].attrs["list"]["level"] == 1
+
+
+def test_docx_export_is_atomic_when_translation_is_missing(tmp_path) -> None:
+    source = tmp_path / "book.bn.docx"
+    destination = tmp_path / "book.en.docx"
+    _write_fixture(source)
+    destination.write_bytes(b"existing output")
+    imported = DocxReader().read(source)
+    with pytest.raises(DocxExportError, match="missing translation"):
+        DocxWriter().write(imported, {}, destination)
+    assert destination.read_bytes() == b"existing output"

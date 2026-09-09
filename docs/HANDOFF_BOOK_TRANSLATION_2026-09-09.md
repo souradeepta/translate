@@ -32,6 +32,10 @@ with the design contract in the corresponding `specs` document.
 - Phase 2.1 initial DOCX reader: headings/chapters, paragraphs, quotes, lists,
   scene breaks, inline emphasis/links, metadata retention, and visible unsupported
   feature warnings.
+- Phase 2.2 DOCX exporter: atomic output, private source-ID metadata, semantic
+  round-trip validation, safe unstyled fallback with `inline_style_projection`
+  findings, and direct-numbering reconstruction. GPT-Terra reviewed the exporter
+  and GPT-Luna addressed its findings.
 
 ## Verification
 
@@ -45,6 +49,7 @@ GPT-Luna reported:
 - Local CPU NLLB-CT2 smoke translation: passed
 - Phase 1 book tests: **19 passed** (GPT-Terra gate)
 - Current focused book suite: **33 passed**
+- Current focused book suite after DOCX export: **37 passed**
 
 ## Review findings still open
 
@@ -56,7 +61,7 @@ The highest-priority items are:
 2. Align the Transformers pin in `requirements.txt` with `pyproject.toml`.
 3. Add registry-wide CLI acceptance coverage and direct tests for the IndicTrans2
    tokenizer compatibility shim.
-4. Complete the Phase 2 DOCX export/round-trip validation and adversarial fixtures.
+4. Add adversarial DOCX fixtures and complete the DOCX semantic round-trip gate.
 5. Add the missing Phase 1 acceptance tests for crash boundaries, leases/CAS,
    migrations, approval preservation, JSONL, and separator/source coverage.
 

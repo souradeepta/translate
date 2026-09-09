@@ -6,15 +6,18 @@ from pathlib import Path
 
 import click
 
-from bn_en_translate.book.formats.text import TextReader
+from bn_en_translate.book.formats import reader_for
 from bn_en_translate.book.project import BookProject
 from bn_en_translate.book.schema import BookDocument
 
 
 def _read_source(path: Path) -> BookDocument:
-    if path.suffix.lower() != ".txt":
-        raise click.UsageError("only UTF-8 .txt import is available in this release")
-    return TextReader().read(path)
+    try:
+        return reader_for(path).read(path)
+    except ValueError as exc:
+        if path.suffix.lower() not in {".txt", ".docx"}:
+            raise click.UsageError("only UTF-8 .txt and DOCX .docx import are available") from exc
+        raise click.UsageError(str(exc)) from exc
 
 
 @click.group()
