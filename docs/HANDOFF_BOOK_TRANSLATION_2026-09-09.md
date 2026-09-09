@@ -36,6 +36,9 @@ with the design contract in the corresponding `specs` document.
   round-trip validation, safe unstyled fallback with `inline_style_projection`
   findings, and direct-numbering reconstruction. GPT-Terra reviewed the exporter
   and GPT-Luna addressed its findings.
+- Phase 2.3 EPUB attempt: no implementation landed. GPT-Terra confirmed there was
+  no EPUB patch available to review, so the DOCX boundary remains the verified
+  stopping point and no incomplete EPUB code was committed.
 
 ## Verification
 
@@ -50,6 +53,7 @@ GPT-Luna reported:
 - Phase 1 book tests: **19 passed** (GPT-Terra gate)
 - Current focused book suite: **33 passed**
 - Current focused book suite after DOCX export: **37 passed**
+- EPUB verification: **not started**; no EPUB files or dependencies were added.
 
 ## Review findings still open
 
@@ -62,14 +66,18 @@ The highest-priority items are:
 3. Add registry-wide CLI acceptance coverage and direct tests for the IndicTrans2
    tokenizer compatibility shim.
 4. Add adversarial DOCX fixtures and complete the DOCX semantic round-trip gate.
-5. Add the missing Phase 1 acceptance tests for crash boundaries, leases/CAS,
+5. Implement Phase 2.3 EPUB import/export with bounded XHTML parsing, spine/order
+   preservation, asset retention, and active-content/external-fetch blocking, then
+   obtain the GPT-Terra gate review.
+6. Add the missing Phase 1 acceptance tests for crash boundaries, leases/CAS,
    migrations, approval preservation, JSONL, and separator/source coverage.
 
 ## Delegation state
 
 GPT-Luna implemented the narrow Phase 1 remediation. GPT-Terra approved that scope
-after review. The next handoff should only advance to Phase 2 after the remaining
-stable-ID/immutability coverage is completed and reviewed.
+after review. GPT-Luna implemented DOCX export and GPT-Terra’s DOCX findings were
+addressed. The EPUB delegation produced no patch; the next handoff should restart
+Phase 2.3 with a bounded implementation and an independent Terra review.
 
 ## Repository safety notes
 
