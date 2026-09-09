@@ -36,9 +36,10 @@ with the design contract in the corresponding `specs` document.
   round-trip validation, safe unstyled fallback with `inline_style_projection`
   findings, and direct-numbering reconstruction. GPT-Terra reviewed the exporter
   and GPT-Luna addressed its findings.
-- Phase 2.3 EPUB attempt: no implementation landed. GPT-Terra confirmed there was
-  no EPUB patch available to review, so the DOCX boundary remains the verified
-  stopping point and no incomplete EPUB code was committed.
+- Phase 2.3 EPUB implementation has since appeared in the working tree, but it is
+  not yet committed or Terra-approved. The EPUB optional dependencies are not
+  installed in this environment, so the reader/exporter remains pending focused
+  dependency-backed verification.
 
 ## Verification
 
@@ -53,7 +54,8 @@ GPT-Luna reported:
 - Phase 1 book tests: **19 passed** (GPT-Terra gate)
 - Current focused book suite: **33 passed**
 - Current focused book suite after DOCX export: **37 passed**
-- EPUB verification: **not started**; no EPUB files or dependencies were added.
+- EPUB verification: **pending**; `ebooklib` is unavailable locally and the new EPUB
+  files remain uncommitted until Terra completes its gate.
 
 ## Review findings still open
 
@@ -66,9 +68,8 @@ The highest-priority items are:
 3. Add registry-wide CLI acceptance coverage and direct tests for the IndicTrans2
    tokenizer compatibility shim.
 4. Add adversarial DOCX fixtures and complete the DOCX semantic round-trip gate.
-5. Implement Phase 2.3 EPUB import/export with bounded XHTML parsing, spine/order
-   preservation, asset retention, and active-content/external-fetch blocking, then
-   obtain the GPT-Terra gate review.
+5. Obtain GPT-Terra’s gate review for the landed-but-uncommitted EPUB implementation
+   after installing/declaring its optional dependencies and running focused tests.
 6. Add the missing Phase 1 acceptance tests for crash boundaries, leases/CAS,
    migrations, approval preservation, JSONL, and separator/source coverage.
 
@@ -76,8 +77,8 @@ The highest-priority items are:
 
 GPT-Luna implemented the narrow Phase 1 remediation. GPT-Terra approved that scope
 after review. GPT-Luna implemented DOCX export and GPT-Terra’s DOCX findings were
-addressed. The EPUB delegation produced no patch; the next handoff should restart
-Phase 2.3 with a bounded implementation and an independent Terra review.
+addressed. An EPUB patch is now present but remains uncommitted pending dependency
+availability and Terra’s independent review.
 
 ## Repository safety notes
 
