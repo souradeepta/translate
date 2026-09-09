@@ -26,6 +26,12 @@ with the design contract in the corresponding `specs` document.
   invalidation with approved-output revalidation, CRLF/separator-preserving TXT
   round trips, and packaged SQL migration resources with schema markers and backup
   support. GPT-Terra approved this narrow remediation.
+- Remaining Phase 1 acceptance coverage: deep immutable attributes, stable-ID
+  re-import edits/insertions/ambiguity fail-closed behavior, and JSON/JSONL migration
+  dispatch tests.
+- Phase 2.1 initial DOCX reader: headings/chapters, paragraphs, quotes, lists,
+  scene breaks, inline emphasis/links, metadata retention, and visible unsupported
+  feature warnings.
 
 ## Verification
 
@@ -38,6 +44,7 @@ GPT-Luna reported:
 - Focused compatibility and fixture tests: passed
 - Local CPU NLLB-CT2 smoke translation: passed
 - Phase 1 book tests: **19 passed** (GPT-Terra gate)
+- Current focused book suite: **33 passed**
 
 ## Review findings still open
 
@@ -49,8 +56,7 @@ The highest-priority items are:
 2. Align the Transformers pin in `requirements.txt` with `pyproject.toml`.
 3. Add registry-wide CLI acceptance coverage and direct tests for the IndicTrans2
    tokenizer compatibility shim.
-4. Complete the remaining Phase 1 stable-ID/immutable-schema acceptance coverage,
-   including ambiguous re-import dry runs and full JSONL migration dispatch.
+4. Complete the Phase 2 DOCX export/round-trip validation and adversarial fixtures.
 5. Add the missing Phase 1 acceptance tests for crash boundaries, leases/CAS,
    migrations, approval preservation, JSONL, and separator/source coverage.
 

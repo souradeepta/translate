@@ -68,3 +68,41 @@ def test_document_rejects_missing_or_reordered_block_membership() -> None:
     )
     with pytest.raises(ValueError, match="chapter block IDs"):
         invalid.validate()
+
+
+def test_block_source_attributes_are_deeply_immutable() -> None:
+    attrs = {"format": {"flags": ["keep", "order"]}}
+    block = BookBlock.create(
+        block_id="c0001-b000001",
+        chapter_id="c0001",
+        ordinal=1,
+        kind=BlockKind.PARAGRAPH,
+        source_text="পাঠ।",
+        attrs=attrs,
+    )
+
+    # Freezing must detach nested source metadata from the caller as well as
+    # prevent mutation through the block itself.
+    attrs["format"]["flags"].append("caller-change")
+    assert block.attrs["format"]["flags"] == ("keep", "order")
+    with pytest.raises(TypeError):
+        block.attrs["format"]["new"] = True  # type: ignore[index]
+    with pytest.raises(AttributeError):
+        block.attrs["format"]["flags"].append("block-change")  # type: ignore[attr-defined]
+
+
+def test_block_runs_and_chapter_membership_are_detached_as_tuples() -> None:
+    runs = [InlineRun("পাঠ।")]
+    block = BookBlock.create(
+        block_id="c0001-b000001",
+        chapter_id="c0001",
+        ordinal=1,
+        kind=BlockKind.PARAGRAPH,
+        source_text="পাঠ।",
+        runs=runs,  # type: ignore[arg-type]
+    )
+    runs.append(InlineRun("পরের পাঠ।"))
+    chapter = Chapter("c0001", 1, None, [block.block_id])  # type: ignore[arg-type]
+
+    assert block.runs == (InlineRun("পাঠ।"),)
+    assert chapter.block_ids == (block.block_id,)

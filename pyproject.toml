@@ -36,6 +36,9 @@ monitor = [
     "psutil>=6.0.0",
     "nvidia-ml-py>=12.535.77",
 ]
+book = [
+    "python-docx>=1.1.2,<2",
+]
 dev = [
     "pytest>=8.3.0",
     "pytest-cov>=5.0.0",

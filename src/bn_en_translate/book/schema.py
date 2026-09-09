@@ -49,11 +49,23 @@ class BookMetadata:
     source_language: str = "ben_Beng"
     target_language: str = "eng_Latn"
     source_format: str = "txt"
+    # Format readers retain document-level properties here rather than attaching
+    # them to a particular paragraph. Values are JSON-safe strings so source
+    # records remain portable and reproducible.
+    core_properties: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         for name in ("source_language", "target_language", "source_format"):
             if not isinstance(getattr(self, name), str) or not getattr(self, name):
                 raise ValueError(f"{name} must be a non-empty string")
+        if not isinstance(self.core_properties, Mapping):
+            raise TypeError("core_properties must be a mapping")
+        if any(
+            not isinstance(key, str) or not isinstance(value, str)
+            for key, value in self.core_properties.items()
+        ):
+            raise TypeError("core_properties must contain string keys and values")
+        object.__setattr__(self, "core_properties", _freeze(dict(self.core_properties)))
 
 
 def canonical_text(text: str) -> str:
@@ -70,7 +82,7 @@ def source_hash(text: str, kind: BlockKind, attrs: Mapping[str, Any] | None = No
 
 def _jsonable(value: Any) -> Any:
     """Convert immutable mapping/sequence wrappers back to JSON values."""
-    if isinstance(value, dict) or isinstance(value, MappingProxyType):
+    if isinstance(value, Mapping):
         return {str(key): _jsonable(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):
         return [_jsonable(item) for item in value]
@@ -84,7 +96,7 @@ def jsonable(value: Any) -> Any:
 
 def _freeze(value: Any) -> Any:
     """Recursively freeze JSON-like attributes so source records stay immutable."""
-    if isinstance(value, dict):
+    if isinstance(value, Mapping):
         return MappingProxyType({str(key): _freeze(item) for key, item in value.items()})
     if isinstance(value, list):
         return tuple(_freeze(item) for item in value)

@@ -6,12 +6,13 @@ from collections.abc import Callable
 from pathlib import Path
 
 from bn_en_translate.book.formats.base import DocumentReader, DocumentWriter
+from bn_en_translate.book.formats.docx import DocxReader
 from bn_en_translate.book.formats.text import TextReader, TextWriter
 
 ReaderFactory = Callable[[], DocumentReader]
 WriterFactory = Callable[[], DocumentWriter]
 
-_READERS: dict[str, ReaderFactory] = {".txt": TextReader}
+_READERS: dict[str, ReaderFactory] = {".docx": DocxReader, ".txt": TextReader}
 _WRITERS: dict[str, WriterFactory] = {".txt": TextWriter}
 
 
@@ -47,6 +48,7 @@ def supported_extensions() -> tuple[str, ...]:
 __all__ = [
     "TextReader",
     "TextWriter",
+    "DocxReader",
     "reader_for",
     "register_format",
     "supported_extensions",

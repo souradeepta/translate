@@ -102,6 +102,12 @@ class BookProject:
         """Reconcile an explicit re-import; ambiguity never mutates project files."""
         report, reconciled = reconcile_documents(self.document(), incoming)
         if report.ambiguous:
+            # A dry run is specifically useful for showing a human which source
+            # records need disambiguation.  It must return the report, while a
+            # real import still fails closed before touching either source file
+            # or the state database.
+            if dry_run:
+                return report
             raise ReconciliationError(report)
         if not dry_run:
             write_source_jsonl(reconciled, self.source_path)

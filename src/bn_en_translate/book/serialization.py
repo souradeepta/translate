@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,30 @@ from bn_en_translate.book.schema import (
 SOURCE_JSONL_VERSION = 1
 
 
+def _identity_migration(value: dict[str, Any]) -> dict[str, Any]:
+    """Return a copy of a document already in the current representation."""
+    return dict(value)
+
+
+def _identity_jsonl_migration(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return a copy of JSONL records already in the current representation."""
+    return list(rows)
+
+
+# Keep migrations as an explicit dispatch table even while v1 is the only
+# released schema.  Adding a new representation must add a deliberate function
+# here; accepting an unknown version by accident would make immutable source
+# records impossible to audit.
+_DOCUMENT_MIGRATIONS: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
+    SCHEMA_VERSION: _identity_migration,
+}
+_SOURCE_JSONL_MIGRATIONS: dict[
+    int, Callable[[list[dict[str, Any]]], list[dict[str, Any]]]
+] = {
+    SOURCE_JSONL_VERSION: _identity_jsonl_migration,
+}
+
+
 def migrate_document_dict(value: dict[str, Any]) -> dict[str, Any]:
     """Migrate a serialized document to the current schema.
 
@@ -30,10 +55,23 @@ def migrate_document_dict(value: dict[str, Any]) -> dict[str, Any]:
     version = value.get("schema_version")
     if not isinstance(version, int) or version > SCHEMA_VERSION or version < 1:
         raise ValueError(f"unsupported schema version: {version}")
-    migrated = dict(value)
-    while version < SCHEMA_VERSION:
+    migration = _DOCUMENT_MIGRATIONS.get(version)
+    if migration is None:
         raise ValueError(f"no migration registered for schema version {version}")
-    return migrated
+    return migration(value)
+
+
+def migrate_source_jsonl_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Dispatch versioned JSONL records through an explicit migration table."""
+    if not rows or rows[0].get("record_type") != "header":
+        raise ValueError("source JSONL must begin with a header record")
+    version = rows[0].get("schema_version")
+    if not isinstance(version, int) or version > SOURCE_JSONL_VERSION or version < 1:
+        raise ValueError(f"unsupported source JSONL version: {version}")
+    migration = _SOURCE_JSONL_MIGRATIONS.get(version)
+    if migration is None:
+        raise ValueError(f"no migration registered for source JSONL version {version}")
+    return migration(rows)
 
 
 def document_to_dict(document: BookDocument) -> dict[str, Any]:
@@ -62,7 +100,7 @@ def document_to_dict(document: BookDocument) -> dict[str, Any]:
             for chapter in document.chapters
         ],
         "document_id": document.document_id,
-        "metadata": document.metadata.__dict__,
+        "metadata": jsonable(document.metadata.__dict__),
         "schema_version": document.schema_version,
     }
 
@@ -164,13 +202,11 @@ def document_to_source_jsonl(document: BookDocument) -> str:
 
 def document_from_source_jsonl(value: str) -> BookDocument:
     """Parse versioned source JSONL and validate all immutable source records."""
-    rows = [json.loads(line) for line in value.splitlines() if line.strip()]
-    if not rows or rows[0].get("record_type") != "header":
-        raise ValueError("source JSONL must begin with a header record")
+    parsed = [json.loads(line) for line in value.splitlines() if line.strip()]
+    if any(not isinstance(row, dict) for row in parsed):
+        raise ValueError("source JSONL records must be objects")
+    rows = migrate_source_jsonl_rows(parsed)
     header = rows[0]
-    version = header.get("schema_version")
-    if not isinstance(version, int) or version != SOURCE_JSONL_VERSION:
-        raise ValueError(f"unsupported source JSONL version: {header.get('schema_version')}")
     if any(row.get("record_type") != "block" for row in rows[1:]):
         raise ValueError("source JSONL contains an unknown record type")
     blocks = tuple(
