@@ -7,13 +7,14 @@ from pathlib import Path
 
 from bn_en_translate.book.formats.base import DocumentReader, DocumentWriter
 from bn_en_translate.book.formats.docx import DocxReader, DocxWriter
+from bn_en_translate.book.formats.epub import EpubReader, EpubWriter
 from bn_en_translate.book.formats.text import TextReader, TextWriter
 
 ReaderFactory = Callable[[], DocumentReader]
 WriterFactory = Callable[[], DocumentWriter]
 
-_READERS: dict[str, ReaderFactory] = {".docx": DocxReader, ".txt": TextReader}
-_WRITERS: dict[str, WriterFactory] = {".docx": DocxWriter, ".txt": TextWriter}
+_READERS: dict[str, ReaderFactory] = {".docx": DocxReader, ".epub": EpubReader, ".txt": TextReader}
+_WRITERS: dict[str, WriterFactory] = {".docx": DocxWriter, ".epub": EpubWriter, ".txt": TextWriter}
 
 
 def register_format(extension: str, *, reader: ReaderFactory, writer: WriterFactory) -> None:
@@ -50,6 +51,8 @@ __all__ = [
     "TextWriter",
     "DocxReader",
     "DocxWriter",
+    "EpubReader",
+    "EpubWriter",
     "reader_for",
     "register_format",
     "supported_extensions",

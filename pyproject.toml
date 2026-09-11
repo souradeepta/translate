@@ -39,6 +39,10 @@ monitor = [
 book = [
     "python-docx>=1.1.2,<2",
 ]
+epub = [
+    "ebooklib>=0.18,<1",
+    "beautifulsoup4>=4.12,<5",
+]
 dev = [
     "pytest>=8.3.0",
     "pytest-cov>=5.0.0",
