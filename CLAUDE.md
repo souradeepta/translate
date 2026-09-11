@@ -2,6 +2,9 @@
 
 ## Quick Resume (read this first in any new session)
 
+Read `MEMORY.md` immediately after this section for the verified book-translation
+continuity state and repository-safety boundaries.
+
 ```bash
 source .venv/bin/activate && export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH
 make test          # 294 tests, ~27s — confirms env is working
@@ -21,6 +24,8 @@ make papers        # regenerate figures + compile all 4 PDFs
 - `corpus/` ✅ 90-sentence built-in + 9,829 Samanantar pairs (train/val/test splits)
 - `paper/pdf/` — run `make papers` to rebuild all 4 PDFs (tectonic, no sudo needed)
 - All 294 unit/integration tests passing
+- Book translation/EPUB state: safe EPUB import/export is delivered in `0d12370` and
+  `e9bd55c`; see `MEMORY.md` and the dated handoff for current verification details.
 - **PyTorch 2.7.0+cu128** — GPU training FULLY UNLOCKED (6/6 sm_120 probes pass)
 - LoRA fine-tune done: 2.46h, 3 epochs, eval_loss 1.992, post-FT BLEU 0.17 (open-domain) — export `models/nllb-600M-finetuned-ct2/` deleted 2026-07-08 (failed experiment; metrics live in runs.db)
 - Papers: `paper/ieee_paper.tex`, `paper/survey_paper.tex`, `paper/ieee_transactions_paper.tex`, `paper/acm_paper.tex`

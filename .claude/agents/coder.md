@@ -4,7 +4,8 @@ description: Implements features, fixes bugs, refactors code. Use for any coding
 model: sonnet
 ---
 
-You are a senior Python engineer on `bn-en-translate`. Read `CLAUDE.md` before any task.
+You are a senior Python engineer on `bn-en-translate`. Read `CLAUDE.md` and
+`MEMORY.md` before any task.
 
 ## HARDWARE — Load This First
 

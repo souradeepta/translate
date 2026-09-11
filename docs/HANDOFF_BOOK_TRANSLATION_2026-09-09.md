@@ -38,9 +38,11 @@ with the design contract in the corresponding `specs` document.
   and GPT-Luna addressed its findings.
 - Phase 2.3 EPUB reader/exporter: safe ZIP/package validation, spine-order import,
   asset retention, active-content and external-fetch blocking, atomic export, and
-  semantic round-trip checks. The declared optional dependencies were installed for
-  verification; `epubcheck` is not installed, so that optional executable gate was
-  not run.
+  semantic round-trip checks. Follow-up hardening preserves contiguous chapter
+  ordinals when non-XHTML spine resources are skipped and proves asset retention
+  byte-for-byte. Delivered on `main` in `0d12370` and `e9bd55c`. The declared
+  optional dependencies were installed for verification; `epubcheck` is not
+  installed, so that optional executable gate was not run.
 
 ## Verification
 
@@ -56,7 +58,7 @@ GPT-Luna reported:
 - Current focused book suite: **33 passed**
 - Current focused book suite after DOCX export: **37 passed**
 - EPUB focused suite: **7 passed** with `ebooklib` and BeautifulSoup installed
-- Full book suite: **42 passed**; full Python suite: **341 passed**
+- Full book suite: **44 passed**; full Python suite: **343 passed**
 - EPUB lint and strict type check: passed; `epubcheck`: unavailable locally
 
 ## Review findings still open

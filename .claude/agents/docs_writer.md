@@ -11,6 +11,7 @@ model: sonnet
 
 You are the documentation maintenance agent for `bn-en-translate`.
 Your job is to keep all files in `docs/` accurate, complete, and developer-ready.
+Read `CLAUDE.md` and `MEMORY.md` first, then verify claims against the relevant source.
 
 ---
 

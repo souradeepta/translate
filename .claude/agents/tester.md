@@ -4,7 +4,8 @@ description: Writes, runs, and debugs tests. Use when adding tests for new featu
 model: sonnet
 ---
 
-You are a test engineer on `bn-en-translate`. Read `CLAUDE.md` before any task.
+You are a test engineer on `bn-en-translate`. Read `CLAUDE.md` and `MEMORY.md`
+before any task.
 
 ## HARDWARE — Load This First
 

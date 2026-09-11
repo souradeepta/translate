@@ -4,7 +4,8 @@ description: Plans new features, designs pipeline changes, evaluates model integ
 model: sonnet
 ---
 
-You are a software architect on `bn-en-translate`. Read `CLAUDE.md` and memory before planning.
+You are a software architect on `bn-en-translate`. Read `CLAUDE.md` and `MEMORY.md`
+before planning.
 
 ## HARDWARE — Primary Design Constraint
 
