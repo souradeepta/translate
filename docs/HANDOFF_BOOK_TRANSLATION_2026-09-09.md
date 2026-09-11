@@ -55,7 +55,7 @@ GPT-Luna reported:
 - Phase 1 book tests: **19 passed** (GPT-Terra gate)
 - Current focused book suite: **33 passed**
 - Current focused book suite after DOCX export: **37 passed**
-- EPUB focused suite: **5 passed** with `ebooklib` and BeautifulSoup installed
+- EPUB focused suite: **7 passed** with `ebooklib` and BeautifulSoup installed
 - Full book suite: **42 passed**; full Python suite: **341 passed**
 - EPUB lint and strict type check: passed; `epubcheck`: unavailable locally
 

@@ -15,7 +15,13 @@ import bn_en_translate.book.formats.epub as epub
 from bn_en_translate.book.schema import BlockKind
 
 
-def _write_epub(path: Path, chapter: str, *, extra: dict[str, bytes] | None = None) -> None:
+def _write_epub(
+    path: Path,
+    chapter: str,
+    *,
+    extra: dict[str, bytes] | None = None,
+    opf: bytes | None = None,
+) -> None:
     entries = {
         "mimetype": b"application/epub+zip",
         "META-INF/container.xml": (
@@ -23,7 +29,7 @@ def _write_epub(path: Path, chapter: str, *, extra: dict[str, bytes] | None = No
             b'xmlns="urn:oasis:names:tc:opendocument:xmlns:container">'
             b'<rootfiles><rootfile full-path="OEBPS/content.opf"/></rootfiles></container>'
         ),
-        "OEBPS/content.opf": (
+        "OEBPS/content.opf": opf or (
             b'<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0">'
             b'<metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Fixture</dc:title>'
             b"</metadata><manifest><item id=\"chapter\" href=\"chapter.xhtml\" "
@@ -120,3 +126,44 @@ def test_epubcheck_is_invoked_when_installed(
     output = tmp_path / "output.epub"
     epub._run_epubcheck(output)
     assert checked == [["/usr/bin/epubcheck", str(output)]]
+
+
+def test_assets_are_retained_byte_for_byte(tmp_path: Path) -> None:
+    source = tmp_path / "source.epub"
+    target = tmp_path / "target.epub"
+    image = b"\x89PNG\r\n\x1a\nunchanged-image-bytes"
+    _write_epub(
+        source,
+        "<html><body><h1>Chapter</h1><p>Text</p></body></html>",
+        extra={"OEBPS/images/cover.png": image},
+    )
+    document = epub.EpubReader().read(source)
+    epub.EpubWriter().write(
+        document, {block.block_id: block.source_text for block in document.blocks}, target
+    )
+    with zipfile.ZipFile(target) as package:
+        assert package.read("OEBPS/images/cover.png") == image
+
+
+def test_skipped_non_xhtml_spine_item_does_not_leave_chapter_ordinal_gap(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source.epub"
+    opf = (
+        b'<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0">'
+        b'<metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Fixture</dc:title>'
+        b'</metadata><manifest><item id="audio" href="sound.mp3" media-type="audio/mpeg"/>'
+        b'<item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>'
+        b'</manifest><spine><itemref idref="audio"/><itemref idref="chapter"/>'
+        b"</spine></package>"
+    )
+    _write_epub(
+        source,
+        "<html><body><h1>Chapter</h1></body></html>",
+        extra={"OEBPS/sound.mp3": b"audio"},
+        opf=opf,
+    )
+    with pytest.warns(epub.EpubImportWarning, match="non-XHTML"):
+        document = epub.EpubReader().read(source)
+    assert [chapter.ordinal for chapter in document.chapters] == [1]
+    assert [block.chapter_id for block in document.blocks] == ["c0001"]

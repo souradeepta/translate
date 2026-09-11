@@ -529,7 +529,10 @@ class EpubReader:
                 ]
                 blocks: list[BookBlock] = []
                 chapters: list[Chapter] = []
-                for chapter_ordinal, item_id in enumerate(spine_ids, start=1):
+                # Spine entries can include non-linear or non-XHTML resources.
+                # Chapter ordinals describe imported chapters, so they must not
+                # inherit gaps from skipped spine entries.
+                for item_id in spine_ids:
                     if not item_id or item_id not in manifest:
                         raise EpubImportError(f"EPUB spine references unknown item: {item_id}")
                     item_href, media_type, _properties = manifest[item_id]
@@ -540,6 +543,7 @@ class EpubReader:
                             stacklevel=2,
                         )
                         continue
+                    chapter_ordinal = len(chapters) + 1
                     chapter_blocks = _item_blocks(
                         package.read(item_href), item_href, chapter_ordinal, len(blocks) + 1
                     )
