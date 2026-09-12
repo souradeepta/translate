@@ -43,6 +43,9 @@ with the design contract in the corresponding `specs` document.
   byte-for-byte. Delivered on `main` in `0d12370` and `e9bd55c`. The declared
   optional dependencies were installed for verification; `epubcheck` is not
   installed, so that optional executable gate was not run.
+- Phase 3.1 translator capabilities: immutable backend request profiles, conservative
+  pre-load token accounting, exact loaded-tokenizer counting where available, and
+  registry-wide profile coverage.
 
 ## Verification
 
@@ -60,6 +63,8 @@ GPT-Luna reported:
 - EPUB focused suite: **7 passed** with `ebooklib` and BeautifulSoup installed
 - Full book suite: **44 passed**; full Python suite: **343 passed**
 - EPUB lint and strict type check: passed; `epubcheck`: unavailable locally
+- Capability contract and its focused interface tests: passed
+- Current full Python suite: **346 passed**
 
 ## Review findings still open
 
@@ -76,6 +81,8 @@ The highest-priority items are:
    run `epubcheck` as an additional release check where it is available.
 6. Add the missing Phase 1 acceptance tests for crash boundaries, leases/CAS,
    migrations, approval preservation, JSONL, and separator/source coverage.
+7. Implement Phase 3.2 tokenizer-aware book segmentation, then independently
+   property-test lossless coverage and budget enforcement.
 
 ## Delegation state
 

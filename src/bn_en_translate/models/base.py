@@ -3,6 +3,15 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
+from dataclasses import replace
+from typing import Any
+
+from bn_en_translate.models.capabilities import (
+    CONSERVATIVE_CAPABILITIES,
+    TranslatorCapabilities,
+    capabilities_for_adapter,
+)
 
 
 class TranslatorBase(ABC):
@@ -18,6 +27,8 @@ class TranslatorBase(ABC):
 
     DEFAULT_BEAM_SIZE: int = 4
     """Per-model default beam size. Subclasses override this."""
+
+    CAPABILITIES: TranslatorCapabilities = CONSERVATIVE_CAPABILITIES
 
     def __init__(self) -> None:
         self._loaded: bool = False
@@ -40,6 +51,59 @@ class TranslatorBase(ABC):
         if config is not None and getattr(config, "beam_size", None) is not None:
             return int(config.beam_size)
         return self.DEFAULT_BEAM_SIZE
+
+    @property
+    def capabilities(self) -> TranslatorCapabilities:
+        """Return backend limits and feature support without loading a model.
+
+        Tokenizer-backed adapters expose exact counting after ``load()``.  Before
+        then, their declared limit remains useful but callers must use the
+        conservative estimate returned by :meth:`count_input_tokens`.
+        """
+        declared = capabilities_for_adapter(type(self).__name__)
+        if self.CAPABILITIES is not CONSERVATIVE_CAPABILITIES:
+            declared = self.CAPABILITIES
+        if self._token_counter() is not None and not declared.token_count_is_exact:
+            return replace(declared, token_count_is_exact=True)
+        return declared
+
+    def count_input_tokens(self, text: str) -> int:
+        """Count request input tokens, conservatively when no tokenizer is loaded."""
+        if not isinstance(text, str):
+            raise TypeError("text must be a string")
+        counter = self._token_counter()
+        if counter is not None:
+            return counter(text)
+        # A tokenizer with byte fallback can emit more than one token for a
+        # Unicode code point.  UTF-8 byte length is deliberately pessimistic but
+        # guarantees a planning caller will not treat the old character/4 guess
+        # as an exact limit.
+        return max(1, len(text.encode("utf-8")))
+
+    def _token_counter(self) -> Callable[[str], int] | None:
+        """Return an exact loaded-tokenizer counter for common HF/CT2 adapters."""
+        tokenizer: Any = getattr(self, "_tokenizer", None)
+        if tokenizer is not None:
+            def count_with_hf(value: str) -> int:
+                encoded = tokenizer(value, add_special_tokens=True, truncation=False)
+                token_ids = encoded["input_ids"]
+                return len(token_ids)
+            return count_with_hf
+        sentencepiece: Any = getattr(self, "_sp", None)
+        if sentencepiece is not None:
+            # CT2 NLLB/IndicTrans2 requests append EOS and the source language.
+            return lambda value: len(sentencepiece.encode(value, out_type=str)) + 2
+        sentencepiece = getattr(self, "_sp_src", None)
+        if sentencepiece is not None:
+            return lambda value: len(sentencepiece.encode(value, out_type=str))
+        processor: Any = getattr(self, "_processor", None)
+        tokenizer = getattr(processor, "tokenizer", None)
+        if tokenizer is not None:
+            def count_with_processor(value: str) -> int:
+                encoded = tokenizer(value, add_special_tokens=True, truncation=False)
+                return len(encoded["input_ids"])
+            return count_with_processor
+        return None
 
     def translate(self, texts: list[str], src_lang: str, tgt_lang: str) -> list[str]:
         """

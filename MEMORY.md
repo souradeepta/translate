@@ -18,16 +18,19 @@ the detailed delivery record.
 - EPUB regression coverage includes unchanged emphasis/link retention, changed-text
   fallback findings, notes and unsupported structures, external CSS blocking,
   byte-for-byte asset retention, and non-XHTML spine-item ordinal handling.
-- Latest verified commands: full Python suite **343 passed**; book suite **44
-  passed**; EPUB suite **7 passed**; EPUB lint and strict type check passed.
+- Phase 3.1 capability contract is delivered: every registered adapter exposes
+  immutable request limits/features, uses a byte-conservative fallback before load,
+  and switches to exact loaded tokenizer counting where available.
+- Latest verified commands: full Python suite **346 passed**; book suite **44
+  passed**; EPUB suite **7 passed**; lint and strict type checks passed.
 
 ## Current follow-up work
 
 - EPUB still needs an independent review and an `epubcheck` release run where that
   executable is available.
-- The next planned implementation unit is Phase 3.1: translator capabilities and
-  tokenizer-aware token counting. Do not invent model limits; ground them in adapter
-  behavior and tests.
+- The next planned implementation unit is Phase 3.2: tokenizer-aware book
+  segmentation. Preserve every source span exactly once and reserve context/output
+  tokens before selecting source text.
 - Preserve the user-owned untracked `inputs/` directory and unrelated
   `.claude/settings.local.json` changes. Do not stage or commit either unless the
   user explicitly asks.
