@@ -1,0 +1,8 @@
+[model: milmmt-46-4b]
+[load_seconds: 142.9]
+[translate_seconds: 53.0]
+[input_chars: 10049]
+[chars_per_sec: 189.7]
+[flores200_bleu: 68.5]
+[flores200_chrf: 81.8]
+------------------------------------------------------------

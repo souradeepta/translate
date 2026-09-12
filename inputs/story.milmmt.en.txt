@@ -1,0 +1,188 @@
+[model: milmmt-46-1b]
+[load_seconds: 22.9]
+[translate_seconds: 23.5]
+[input_chars: 10049]
+[chars_per_sec: 427.8]
+[flores200_bleu: 65.2]
+[flores200_chrf: 79.6]
+------------------------------------------------------------
+
+For "A chilling ghost story"
+
+Story - That Comes in the Dark (Just Story - 1703 words)
+
+Author - Shankar Biswas
+
+Manam was returning home alone from tuition. Her mind is quite confused. A fight broke out with the stupid Gita. The girl is such a stubborn one, she can't be tolerated.
+
+The tutor went out to answer a math problem for them, and on hearing his wife's call, he found two girls and two boys sitting in the front room of his house. The other three, apart from the human, are residents of the same area.
+
+Man was doing the math with his mind.
+
+Suddenly, from the side, Geeta said – “Do you walk alone on that creepy road every evening? See, one day a ghost will come down from the top of a tree and press on your neck,” and her face looked like a ghost.
+
+Hearing this, the boy laughed and the other girl put her hand over her mouth and giggled.
+
+“Your crooked road!” - as if the road was made by a human father. It is the only paved road in the village.
+
+How can Gita forget that the only way to the railway station from the village is this one. Gita has to walk on this road if necessary.
+
+The man, angry, said, “Don’t make a ghost. Have you seen a ghost?”
+
+“Have you seen God?”
+
+The human was stunned; he didn't even think the question would come.
+
+“God is one, and ghosts are millions, billions. Don’t talk like a fool.”
+
+Who is the one who talks nonsense to me? Who the hell told you that? You know, we have thirty-five crore gods and goddesses. We all consider them to be gods.
+
+He said to not lose hope – “God is there to make us good”
+
+“There are such ghosts to ruin us. You go alone, one night the ghost will come and bite your neck on that road.”
+
+He said, pulling his tongue out of his mouth and turned his eyes to look as if he had died.
+
+The other two laughed and opened their mouths, laughing so hard that the teacher from the next room shouted, “Hey, don’t make a scene, just do the math.”
+
+The human inside was so excited that he wanted to smack Gita in the face with a punch. But even as a boy, he could have gotten away with it, and as a girl, touching her body—‘Nayib Nivy Ch’. Losing a fight and touching a girl is tantamount to cowardice.
+
+Why did this crazy girl get admitted to her tutoring class? She's pretty good at studying, not as good as a human, mind you. But she always says some weird things behind people's backs, especially when human is the target of her stupid talk. She's smart too.
+
+The human controlled his anger, kept quiet, and solved the math problem with his head bowed. The teacher came a little later. The matter was settled there.
+
+*********
+
+Since then, my mind has been racing. Every time I walk down the street, I keep hearing that argument. And I also remember Gita’s comment – ‘One day, a ghost will haunt you on that street.’
+
+The thought of that made my heart pound. For how many days had the human been walking this almost-dark path, never once thinking of an accident? He always returned home in a good mood.
+
+Today, I keep thinking about that scary Gita, afraid that something terrible will happen. Man looked around, then looked at the forest of palm trees. It's hard to see in the darkness from a distance, but he heard the sound. He knew it was a slight movement of the leaves, a faint sound of a storm in the wind. Man has heard that sound almost every day.
+
+No, everything is the same, I didn't notice any changes anywhere.
+
+But the mind still wasn't at peace. A knot of fear was tugging at my chest.
+
+**********
+
+There are two distinct groups in this village. The affluent or original residents of the village live in the inner part of the village. The new and economically weaker people live on the outskirts of the village. The main population in this area is made up of people from East Bengal or families who were once tenants in the city and later bought cheap land outside the city to build houses in search of their own homes.
+
+The older people have kept the land. Many have moved to the city to live in the land. Although their grandparents and parents are happy in the village, they no longer like living there.
+
+Some families have survived by not letting their sons and daughters focus on education. Some may work in very low-paid jobs, while others have no work at all. They are making a living from the money they earn from surviving on their land.
+
+Electricity has been around for a long time in the interior. But the people living outside the village have always worked with hurricane lights, kerosene, and kerosene lamps.
+
+Before the elections, the leaders promise every time that this area will definitely be electrified. But after the elections, they forget. Therefore, the area remains dark at night.
+
+Between these two parts is a vast field and some agricultural land. In one corner of the field, a group of palm trees stands tall. Everyone in the village says that a ghost lives in the top of that palm tree. Even when two or three shepherd dogs go to graze near the palm forest during the day, no one dares to set foot there after dusk. It is also said that thieves divide up the loot by sitting on the ground of the palm tree. As for why they do not catch the thieves, no one makes any fuss about it.
+
+A few years ago, a man went to the palm grove to look for a cow that had not returned home. He saw a skeleton rising from the palm tree, with his eyes like burning fireballs. The man left the cow and ran away. The news spread through the village.
+
+The paved road has gone through the heart of this area. It is on that road that the human is walking.
+
+In the village, there is a school in the old area, in the middle of the village. The teachers are also residents of the old area. The only light in this empty area, where there is no human settlement on either side of the road, is the moonlight and the light from the battery-filled lanterns. Very few people venture into this area at night. They have reduced the need to go out at night in the village life.
+
+However, the railway line has passed through the new area. It used to be outside the village, but now it has moved inside. This low-middle-class neighborhood has grown around the railway station and the surrounding shops. Ricks and auto rickshaws run between the two areas. People use them to get around at night if necessary.
+
+********
+
+The old man was walking back from the tuition in the dark street. He knows this road well; he goes to school here every day and walks through it. His school is about a kilometer away. The villagers have no objection to walking this short distance.
+
+Dark dusk has descended, though it has not yet left the place to the night. A pale curved moon has risen in the sky. A group of gray-black clouds floats in the sky with a slow pace, appearing dark as a group of prehistoric animals is crawling. The herds are now hiding their faces behind the clouds, and when the clouds move, they will be seen. The lights are glowing brightly in the distant shadows of the houses.
+
+On one side of the path where humans were walking, there was a grove of palm trees, and on the other side was a rice field. As night fell, the sounds of a lion could be heard here. Mothers would put their children to sleep, saying, “Be quiet, or the lion will come and bite you.”
+
+People do not believe in ghosts. Even if they hear people talk about ghosts, they have not met anyone who has seen a ghost with their own eyes.
+
+From childhood, he saw his father speak rationally. He explained many cases of seeing ghosts to humans. He said, "If you hear something strange, don't believe it immediately; first, verify it."
+
+But at the same time, humans have also learned that, just as many people believe, it is not necessary to dismiss superstition as mere superstition just because it is believed by a few people.
+
+**********
+
+But today my mind is filled with anxiety, fear has taken hold of me.
+
+A cold wind came and blew the human's hair out of his head. Where did the wind come from? The leaves of the palm tree made a loud noise. In the half-darkness, the human saw a palm tree move repeatedly. His chest jumped up and down. His body shook with a shiver.
+
+Suddenly, he heard footsteps behind him; someone was running. He looked back and saw a little boy running. He stood up. The boy looked like he was in fourth or fifth grade.
+
+The child stopped, then walked for a while. He came running very fast.
+
+“Hey, what happened? Why were you running?
+
+“Aren’t you afraid to walk alone on this dark road? I ran over to see you from a distance, and I’ll walk with you.”
+
+Why did you come out in the dark like this?
+
+“Look, Dipo said they were going to their house in the afternoon to eat the big mangoes. But her mother broke the mango so late that the evening came while they were eating the fried mangoes,”
+
+The two started walking again on the almost deserted road, as much as the moonlight would allow. The road is not regularly mowed, so it is broken here and there. One has to walk carefully, or there is a risk of falling. Still, this is the main road in the village.
+
+The child's strength of mind increased a lot after he found it.
+
+The child asked – “You went to read, didn’t you?”
+
+“Yes”
+
+“Go every day?”
+
+“No, two days a week”
+
+“Walk this dark road again?”
+
+“Tell me what to do, there’s no more electric lights on the street”
+
+“Do you not fear ghosts?”
+
+The man smiled, "Do you have it?"
+
+“Yes”
+
+“Have you seen a ghost?”
+
+“No, but the elders say so”
+
+“What do you say?”
+
+“Didn’t you hear? There are ghosts on the top of the palm trees; they make a whooshing sound when they see a single person and scare them.”
+
+“The poor people sit on the branches of the trees and spread their legs.”
+
+And
+
+“At night, the spirits cast their nets in the pond and catch fish. There is no sign of the nets being cast during the day.”
+
+Now Manum was really laughing out loud.
+
+“How do you know all the things you mentioned?”
+
+“Okay, tell me about the palm tree thing”
+
+The leaves of the date palm are very tough. Even after the leaves die and become dry, they remain attached to the tree for a long time. When the leaves rustle in the wind, they make a rustling sound.
+
+But why do the shepherds sit on the branches of the trees?
+
+The explanation is also quite simple: the mother or the peacocks may have hung the cloth on a tree branch to dry, then forgot to take it off in the evening. That is what moves in the wind and in the night, as if someone is wearing a saree and sitting on a tree branch, swinging their legs. I have seen it myself.
+
+“Wow, you have a lot of courage. But what about catching a ghost?”
+
+“Yes, it’s a bit complicated; you can’t see it right away. But I saw it all of a sudden one day”
+
+“Have you ever seen a ghost cast a spell?”
+
+“Oh no, don’t listen to the whole thing. The fish don’t get good air in the muddy water of the pond; then the small, maybe a few thousand, fish, float together in one place. It happens even during the day. Then someone goes by the pond, what they see, the fish are scared and dive together, and a sudden noise is heard. People think it’s a ghost casting a net.”
+
+“You know so much?”
+
+Suddenly the child stood in front of the man, in a serious voice, saying – “Wait”
+
+The human is a bit surprised, is the kid?
+
+The child grew taller in front of her eyes, and continued to grow. The human's head rose, and grew even taller, becoming five feet taller than her. Gradually, her face began to change, from a plump body to a black, skin-covered skeleton. That too began to change, becoming a bone-like skeleton. The human's face turned upward in fear. The white bones became even whiter in the moonlight. Only the face and the corners of the nose were black, and the eyes were two glowing fragments of a tumor.
+
+The ghost laughed out loud and smiled.
+
+Then he asked – “What explanation will you give this time?”
+
+9920903316

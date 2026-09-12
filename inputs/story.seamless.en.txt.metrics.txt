@@ -1,0 +1,9 @@
+[model: seamless-medium]
+[load_seconds: 38.2]
+[translate_seconds: 88.2]
+[input_chars: 10049]
+[chars_per_sec: 114.0]
+[flores200_bleu: 67.0]
+[flores200_chrf: 80.2]
+------------------------------------------------------------
+
